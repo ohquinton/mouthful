@@ -22,11 +22,28 @@ const FALLBACK = 'en-US';
 const offered = (id: string) => SPEECH_LOCALES.some((l) => l.id === id);
 
 /**
+ * The region subtag of a BCP 47 tag: "zh-Hans-SG" → "SG", "en-IN-u-ca-gregory" → "IN".
+ * It comes after the language and an optional 4-letter script, and before any variants or
+ * extensions (which start at a one-letter subtag, so "-u-ca-…" is never read as Canada).
+ */
+function regionOf(tag: string): string | undefined {
+  const parts = tag.split(/[-_]/);
+  for (let i = 1; i < parts.length; i++) {
+    const p = parts[i];
+    if (p.length <= 1) return undefined; // extension or private use: no region before it
+    if (/^[A-Za-z]{2}$/.test(p)) return p.toUpperCase();
+    if (/^[A-Za-z]{4}$/.test(p) && i === 1) continue; // script, e.g. Hans, Latn
+    return undefined; // a variant or numeric region (419): nothing we offer
+  }
+  return undefined;
+}
+
+/**
  * The English variety for the phone's region, e.g. "hi-IN" → "en-IN". Passages are always
  * English, so the phone's language doesn't matter, only where it's set to.
  */
 export function defaultSpeechLocale(deviceLocale: string | undefined): string {
-  const region = (deviceLocale ?? '').replace('_', '-').split('-')[1]?.toUpperCase();
+  const region = regionOf(deviceLocale ?? '');
   const id = region ? `en-${region}` : FALLBACK;
   return offered(id) ? id : FALLBACK;
 }

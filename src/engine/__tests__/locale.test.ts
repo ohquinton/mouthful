@@ -35,7 +35,20 @@ describe('speech recognition locale', () => {
     expect(defaultSpeechLocale('fr-CA')).toBe('en-CA');
   });
 
+  it('reads the region past a script subtag, so a Singapore or Serbia phone isn’t mistaken for no region', () => {
+    expect(defaultSpeechLocale('zh-Hans-SG')).toBe('en-SG');
+    expect(defaultSpeechLocale('zh_Hant_SG')).toBe('en-SG');
+    expect(defaultSpeechLocale('sr-Latn-RS')).toBe('en-US'); // Serbia has no offered English, so the fallback
+    expect(defaultSpeechLocale('en-Latn-IN')).toBe('en-IN');
+  });
+
+  it('ignores extensions and variants that come after the region', () => {
+    expect(defaultSpeechLocale('en-IN-u-ca-gregory')).toBe('en-IN');
+    expect(defaultSpeechLocale('en-GB-oxendict')).toBe('en-GB');
+  });
+
   it('falls back to US English for unknown regions or no region', () => {
+    expect(defaultSpeechLocale('zh-Hans')).toBe('en-US');
     expect(defaultSpeechLocale('pt-BR')).toBe('en-US');
     expect(defaultSpeechLocale('en')).toBe('en-US');
     expect(defaultSpeechLocale('')).toBe('en-US');
