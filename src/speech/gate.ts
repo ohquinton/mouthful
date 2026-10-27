@@ -118,6 +118,25 @@ export function restartDelayMs(recentHiccups: number): number {
   return Math.min(recentHiccups, HICCUP_LIMIT) * 250;
 }
 
+/**
+ * Whether "Carry on" (useListener's resume()) makes sense after a session ended with this
+ * error code. A call, Siri, a lost connection or a mic that stopped may come back, so the read
+ * so far is worth keeping. A variety the phone can't listen for won't, so that only offers
+ * Try again (after picking another English).
+ */
+export function canResumeAfter(code: string | null | undefined): boolean {
+  return code === 'interrupted' || code === 'repeated-failure' || code === 'network' || code === 'restart-failed';
+}
+
+/**
+ * The key a recogniser error is counted under in tester diagnostics. The library's codes are
+ * short kebab-case words ('network', 'audio-capture'); anything else could carry native text,
+ * so it's counted as 'other'. Diagnostics never hold words.
+ */
+export function diagnosticCode(code: unknown): string {
+  return typeof code === 'string' && /^[a-z][a-z-]{0,31}$/.test(code) ? code : 'other';
+}
+
 /** The state once the recogniser has ended and won't restart: never hide why it stopped. */
 export function stateAfterEnd(current: ListenerState): ListenerState {
   switch (current) {

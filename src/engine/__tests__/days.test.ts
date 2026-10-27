@@ -1,34 +1,33 @@
 // Calendar days, not 24-hour blocks: a week that crosses a clock change is still 7 days.
-// These run in Toronto time so the spring-forward night (8 March 2026) is really in the gap,
-// whatever zone the machine running jest is set to.
+// The zone comes from test/globalSetup.js (MOUTHFUL_TEST_TZ, default America/Toronto); setting
+// process.env.TZ in here wouldn't reach Node's clock. The clock-change tests only mean something
+// in a zone with Toronto's 2026 transitions, so elsewhere (CI also runs Asia/Kolkata, no DST)
+// they're skipped by name and the plain calendar tests still run.
 import { daysBetween } from '../days';
 import { retestDue, SessionLike } from '../progress';
 
-const ORIGINAL_TZ = process.env.TZ;
-beforeAll(() => {
-  process.env.TZ = 'America/Toronto';
-});
-afterAll(() => {
-  if (ORIGINAL_TZ === undefined) delete process.env.TZ;
-  else process.env.TZ = ORIGINAL_TZ;
-});
-
 const at = (month: number, day: number, h = 0, m = 0) => new Date(2026, month - 1, day, h, m).getTime();
+
+const hours = (a: number, b: number) => (b - a) / 3_600_000;
+/** Spring-forward 8 March and fall-back 1 November 2026, as in Toronto. */
+const hasTorontoDst = hours(at(3, 2, 0, 30), at(3, 9, 0, 30)) === 167 && hours(at(10, 29, 23, 30), at(11, 5, 23, 30)) === 169;
+const dstIt = hasTorontoDst ? it : it.skip;
+const dstName = (name: string) => (hasTorontoDst ? name : `${name} (skipped: no Toronto DST in ${process.env.TZ ?? 'this zone'})`);
 
 function session(id: string, t: number): SessionLike {
   return { id, passageId: 'baseline', at: t, wpm: 150, fillersPerMin: 0, accuracy: 95, score: 80 };
 }
 
 describe('daysBetween', () => {
-  it('really is testing a clock change: this week is an hour short', () => {
-    expect((at(3, 9, 0, 30) - at(3, 2, 0, 30)) / 3_600_000).toBe(167);
+  dstIt(dstName('really is testing a clock change: this week is an hour short'), () => {
+    expect(hours(at(3, 2, 0, 30), at(3, 9, 0, 30))).toBe(167);
   });
 
-  it('counts a week across spring-forward as 7 days', () => {
+  dstIt(dstName('counts a week across spring-forward as 7 days'), () => {
     expect(daysBetween(at(3, 2, 0, 30), at(3, 9, 0, 30))).toBe(7);
   });
 
-  it('counts a week across fall-back as 7 days', () => {
+  dstIt(dstName('counts a week across fall-back as 7 days'), () => {
     expect(daysBetween(at(10, 29, 23, 30), at(11, 5, 23, 30))).toBe(7);
   });
 
@@ -44,14 +43,14 @@ describe('daysBetween', () => {
 });
 
 describe('re-tests across a clock change', () => {
-  it('asks for the day 7 re-test a week after Day 1, even when the clocks went forward', () => {
+  dstIt(dstName('asks for the day 7 re-test a week after Day 1, even when the clocks went forward'), () => {
     const day1 = session('day1', at(3, 2, 0, 30));
     expect(retestDue([day1], 'day1', at(3, 9, 0, 30))).toBe(7);
   });
 
-  it('counts a re-test read early on day 7 as done', () => {
+  dstIt(dstName('counts a re-test read early on day 7 as done, though that week was an hour short'), () => {
     const day1 = session('day1', at(3, 2, 0, 30));
-    const retest = session('r', at(3, 9, 0, 10)); // day 7 on the calendar, 23 h 40 m short of 7 × 24 h
+    const retest = session('r', at(3, 9, 0, 10)); // day 7 on the calendar, 1 h 20 m short of 7 × 24 h in Toronto
     expect(retestDue([day1, retest], 'day1', at(3, 9, 12))).toBeUndefined();
   });
 

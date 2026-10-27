@@ -39,6 +39,7 @@ jest.mock('react', () => {
 
 const native = {
   onDevice: true,
+  locales: [] as string[], // what getSupportedLocales() lists; [] means "no list" (unknown)
   permission: Promise.resolve({ granted: true }) as Promise<{ granted: boolean }>,
   start: jest.fn(),
   stop: jest.fn(),
@@ -50,7 +51,7 @@ jest.mock('expo-speech-recognition', () => ({
     isRecognitionAvailable: () => true,
     supportsOnDeviceRecognition: () => native.onDevice,
     supportsRecording: () => false,
-    getSupportedLocales: async () => ({ locales: [], installedLocales: [] }),
+    getSupportedLocales: async () => ({ locales: native.locales, installedLocales: [] }),
     requestPermissionsAsync: () => native.permission,
     start: (o: unknown) => native.start(o),
     stop: () => native.stop(),
@@ -127,6 +128,7 @@ async function listening(opts: Opts = {}) {
 beforeEach(() => {
   jest.useFakeTimers();
   native.onDevice = true;
+  native.locales = [];
   native.permission = Promise.resolve({ granted: true });
   native.start.mockClear();
   native.stop.mockClear();
@@ -167,7 +169,17 @@ describe('routine recogniser glitches never show "stopped listening" over a work
     expect(native.start).toHaveBeenCalledTimes(starts); // no more restarts
   });
 
-  it('says it’s the connection when the network keeps failing', async () => {
+  it('tells the reader to check the mic when glitches keep coming and nothing is heard', async () => {
+    const h = await listening();
+    for (let i = 0; i < 3; i++) {
+      emit('error', { error: 'audio-capture', message: '' });
+      emit('end');
+      jest.advanceTimersByTime(1000);
+    }
+    expect(h.l.error).toBe('It tried 3 times and didn’t catch any words. Check nothing is covering the mic, or switch off headphones, then try again.');
+  });
+
+  it('says the speech service couldn’t be reached when the network keeps failing, with its own code', async () => {
     const h = await listening();
     for (let i = 0; i < 3; i++) {
       emit('error', { error: 'network', message: '' });
@@ -175,7 +187,38 @@ describe('routine recogniser glitches never show "stopped listening" over a work
       jest.advanceTimersByTime(1000);
     }
     expect(h.l.state).toBe('error');
-    expect(h.l.error).toMatch(/connection/i);
+    expect(h.l.errorCode).toBe('network');
+    expect(h.l.error).toBe('The speech service couldn’t be reached. When you’re back online, tap Try again.');
+    expectContract(h.l);
+  });
+
+  it('does not give up on 3 glitches spread over more than 10 seconds', async () => {
+    const h = await listening();
+    for (let i = 0; i < 3; i++) {
+      emit('error', { error: 'audio-capture', message: '' });
+      emit('end');
+      jest.advanceTimersByTime(6000); // 0 s, 6 s, 12 s: never 3 inside one 10 s window
+      emit('start');
+    }
+    expect(h.l.state).toBe('listening');
+    expect(native.start).toHaveBeenCalledTimes(4);
+    expectContract(h.l);
+  });
+
+  it('starts counting again after a word is heard between glitches', async () => {
+    const h = await listening();
+    const glitch = () => {
+      emit('error', { error: 'busy', message: '' });
+      emit('end');
+      jest.advanceTimersByTime(1000);
+      emit('start');
+    };
+    glitch();
+    glitch();
+    heard('the night');
+    glitch(); // third glitch inside 10 s, but only the first since words came through
+    expect(h.l.state).toBe('listening');
+    expectContract(h.l);
   });
 
   it('does not give up while words are still coming through between glitches', async () => {
@@ -200,6 +243,7 @@ describe('errors that really stop listening', () => {
     jest.advanceTimersByTime(1000);
     expect(h.l.state).toBe('error');
     expect(h.l.errorCode).toBe('language-not-supported');
+    expect(h.l.error).toBe('This phone can’t listen for Filipino English. Choose a different English in the You tab.');
     expect(native.start).toHaveBeenCalledTimes(1);
     expectContract(h.l);
   });
@@ -318,5 +362,224 @@ describe('server consent follows the profile, with a one-session yes from MicGat
     await flush();
     expect(h.l.state).toBe('needs-consent');
     expect(native.start).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('needs-consent is never hidden by the recogniser ending', () => {
+  it('stays needs-consent when an end arrives after the gate asked', async () => {
+    native.onDevice = false;
+    const h = mount({ allowServer: false });
+    await h.l.start();
+    await flush();
+    expect(h.l.state).toBe('needs-consent');
+    emit('end');
+    expect(h.l.state).toBe('needs-consent');
+    expectContract(h.l);
+  });
+
+  it('stays needs-consent when consent went away mid-read and the recogniser then ends', async () => {
+    native.onDevice = false;
+    const h = await listening({ allowServer: true });
+    h.rerender({ allowServer: false });
+    emit('end');
+    jest.advanceTimersByTime(1000);
+    expect(h.l.state).toBe('needs-consent');
+    emit('end');
+    jest.advanceTimersByTime(1000);
+    expect(h.l.state).toBe('needs-consent');
+    expect(native.start).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Carry on after a call, Siri or an alarm keeps the read so far', () => {
+  async function interruptedAfter(text: string, opts: Opts = {}) {
+    const h = await listening(opts);
+    emit('result', { isFinal: true, results: [{ transcript: text }] });
+    emit('error', { error: 'interrupted', message: '' });
+    emit('end');
+    return h;
+  }
+
+  it('offers Carry on after an interruption, and resuming keeps the transcript', async () => {
+    const h = await interruptedAfter('the night shift');
+    expect(h.l.canResume).toBe(true);
+    await h.l.resume();
+    await flush();
+    emit('start');
+    expect(native.start).toHaveBeenCalledTimes(2);
+    expect(h.l.state).toBe('listening');
+    expect(h.l.canResume).toBe(false);
+    expectContract(h.l);
+    expect(h.l.transcript).toBe('the night shift');
+    heard('began at');
+    expect(h.l.transcript).toBe('the night shift began at');
+  });
+
+  it('keeps words that were still interim when the call came in', async () => {
+    const h = await listening();
+    heard('the night');
+    emit('error', { error: 'interrupted', message: '' }); // no end event before Carry on
+    await h.l.resume();
+    await flush();
+    emit('start');
+    heard('shift began');
+    expect(h.l.transcript).toBe('the night shift began');
+  });
+
+  it.each(['network', 'repeated-failure'] as const)('offers Carry on after a %s give-up', async (code) => {
+    const h = await listening();
+    heard('the night');
+    for (let i = 0; i < 3; i++) {
+      emit('error', { error: code === 'network' ? 'network' : 'audio-capture', message: '' });
+      emit('end');
+      jest.advanceTimersByTime(1000);
+    }
+    expect(h.l.errorCode).toBe(code);
+    expect(h.l.canResume).toBe(true);
+    await h.l.resume();
+    await flush();
+    emit('start');
+    expect(h.l.state).toBe('listening');
+    expect(h.l.transcript).toBe('the night');
+  });
+
+  it('says Carry on picks up where you were when a restart fails', async () => {
+    const h = await listening();
+    native.start.mockImplementationOnce(() => {
+      throw new Error('busy');
+    });
+    emit('end');
+    jest.advanceTimersByTime(1000);
+    expect(h.l.errorCode).toBe('restart-failed');
+    expect(h.l.error).toBe('The phone stopped listening. Tap Carry on to pick up where you were.');
+    expect(h.l.canResume).toBe(true);
+  });
+
+  it('does not offer Carry on when the phone can’t listen for that English', async () => {
+    const h = await listening({ lang: 'en-PH' });
+    heard('the night');
+    emit('error', { error: 'language-not-supported', message: '' });
+    emit('end');
+    expect(h.l.canResume).toBe(false);
+    await h.l.resume();
+    await flush();
+    expect(native.start).toHaveBeenCalledTimes(1);
+    expect(h.l.state).toBe('error');
+    expect(h.l.errorCode).toBe('language-not-supported');
+  });
+
+  it('does nothing while listening normally', async () => {
+    const h = await listening();
+    expect(h.l.canResume).toBe(false);
+    await h.l.resume();
+    await flush();
+    expect(native.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not turn the mic on after the screen has closed', async () => {
+    const h = await interruptedAfter('the night shift');
+    const resume = h.l.resume;
+    h.unmount();
+    await resume();
+    await flush();
+    expect(native.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not turn the mic on if the screen closes during the permission prompt', async () => {
+    const h = await interruptedAfter('the night shift');
+    let grant!: (v: { granted: boolean }) => void;
+    native.permission = new Promise((r) => (grant = r));
+    const resumed = h.l.resume();
+    await flush();
+    h.unmount();
+    grant({ granted: true });
+    await resumed;
+    await flush();
+    expect(native.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks for consent again instead of using the server, then still keeps the read', async () => {
+    native.onDevice = false;
+    const h = mount({ allowServer: false });
+    await h.l.start({ allowServer: true }); // MicGate's yes, for that session only
+    await flush();
+    emit('start');
+    emit('result', { isFinal: true, results: [{ transcript: 'the night shift' }] });
+    emit('error', { error: 'interrupted', message: '' });
+    emit('end');
+    await h.l.resume();
+    await flush();
+    expect(native.start).toHaveBeenCalledTimes(1); // not the server without a yes
+    expect(h.l.state).toBe('needs-consent');
+    expectContract(h.l);
+    await h.l.start({ allowServer: true }); // MicGate again
+    await flush();
+    emit('start');
+    expect(native.start).toHaveBeenCalledTimes(2);
+    expect(h.l.transcript).toBe('the night shift');
+  });
+
+  it('re-checks the language on resume and stops for good if the phone can’t do it', async () => {
+    native.onDevice = false;
+    const h = await interruptedAfter('the night shift', { allowServer: true, lang: 'en-PH' });
+    native.locales = ['en-US'];
+    await h.l.resume();
+    await flush();
+    expect(native.start).toHaveBeenCalledTimes(1);
+    expect(h.l.errorCode).toBe('language-not-supported');
+    expect(h.l.canResume).toBe(false);
+  });
+
+  it('Try again after an interruption still starts a fresh read', async () => {
+    const h = await interruptedAfter('the night shift');
+    await h.l.start();
+    await flush();
+    emit('start');
+    expect(h.l.transcript).toBe('');
+  });
+});
+
+describe('per-session diagnostics for tester mode: codes and counts only', () => {
+  it('counts quiet restarts and glitches by code', async () => {
+    const h = await listening();
+    emit('error', { error: 'network', message: 'Error Domain=kAFAssistantErrorDomain Code=1101' });
+    emit('end');
+    jest.advanceTimersByTime(1000);
+    emit('error', { error: 'audio-capture', message: 'route change' });
+    emit('end');
+    jest.advanceTimersByTime(1000);
+    emit('end'); // iOS ending on its own: a restart, not a glitch
+    jest.advanceTimersByTime(1000);
+    expect(h.l.getDiagnostics()).toEqual({ restarts: 3, glitches: { network: 1, 'audio-capture': 1 } });
+  });
+
+  it('never keeps native message text, even if a code looks like free text', async () => {
+    const h = await listening();
+    emit('error', { error: 'Something odd: the night shift', message: 'the night shift' });
+    expect(h.l.getDiagnostics().glitches).toEqual({ other: 1 });
+  });
+
+  it('keeps counting across Carry on, and starts at zero for a new attempt', async () => {
+    const h = await listening();
+    emit('error', { error: 'busy', message: '' });
+    emit('end');
+    jest.advanceTimersByTime(1000);
+    emit('error', { error: 'interrupted', message: '' });
+    await h.l.resume();
+    await flush();
+    expect(h.l.getDiagnostics()).toEqual({ restarts: 1, glitches: { busy: 1 } });
+    h.l.reset();
+    expect(h.l.getDiagnostics()).toEqual({ restarts: 0, glitches: {} });
+    emit('error', { error: 'busy', message: '' });
+    await h.l.start();
+    await flush();
+    expect(h.l.getDiagnostics()).toEqual({ restarts: 0, glitches: {} });
+  });
+
+  it('hands back a copy, so a saved snapshot doesn’t change later', async () => {
+    const h = await listening();
+    const before = h.l.getDiagnostics();
+    emit('error', { error: 'busy', message: '' });
+    expect(before).toEqual({ restarts: 0, glitches: {} });
   });
 });
