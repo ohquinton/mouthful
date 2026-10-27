@@ -4,6 +4,7 @@
  */
 module.exports = {
   testEnvironment: 'node',
+  globalSetup: '<rootDir>/test/globalSetup.js',
   roots: ['<rootDir>/src/engine', '<rootDir>/test'],
   moduleNameMapper: {
     '^@react-native-async-storage/async-storage$': '<rootDir>/test/asyncStorageMock.js',
