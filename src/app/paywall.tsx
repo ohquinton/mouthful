@@ -1,10 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { TARGET_WPM } from '../engine/score';
-import { PlanId, PLANS, purchase, PurchaseCancelled, PurchasesNotConfigured, restore, storePrices } from '../purchases';
+import {
+  PlanId,
+  PLANS,
+  purchase,
+  PurchaseCancelled,
+  PurchasesNotConfigured,
+  restore,
+  storePrices,
+  trialOffer,
+  type TrialOffer,
+} from '../purchases';
 import { track } from '../analytics';
 import { BRAND } from '../brand';
 import { useProfile } from '../store/profile';
@@ -29,11 +39,14 @@ export default function Paywall() {
   const [error, setError] = useState<string | null>(null);
   const [day1, setDay1] = useState<number | undefined>(wpmParam ? Number(wpmParam) : undefined);
   const [prices, setPrices] = useState<Partial<Record<PlanId, string>>>({});
+  // Only the store knows whether this person can still get the free trial. Until it says yes, no trial copy.
+  const [trial, setTrial] = useState<TrialOffer>(null);
 
   useEffect(() => {
     update({ paywallSeen: true });
     track('paywall_view', { feature: feature ?? 'main', has_day1: !!day1 });
     storePrices().then((p) => p && setPrices(p));
+    trialOffer('annual').then(setTrial);
     if (!day1 && profile.baselineSessionId) getSession(profile.baselineSessionId).then((s) => s && setDay1(s.wpm));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -69,6 +82,10 @@ export default function Paywall() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const openLink = (url: string) => {
+    Linking.openURL(url).catch(() => setError(`Couldn’t open the link. It’s ${url}`));
   };
 
   const onRestore = async () => {
@@ -116,7 +133,9 @@ export default function Paywall() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={[styles.planTitle, { color: colors.ink }]}>{id === 'annual' ? 'Annual' : 'Monthly'}</Text>
-                <Text style={[styles.planNote, { color: id === 'annual' ? colors.good : colors.muted }]}>{p.note}</Text>
+                <Text style={[styles.planNote, { color: id === 'annual' && trial ? colors.good : colors.muted }]}>
+                  {id === 'annual' && trial ? `${trial.days}-day free trial` : p.note}
+                </Text>
               </View>
               <Text style={[styles.planPrice, { color: colors.ink }]}>
                 {prices[id] ?? p.price}
@@ -128,12 +147,23 @@ export default function Paywall() {
       </ScrollView>
 
       {error && <Text style={[styles.error, { color: colors.stumble }]}>{error}</Text>}
-      <PrimaryButton label={plan === 'annual' ? 'Start free trial' : 'Subscribe'} busy={busy} onPress={buy} />
+      <PrimaryButton label={plan === 'annual' && trial ? 'Start free trial' : 'Subscribe'} busy={busy} onPress={buy} />
       <Text style={[styles.fine, { color: colors.muted }]}>
         {plan === 'annual'
-          ? `Free for 7 days, then ${prices.annual ?? PLANS.annual.price} a year. Cancel anytime in Settings before the trial ends.`
-          : `${prices.monthly ?? PLANS.monthly.price} a month. Cancel anytime in Settings.`}
+          ? trial
+            ? `Free for ${trial.days} days, then ${prices.annual ?? PLANS.annual.price} a year. Renews automatically. Cancel anytime in Settings before the trial ends.`
+            : `${prices.annual ?? PLANS.annual.price} a year. Renews automatically. Cancel anytime in Settings.`
+          : `${prices.monthly ?? PLANS.monthly.price} a month. Renews automatically. Cancel anytime in Settings.`}
       </Text>
+      <View style={styles.legal}>
+        <Pressable onPress={() => openLink(BRAND.privacyUrl)} hitSlop={8} accessibilityRole="link">
+          <Text style={[styles.legalLink, { color: colors.muted }]}>Privacy Policy</Text>
+        </Pressable>
+        <Text style={[styles.legalDot, { color: colors.muted }]}>·</Text>
+        <Pressable onPress={() => openLink(BRAND.termsUrl)} hitSlop={8} accessibilityRole="link">
+          <Text style={[styles.legalLink, { color: colors.muted }]}>Terms of Use</Text>
+        </Pressable>
+      </View>
       <View style={styles.footer}>
         <Pressable onPress={close} hitSlop={8}>
           <Text style={[styles.footerLink, { color: colors.ink }]}>Not now</Text>
@@ -163,6 +193,9 @@ const styles = StyleSheet.create({
   planPer: { fontSize: 14, fontWeight: '500' },
   error: { fontSize: 14, textAlign: 'center' },
   fine: { fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  legal: { flexDirection: 'row', justifyContent: 'center', gap: space(1) },
+  legalLink: { fontSize: 13, textDecorationLine: 'underline' },
+  legalDot: { fontSize: 13 },
   footer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: space(1) },
   footerLink: { fontSize: 15, fontWeight: '600', paddingVertical: 8 },
 });
