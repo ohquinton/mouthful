@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Mouthful",
+    "slug": "mouthful",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ca.quintonjackson.mouthful"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "ca.quintonjackson.mouthful"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Mouthful listens while you practise so it can follow along. Recordings are only kept on this phone, and only if you choose.",
+          "speechRecognitionPermission": "Mouthful turns your speech into text to follow your reading and check your pace and fillers."
+        }
+      ],
+      "expo-splash-screen",
+      "expo-notifications",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Mouthful listens while you practise so it can follow along."
+        }
+      ]
+    ],
+    "scheme": "mouthful",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

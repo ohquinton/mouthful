@@ -1,0 +1,202 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
+import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
+import { recordingsFolderUri } from '../store/recordings';
+
+export type ListenerState =
+  | 'idle'
+  | 'asking'
+  | 'denied'
+  | 'unavailable'
+  | 'needs-consent' // phone can't transcribe offline and the user hasn't agreed to the server service yet
+  | 'listening'
+  | 'stopped'
+  | 'error';
+
+type Options = {
+  /** User agreed to use the platform's server recognition when on-device isn't supported. */
+  allowServer?: boolean;
+  /** Save this session's audio to the phone (Day 1 and re-tests only, with consent). */
+  record?: boolean;
+  /** Emit a 0–1 voice level for the voice ribbon. */
+  onLevel?: (level: number) => void;
+};
+
+/** True when speech never leaves the device. */
+export function onDeviceSupported(): boolean {
+  try {
+    return Platform.OS !== 'web' && ExpoSpeechRecognitionModule.supportsOnDeviceRecognition();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Wraps the native recogniser for a session.
+ * - Privacy: uses on-device recognition when the phone supports it. If it doesn't, it stops
+ *   and reports `needs-consent` until the user agrees to the platform's server service.
+ * - Keeps finished segments plus the live (interim) segment as one transcript.
+ * - Restarts quietly if iOS ends recognition mid-session (silence, ~1 min limits).
+ */
+export function useListener(hints: string[], opts: Options = {}) {
+  const [state, setState] = useState<ListenerState>('idle');
+  const [transcript, setTranscript] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [lastHeardAt, setLastHeardAt] = useState(0);
+  const [recordings, setRecordings] = useState<string[]>([]);
+
+  const finalText = useRef('');
+  const interim = useRef('');
+  const wanted = useRef(false); // true while the session should keep listening
+  const optsRef = useRef(opts);
+  optsRef.current = opts;
+  const recordingsRef = useRef<string[]>([]);
+  const endWaiters = useRef<((uris: string[]) => void)[]>([]);
+
+  const publish = () => setTranscript(`${finalText.current} ${interim.current}`.trim());
+
+  const startNative = useCallback(() => {
+    const onDevice = onDeviceSupported();
+    let canRecord = false;
+    try {
+      canRecord = !!optsRef.current.record && Platform.OS !== 'web' && ExpoSpeechRecognitionModule.supportsRecording();
+    } catch {}
+    const folderUri = canRecord ? recordingsFolderUri() : undefined;
+    ExpoSpeechRecognitionModule.start({
+      lang: 'en-US',
+      interimResults: true,
+      continuous: true,
+      maxAlternatives: 1,
+      addsPunctuation: false,
+      requiresOnDeviceRecognition: onDevice,
+      contextualStrings: hints.slice(0, 50),
+      iosTaskHint: 'dictation',
+      volumeChangeEventOptions: { enabled: !!optsRef.current.onLevel, intervalMillis: 120 },
+      recordingOptions: canRecord && folderUri ? { persist: true, outputDirectory: folderUri } : undefined,
+    });
+  }, [hints]);
+
+  useSpeechRecognitionEvent('start', () => setState('listening'));
+
+  useSpeechRecognitionEvent('volumechange', (e) => {
+    // -2..10 from the recogniser; below 0 is silence. Map to 0..1.
+    const level = Math.max(0, Math.min(1, e.value / 10));
+    optsRef.current.onLevel?.(level);
+  });
+
+  useSpeechRecognitionEvent('audioend', (e) => {
+    if (e.uri) {
+      recordingsRef.current = [...recordingsRef.current, e.uri];
+      setRecordings(recordingsRef.current);
+    }
+  });
+
+  useSpeechRecognitionEvent('result', (e) => {
+    const text = e.results[0]?.transcript ?? '';
+    if (e.isFinal) {
+      finalText.current = `${finalText.current} ${text}`.trim();
+      interim.current = '';
+    } else {
+      interim.current = text;
+    }
+    setLastHeardAt(Date.now());
+    publish();
+  });
+
+  useSpeechRecognitionEvent('end', () => {
+    optsRef.current.onLevel?.(0);
+    // Keep whatever was mid-flight when the recogniser stopped.
+    if (interim.current) {
+      finalText.current = `${finalText.current} ${interim.current}`.trim();
+      interim.current = '';
+      publish();
+    }
+    if (wanted.current) {
+      try {
+        startNative();
+      } catch {
+        setState('error');
+      }
+    } else {
+      setState('stopped');
+      const waiters = endWaiters.current;
+      endWaiters.current = [];
+      waiters.forEach((w) => w(recordingsRef.current));
+    }
+  });
+
+  useSpeechRecognitionEvent('error', (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      wanted.current = false;
+      setState('denied');
+      return;
+    }
+    // "no-speech" and "aborted" are routine; the end handler restarts if needed.
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    setError(e.message || e.error);
+  });
+
+  const start = useCallback(async (override?: { allowServer?: boolean }) => {
+    if (!ExpoSpeechRecognitionModule.isRecognitionAvailable()) {
+      setState('unavailable');
+      return;
+    }
+    if (!onDeviceSupported() && !(override?.allowServer ?? optsRef.current.allowServer)) {
+      setState('needs-consent');
+      return;
+    }
+    setState('asking');
+    const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!perm.granted) {
+      setState('denied');
+      return;
+    }
+    finalText.current = '';
+    interim.current = '';
+    setTranscript('');
+    setRecordings([]);
+    recordingsRef.current = [];
+    setError(null);
+    wanted.current = true;
+    setLastHeardAt(Date.now());
+    startNative();
+  }, [startNative]);
+
+  /** Forget the last attempt straight away, so a retry starts from a clean page. */
+  const reset = useCallback(() => {
+    finalText.current = '';
+    interim.current = '';
+    setTranscript('');
+    setRecordings([]);
+    recordingsRef.current = [];
+    setError(null);
+  }, []);
+
+  /** Stops listening. Resolves with any saved recordings once the recogniser has finished (max 1.5 s). */
+  const stop = useCallback((): Promise<string[]> => {
+    wanted.current = false;
+    const done = new Promise<string[]>((resolve) => {
+      endWaiters.current.push(resolve);
+      setTimeout(() => resolve(recordingsRef.current), 1500);
+    });
+    try {
+      ExpoSpeechRecognitionModule.stop();
+    } catch {}
+    return done;
+  }, []);
+
+  useEffect(
+    () => () => {
+      wanted.current = false;
+      ExpoSpeechRecognitionModule.abort();
+    },
+    [],
+  );
+
+  return { state, transcript, error, lastHeardAt, recordings, start, stop, reset };
+}
+
+/** The words for the consent screen, per platform. */
+export function serverServiceName(): string {
+  return Platform.OS === 'ios' ? 'Apple’s speech service' : Platform.OS === 'android' ? 'Google’s speech service' : 'your browser’s speech service';
+}
