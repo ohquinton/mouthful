@@ -6,6 +6,7 @@ Mouthful helps adults rehearse what they'll actually say at work (an interview a
 
 Formerly "Cadence" (renamed: at least two speaking apps already use that name). The product name lives in `src/brand.ts` only.
 
+Strategy, bets and open decisions: `STRATEGY.md` (read it before planning work).
 Product spec (written under the old name): https://claude.ai/artifact/7y5W1WCUVuHKrXsHjLFAmC
 Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the versioned docs.
 
