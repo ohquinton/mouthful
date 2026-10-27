@@ -16,6 +16,7 @@ import { track } from '../analytics';
 import { listenLocale, useListener } from '../speech/useListener';
 import { useVoiceLevel, VoiceRibbon } from '../components/VoiceRibbon';
 import { MicGate, gateStates } from '../components/MicGate';
+import { ListenError } from '../components/ListenError';
 import { fonts, space, useColors } from '../theme';
 
 type Item = { word: string; sentence?: string };
@@ -60,8 +61,9 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
   const [heardFrom, setHeardFrom] = useState(0); // ignore transcript from before this step
   const [cleared, setCleared] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [done, setDone] = useState(false);
   const score = useRef({ alone: 0, sentence: 0 });
+  // Set when the drill ends: a copy of the score for the done screen (render can't read the ref).
+  const [result, setResult] = useState<{ alone: number; sentence: number } | null>(null);
 
   useEffect(() => {
     listener.start();
@@ -73,9 +75,9 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
 
   const item = items[i];
   const info = item ? DICTIONARY.get(item.word.toLowerCase()) : undefined;
-  const tokens = tokenise(listener.transcript).slice(heardFrom);
+  const tokens = useMemo(() => tokenise(listener.transcript).slice(heardFrom), [listener.transcript, heardFrom]);
   const sentenceWords = useMemo(() => preparePassage(item?.sentence ?? ''), [item]);
-  const sentenceAlign = useMemo(() => align(sentenceWords, tokens), [sentenceWords, tokens.join(' ')]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sentenceAlign = useMemo(() => align(sentenceWords, tokens), [sentenceWords, tokens]);
   const targetIdx = sentenceWords.findIndex((w) => w.key === normalise(item?.word ?? ''));
 
   const aloneHit = phase === 'alone' && !!item && !speaking && tokens.some((t) => wordsMatch(t, normalise(item.word)));
@@ -92,7 +94,7 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
     setPhase('alone');
     if (i + 1 >= items.length) {
       listener.stop();
-      setDone(true);
+      setResult({ ...score.current });
       track('drill_complete', { words: items.length, alone: score.current.alone, sentence: score.current.sentence });
       onFinished();
     } else setI(i + 1);
@@ -102,6 +104,8 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
   useEffect(() => {
     if (cleared || !item) return;
     if (aloneHit) {
+      // Reacting to what the recogniser heard; `cleared` guards it so it records once per step.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the hit comes from the recogniser (outside React), and the guard stops a cascade
       setCleared(true);
       score.current.alone++;
       recordWords([{ word: item.word, clean: true, where: 'alone' }]);
@@ -139,22 +143,34 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
+  // The recogniser reported a problem (e.g. it can't listen for this English). Shown whatever the state.
+  const failed = listener.error !== null || listener.state === 'error';
+
+  /** Start listening again from a clean page. The step stays where it was. */
+  const retryListening = async () => {
+    if (listener.state === 'listening') await listener.stop();
+    listener.reset();
+    setHeardFrom(0); // the transcript starts empty again
+    setCleared(false);
+    listener.start();
+  };
+
   if (gateStates.includes(listener.state)) {
     return <MicGate state={listener.state} onAllowed={() => listener.start({ allowServer: true })} />;
   }
 
-  if (done) {
+  if (result) {
     const withSentence = items.filter((x) => x.sentence).length;
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg }]}>
         <Animated.View entering={FadeInDown.duration(300)} style={styles.doneWrap}>
           <Ionicons name="checkmark-circle" size={56} color={colors.good} />
           <Text style={[styles.doneTitle, { color: colors.ink }]}>
-            {score.current.alone} of {items.length} heard clearly
+            {result.alone} of {items.length} heard clearly
           </Text>
           {withSentence > 0 && (
             <Text style={[styles.doneSub, { color: colors.ink }]}>
-              {score.current.sentence} of {withSentence} said cleanly in a sentence
+              {result.sentence} of {withSentence} said cleanly in a sentence
             </Text>
           )}
           <Text style={[styles.hint, { color: colors.muted, textAlign: 'center' }]}>
@@ -223,20 +239,26 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
         <Text style={[styles.hearText, { color: colors.ink }]}>{speaking ? 'Playing…' : 'Hear it'}</Text>
       </Pressable>
 
-      <View style={styles.listenRow}>
-        <VoiceRibbon level={level} color={cleared ? colors.good : colors.signal} />
-        <Text style={[styles.hint, { color: cleared ? colors.good : colors.muted }]}>
-          {cleared
-            ? phase === 'sentence' && !sentenceClean
-              ? 'Almost. The word didn’t come through clearly.'
-              : 'Heard clearly.'
-            : speaking
-              ? ' '
-              : listener.state === 'listening'
-                ? stepLabel
-                : 'Getting the mic ready…'}
-        </Text>
-      </View>
+      {failed ? (
+        <View style={styles.errorWrap}>
+          <ListenError message={listener.error} onRetry={retryListening} />
+        </View>
+      ) : (
+        <View style={styles.listenRow}>
+          <VoiceRibbon level={level} color={cleared ? colors.good : colors.signal} />
+          <Text style={[styles.hint, { color: cleared ? colors.good : colors.muted }]}>
+            {cleared
+              ? phase === 'sentence' && !sentenceClean
+                ? 'Almost. The word didn’t come through clearly.'
+                : 'Heard clearly.'
+              : speaking
+                ? ' '
+                : listener.state === 'listening'
+                  ? stepLabel
+                  : 'Getting the mic ready…'}
+          </Text>
+        </View>
+      )}
 
       <View style={[styles.bottom, { bottom: insetsBottom + 32 }]}>
         <Pressable onPress={advance} hitSlop={8}>
@@ -261,6 +283,7 @@ const styles = StyleSheet.create({
   hear: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 999, paddingHorizontal: space(2), paddingVertical: 10, minHeight: 44 },
   hearText: { fontSize: 16, fontWeight: '600' },
   listenRow: { alignItems: 'center', gap: space(1) },
+  errorWrap: { alignSelf: 'stretch', maxWidth: 420 },
   hint: { fontSize: 17 },
   fine: { fontSize: 13, lineHeight: 18, textAlign: 'center', maxWidth: 320 },
   bottom: { position: 'absolute', left: space(4), right: space(4), flexDirection: 'row', justifyContent: 'space-between' },

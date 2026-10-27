@@ -14,6 +14,7 @@ import { useProfile } from '../store/profile';
 import { track } from '../analytics';
 import { useVoiceLevel, VoiceRibbon } from '../components/VoiceRibbon';
 import { MicGate, gateStates } from '../components/MicGate';
+import { ListenError } from '../components/ListenError';
 import { fonts, space, useColors } from '../theme';
 
 const LIMIT_S = 60;
@@ -28,7 +29,7 @@ export default function FreeTalk() {
   const listener = useListener([], { allowServer: profile.allowServerRecognition, onLevel, lang: listenLocale(profile.speechLang) });
   const [shuffle, setShuffle] = useState(0);
   const [startedAt, setStartedAt] = useState(0);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [notice, setNotice] = useState<string | null>(null);
   const pauses = useRef(0);
   const prevHeard = useRef(0);
@@ -42,6 +43,8 @@ export default function FreeTalk() {
   const wpm = wordsPerMinute(counts.spoken, seconds);
   const zoneNow = paceZone(wpm, 'talking');
   const left = Math.max(0, Math.ceil(LIMIT_S - seconds));
+  // The recogniser reported a problem (e.g. it can't listen for this English). Shown whatever the state.
+  const failed = listener.error !== null || listener.state === 'error';
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 250);
@@ -57,7 +60,7 @@ export default function FreeTalk() {
 
   /** Every attempt (first go, retry, after consent) starts from a clean slate. */
   const begin = async (override?: { allowServer?: boolean }) => {
-    const isRetry = notice !== null;
+    const isRetry = notice !== null || failed;
     listener.reset();
     pauses.current = 0;
     prevHeard.current = 0;
@@ -67,6 +70,15 @@ export default function FreeTalk() {
     await listener.start(override);
     setStartedAt(Date.now());
     track(isRetry ? 'session_retry' : 'session_start', { kind: 'talk', pace: 'talking', where: 'talk' });
+  };
+
+  /** Try again after a recogniser error: make sure the mic is off first, then start clean. */
+  const retryAfterError = async () => {
+    if (listener.state === 'listening') {
+      done.current = true; // so the 60 s limit can't save this attempt while it stops
+      await listener.stop();
+    }
+    begin();
   };
 
   const finish = async () => {
@@ -107,6 +119,8 @@ export default function FreeTalk() {
   };
 
   useEffect(() => {
+    // finish() is guarded by done.current, so this runs it once when the minute is up.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the time limit is an effect of the clock; finish() sets state only after awaiting the recogniser
     if (running && seconds >= LIMIT_S) finish();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, seconds]);
@@ -178,12 +192,16 @@ export default function FreeTalk() {
             )}
           </View>
         )}
-        {notice && <Text style={[styles.notice, { color: colors.stumble }]}>{notice}</Text>}
+        {failed ? (
+          <ListenError message={listener.error} onRetry={retryAfterError} />
+        ) : (
+          notice && <Text style={[styles.notice, { color: colors.stumble }]}>{notice}</Text>
+        )}
       </View>
 
       {running ? (
         <PrimaryButton label="Finish" onPress={finish} />
-      ) : (
+      ) : failed ? null : (
         <PrimaryButton
           label={listener.state === 'asking' ? 'Getting the mic ready…' : notice ? 'Try again' : 'Start talking'}
           onPress={() => begin()}
