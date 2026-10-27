@@ -29,6 +29,9 @@ export default function FreeTalk() {
   const listener = useListener([], { allowServer: profile.allowServerRecognition, onLevel, lang: listenLocale(profile.speechLang) });
   const [shuffle, setShuffle] = useState(0);
   const [startedAt, setStartedAt] = useState(0);
+  // When the error card came up mid-talk (e.g. iOS `interrupted` by a call), 0 otherwise. The
+  // minute stands still from then, so the 60 s limit and live pace don't run during the call.
+  const [pausedAt, setPausedAt] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [notice, setNotice] = useState<string | null>(null);
   const pauses = useRef(0);
@@ -39,7 +42,7 @@ export default function FreeTalk() {
   const heard = useMemo(() => tokenise(listener.transcript), [listener.transcript]);
   const counts = useMemo(() => countFreeTalk(heard), [heard]);
   const running = startedAt > 0 && listener.state === 'listening';
-  const seconds = startedAt ? (now - startedAt) / 1000 : 0;
+  const seconds = startedAt ? ((pausedAt || now) - startedAt) / 1000 : 0;
   const wpm = wordsPerMinute(counts.spoken, seconds);
   const zoneNow = paceZone(wpm, 'talking');
   const left = Math.max(0, Math.ceil(LIMIT_S - seconds));
@@ -59,6 +62,22 @@ export default function FreeTalk() {
     prevHeard.current = listener.lastHeardAt;
   }, [listener.lastHeardAt, startedAt]);
 
+  // Stop the minute when the recogniser stops for good. If listening resumes with the transcript
+  // kept (the coming "Carry on"), move the start forward by the time away, so the call doesn't
+  // use up the minute or drag pace down. Try again goes through begin(), which clears the stamp.
+  useEffect(() => {
+    if (listener.state === 'error') {
+      // Forget the last word's time, so the gap across the call isn't counted as a pause.
+      prevHeard.current = 0;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to the recogniser stopping (outside React); guarded so it stamps once
+      if (startedAt && !pausedAt) setPausedAt(Date.now());
+    } else if (listener.state === 'listening' && pausedAt) {
+      const away = Date.now() - pausedAt; // captured now, before the updater runs
+      setStartedAt((s) => s + away);
+      setPausedAt(0);
+    }
+  }, [listener.state, startedAt, pausedAt]);
+
   /**
    * Every attempt (first go, retry, after consent) starts from a clean slate. That includes a
    * consent ask in the middle of a talk (on-device recognition went away at a restart): Free
@@ -73,6 +92,7 @@ export default function FreeTalk() {
     prevHeard.current = 0;
     done.current = false;
     setStartedAt(0);
+    setPausedAt(0);
     setNotice(null);
     await listener.start(override);
     setStartedAt(Date.now());
@@ -92,7 +112,8 @@ export default function FreeTalk() {
     if (done.current) return;
     done.current = true;
     await listener.stop();
-    const secs = Math.max(1, (Date.now() - startedAt) / 1000);
+    // Up to the pause if the error card is up: the call isn't talking time.
+    const secs = Math.max(1, ((pausedAt || Date.now()) - startedAt) / 1000);
     if (counts.spoken < MIN_WORDS) {
       // The guard resets in begin(), which the Try again button calls.
       setStartedAt(0);
@@ -148,7 +169,7 @@ export default function FreeTalk() {
         </Pressable>
         <Text style={[styles.topTitle, { color: colors.muted }]}>Free talk</Text>
         <Text style={[styles.timer, { color: running ? colors.ink : colors.muted }]}>
-          0:{String(running ? left : LIMIT_S).padStart(2, '0')}
+          0:{String(running || pausedAt ? left : LIMIT_S).padStart(2, '0')}
         </Text>
       </View>
 

@@ -66,6 +66,9 @@ let decided = false;
 let generation = 0;
 let queue: { event: string; properties: Props; timestamp: string }[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
+// Most events we hold while waiting for the profile. If it never loads (storage broken), the
+// queue would otherwise grow for the whole session. Oldest go first: the latest are the most useful.
+export const MAX_QUEUE = 100;
 
 async function getId(): Promise<string> {
   if (distinctId) return distinctId;
@@ -120,6 +123,7 @@ async function flush() {
 export function track(event: EventName, properties: Props = {}) {
   if (!KEY || !enabled) return;
   queue.push({ event, properties: sanitise(properties), timestamp: new Date().toISOString() });
+  if (queue.length > MAX_QUEUE) queue = queue.slice(-MAX_QUEUE);
   schedule();
 }
 
