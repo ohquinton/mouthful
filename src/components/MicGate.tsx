@@ -12,8 +12,18 @@ import { space, useColors } from '../theme';
  * Shown instead of a practice screen when the mic can't be used yet:
  * - permission denied → send them to Settings
  * - phone can't transcribe offline → ask, once, before any audio leaves the device
+ * - speech recognition switched off (iOS: Siri & Dictation) → send them to Settings
  * Returns null when listening can go ahead.
  */
+
+/** Settings can't open on web (and may throw on some platforms): fail quietly. */
+function openSettings() {
+  try {
+    Linking.openSettings().catch(() => {});
+  } catch {}
+}
+
+const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 export function MicGate({ state, onAllowed }: { state: ListenerState; onAllowed: () => void }) {
   const colors = useColors();
   const { update } = useProfile();
@@ -23,7 +33,7 @@ export function MicGate({ state, onAllowed }: { state: ListenerState; onAllowed:
     return (
       <View style={[styles.wrap, { backgroundColor: colors.bg }]}>
         <Ionicons name="cloud-outline" size={44} color={colors.signal} />
-        <Text style={[styles.h2, { color: colors.ink }]}>This device can’t transcribe offline</Text>
+        <Text style={[styles.h2, { color: colors.ink }]}>This phone needs help to follow you</Text>
         <Text style={[styles.body, { color: colors.muted }]}>
           To follow your reading, {BRAND.name} can use {service}. Your voice is sent to that service to be turned
           into text while you read. {BRAND.name} doesn’t keep it, and nothing is sent until you say yes.
@@ -41,9 +51,9 @@ export function MicGate({ state, onAllowed }: { state: ListenerState; onAllowed:
           hitSlop={8}
           onPress={() => {
             track('server_recognition_consent', { allowed: false });
-            if (router.canGoBack()) router.back();
-            else router.replace('/');
+            leave();
           }}
+          accessibilityRole="button"
         >
           <Text style={[styles.link, { color: colors.muted }]}>Not now</Text>
         </Pressable>
@@ -60,8 +70,8 @@ export function MicGate({ state, onAllowed }: { state: ListenerState; onAllowed:
           It listens only while you practise, so it can follow along. Turn on Microphone and Speech Recognition in
           Settings.
         </Text>
-        <PrimaryButton label="Open Settings" style={{ alignSelf: 'stretch' }} onPress={() => Linking.openSettings()} />
-        <Pressable hitSlop={8} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}>
+        <PrimaryButton label="Open Settings" style={{ alignSelf: 'stretch' }} onPress={openSettings} />
+        <Pressable hitSlop={8} onPress={leave} accessibilityRole="button">
           <Text style={[styles.link, { color: colors.muted }]}>Not now</Text>
         </Pressable>
       </View>
@@ -71,7 +81,13 @@ export function MicGate({ state, onAllowed }: { state: ListenerState; onAllowed:
   if (state === 'unavailable') {
     return (
       <View style={[styles.wrap, { backgroundColor: colors.bg }]}>
-        <Text style={[styles.body, { color: colors.ink }]}>Speech recognition isn’t available on this device right now.</Text>
+        <Ionicons name="mic-off-outline" size={44} color={colors.muted} />
+        <Text style={[styles.h2, { color: colors.ink }]}>Speech recognition is off on this phone</Text>
+        <Text style={[styles.body, { color: colors.muted }]}>Check that Siri & Dictation is on in Settings, then come back.</Text>
+        <PrimaryButton label="Open Settings" style={{ alignSelf: 'stretch' }} onPress={openSettings} />
+        <Pressable hitSlop={8} onPress={leave} accessibilityRole="button">
+          <Text style={[styles.link, { color: colors.muted }]}>Not now</Text>
+        </Pressable>
       </View>
     );
   }
