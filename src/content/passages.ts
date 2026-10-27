@@ -55,9 +55,16 @@ export const PASSAGES: Passage[] = [
   },
 ];
 
+/**
+ * Days since 1970 on the reader's own calendar. Counting from `getTime()` would roll over
+ * at UTC midnight (7 pm in Toronto), swapping today's read mid-evening.
+ */
+export function localDay(date = new Date()): number {
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000);
+}
+
 export function passageOfTheDay(date = new Date()): Passage {
-  const day = Math.floor(date.getTime() / 86_400_000);
-  return PASSAGES[day % PASSAGES.length];
+  return PASSAGES[localDay(date) % PASSAGES.length];
 }
 
 export function getPassage(id: string): Passage | undefined {

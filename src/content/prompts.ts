@@ -1,3 +1,5 @@
+import { localDay } from './passages';
+
 export const PROMPTS = [
   'Explain what you do for work to a ten-year-old.',
   'Pitch your favourite restaurant in sixty seconds.',
@@ -14,6 +16,5 @@ export const PROMPTS = [
 ];
 
 export function promptOfTheDay(date = new Date(), offset = 0): string {
-  const day = Math.floor(date.getTime() / 86_400_000);
-  return PROMPTS[(day + offset) % PROMPTS.length];
+  return PROMPTS[(localDay(date) + offset) % PROMPTS.length];
 }
