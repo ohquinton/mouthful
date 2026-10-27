@@ -1,16 +1,15 @@
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { useProfile } from '../../store/profile';
-import { clearSessionRecordings, loadSessions, recordingUris } from '../../store/sessions';
+import { clearSessionRecordings, clearSessionReviews, loadSessions, recordingUris, reviewCount } from '../../store/sessions';
 import { deleteAllRecordings, listRecordings } from '../../store/recordings';
-import { track } from '../../analytics';
+import { analyticsEnabled, track } from '../../analytics';
 import { countdownLabel, getMoment } from '../../content/moments';
-import { listenLocale, onDeviceSupported } from '../../speech/useListener';
+import { listenLocale, onDeviceSupported, serverServiceName } from '../../speech/useListener';
 import { SPEECH_LOCALES, speechLocaleLabel } from '../../engine/locale';
-import { analyticsEnabled } from '../../analytics';
 import { BRAND } from '../../brand';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { cancelDailyReminder, formatTime, REMINDER_OPTIONS, scheduleDailyReminder } from '../../reminders';
@@ -26,6 +25,9 @@ export default function You() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [recCount, setRecCount] = useState(0);
   const [confirmRecDelete, setConfirmRecDelete] = useState(false);
+  const [privacyNote, setPrivacyNote] = useState<string | null>(null);
+  // After tester mode is switched off: how many sessions still hold what the phone heard.
+  const [reviewsLeft, setReviewsLeft] = useState(0);
   // Tester mode is hidden: tap the version line 7 times, or build with EXPO_PUBLIC_TESTER_MODE=1.
   const [versionTaps, setVersionTaps] = useState(0);
   const showTester = profile.testerMode === true || versionTaps >= 7 || process.env.EXPO_PUBLIC_TESTER_MODE === '1';
@@ -50,6 +52,33 @@ export default function You() {
     setRecCount(0);
     setNote(n === 1 ? 'Deleted 1 recording.' : `Deleted ${n} recordings.`);
     track('recordings_deleted', { count: n });
+  };
+
+  const withdrawServer = async () => {
+    await update({ allowServerRecognition: false });
+    track('server_recognition_consent', { allowed: false, where: 'you' });
+    setPrivacyNote(`Turned off. Next time this phone can’t listen offline, ${BRAND.name} will ask first.`);
+  };
+
+  const setTesterMode = async (on: boolean) => {
+    await update({ testerMode: on });
+    if (on) {
+      setReviewsLeft(0);
+      return;
+    }
+    // Tester mode kept what the phone heard for each read. Offer to delete it now rather than
+    // leave a tester's words on the phone without anyone remembering they're there.
+    setReviewsLeft(reviewCount(await loadSessions()));
+  };
+
+  const deleteReviews = async () => {
+    const n = await clearSessionReviews();
+    setReviewsLeft(0);
+    setNote(n === 1 ? 'Deleted what the phone heard in 1 session.' : `Deleted what the phone heard in ${n} sessions.`);
+  };
+
+  const openPrivacyPolicy = () => {
+    Linking.openURL(BRAND.privacyUrl).catch(() => setPrivacyNote(`Couldn’t open the link. It’s ${BRAND.privacyUrl}`));
   };
 
   const setReminder = async (opt: { hour: number; minute: number } | null) => {
@@ -164,13 +193,45 @@ export default function You() {
           : profile.allowServerRecognition
             ? `This device can’t transcribe ${speechLocaleLabel(lang)} English offline, so you agreed to use its speech service, which receives your audio while you practise.`
             : `This device can’t transcribe ${speechLocaleLabel(lang)} English offline. We’ll ask before using a speech service.`}{' '}
-        Sessions, scripts and recordings stay on this device.
-        {analyticsEnabled ? ' We collect anonymous usage counts (like “session finished”) to improve the app, never your words or voice.' : ''}
+        Sessions, scripts and recordings are kept on this phone, and in your phone’s own backup if you use one. They’re never
+        sent to us.
       </Text>
+      {profile.allowServerRecognition === true && (
+        <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.momentTitle, { color: colors.ink }]}>Use {serverServiceName()}</Text>
+            <Text style={[styles.momentSub, { color: colors.muted }]}>
+              Only when this phone can’t listen offline. Turn off to stop sending audio there. We’ll ask again before the next session
+              that needs it.
+            </Text>
+          </View>
+          <Switch value onValueChange={(v) => {
+              if (!v) withdrawServer();
+            }} accessibilityLabel={`Use ${serverServiceName()}`} />
+        </View>
+      )}
+      {analyticsEnabled && (
+        <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.momentTitle, { color: colors.ink }]}>Share anonymous usage counts</Text>
+            <Text style={[styles.momentSub, { color: colors.muted }]}>
+              Counts like “session finished” help us improve the app. Never your words or voice.
+            </Text>
+          </View>
+          <Switch
+            value={profile.analyticsOptOut !== true}
+            onValueChange={(v) => update({ analyticsOptOut: !v })}
+            accessibilityLabel="Share anonymous usage counts"
+          />
+        </View>
+      )}
+      {privacyNote && <Text style={[styles.note, { color: colors.muted }]}>{privacyNote}</Text>}
       <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.line }]}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.momentTitle, { color: colors.ink }]}>Keep Day 1 and re-test recordings</Text>
-          <Text style={[styles.momentSub, { color: colors.muted }]}>Saved only on this phone, for before-and-after replay.</Text>
+          <Text style={[styles.momentSub, { color: colors.muted }]}>
+            For before-and-after replay. Kept on this phone, and in its backup if you use one.
+          </Text>
         </View>
         <Switch value={profile.keepRecordings === true} onValueChange={(v) => update({ keepRecordings: v })} accessibilityLabel="Keep recordings on this phone" />
       </View>
@@ -201,6 +262,9 @@ export default function You() {
         ))}
 
       <View style={styles.links}>
+        <Pressable onPress={openPrivacyPolicy} hitSlop={8} accessibilityRole="link">
+          <Text style={[styles.link, { color: colors.signal }]}>Privacy policy</Text>
+        </Pressable>
         <Pressable onPress={onRestore} hitSlop={8}>
           <Text style={[styles.link, { color: colors.signal }]}>Restore purchases</Text>
         </Pressable>
@@ -237,13 +301,13 @@ export default function You() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.momentTitle, { color: colors.ink }]}>Record every reading session</Text>
               <Text style={[styles.momentSub, { color: colors.muted }]}>
-                For supervised beta tests, with the tester’s OK. Keeps the audio and what the phone heard on this phone so you can
-                check them side by side. Copy the numbers, then delete recordings or reset before the next tester.
+                For supervised beta tests, with the tester’s OK. Keeps the audio and what the phone heard on this phone (and in its
+                backup, if one is on) so you can check them side by side. Copy the numbers, then delete recordings or reset before the next tester.
               </Text>
             </View>
             <Switch
               value={profile.testerMode === true}
-              onValueChange={(v) => update({ testerMode: v })}
+              onValueChange={setTesterMode}
               accessibilityLabel="Tester mode: record every reading session"
             />
           </View>
@@ -253,6 +317,22 @@ export default function You() {
             </Pressable>
           )}
         </>
+      )}
+      {reviewsLeft > 0 && (
+        <View style={styles.confirm}>
+          <Text style={[styles.body, { color: colors.ink }]}>
+            Tester mode is off. What the phone heard is still kept with {reviewsLeft === 1 ? '1 session' : `${reviewsLeft} sessions`}.
+            Delete it now? Scores stay. Recordings are separate: delete them under Privacy.
+          </Text>
+          <View style={styles.confirmRow}>
+            <Pressable onPress={deleteReviews} hitSlop={8} accessibilityRole="button">
+              <Text style={[styles.link, { color: colors.stumble }]}>Delete it</Text>
+            </Pressable>
+            <Pressable onPress={() => setReviewsLeft(0)} hitSlop={8} accessibilityRole="button">
+              <Text style={[styles.link, { color: colors.muted }]}>Keep for now</Text>
+            </Pressable>
+          </View>
+        </View>
       )}
 
       <Pressable onPress={() => setVersionTaps((n) => n + 1)} accessibilityRole="text">

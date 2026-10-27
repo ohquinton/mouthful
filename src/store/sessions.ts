@@ -151,6 +151,27 @@ export function recordingUris(sessions: SavedSession[]): string[] {
   return sessions.flatMap((s) => s.recordings ?? []);
 }
 
+/** How many sessions still hold tester mode's review data (what the phone heard, marks). */
+export function reviewCount(sessions: SavedSession[]): number {
+  return sessions.filter((s) => s.review).length;
+}
+
+/**
+ * Forget what tester mode kept: transcripts, word statuses, marks, first-word lag.
+ * Scores and the sessions themselves stay. Recordings are separate (store/recordings.ts).
+ * Returns how many sessions had review data.
+ */
+export async function clearSessionReviews(): Promise<number> {
+  try {
+    const all = await loadSessions();
+    const n = reviewCount(all);
+    if (n) await AsyncStorage.setItem(KEY, JSON.stringify(all.map(({ review: _r, ...rest }) => rest)));
+    return n;
+  } catch {
+    return 0;
+  }
+}
+
 /** Forget recordings on every session (after the files themselves are deleted). */
 export async function clearSessionRecordings(): Promise<void> {
   try {
