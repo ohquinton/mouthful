@@ -219,7 +219,9 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     const fillersPerMin = +(a.fillerCount / (secs / 60)).toFixed(1);
     const attempted = a.read + a.skipped;
     const accuracy = attempted ? Math.round((a.read / attempted) * 100) : 0;
-    const segments = paceSegments(words, reachedAt.current);
+    // The recogniser's statuses (raw), not the corrected ones: a word the reader tapped as said
+    // was still a skip when Glide stamped its timing, so its steps can't be timed.
+    const segments = paceSegments(words, reachedAt.current, raw.status);
     const steady = paceSteadiness(segments);
     const stats = { wpm: wordsPerMinute(a.spoken, secs), fillersPerMin, accuracy, midSentencePauses: pauses.current, seconds: secs, steadiness: steady?.score };
     const topFiller = Object.entries(a.fillers).sort((x, y) => y[1] - x[1])[0]?.[0];
@@ -274,7 +276,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (isBaseline && !profile.onboarded) router.replace({ pathname: '/onboarding/day1', params: { id: sessionId } });
     else router.replace({ pathname: '/tape', params: { id: sessionId } });
-  }, [a, listener, passage, words, pace, corrected, profile, update, step, isBaseline, tester]);
+  }, [a, raw, listener, passage, words, pace, corrected, profile, update, step, isBaseline, tester]);
 
   /** A real restart: clean transcript, timer, corrections, marks and pauses, then listen again. */
   const retry = useCallback(() => {
