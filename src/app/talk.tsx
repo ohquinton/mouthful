@@ -43,8 +43,9 @@ export default function FreeTalk() {
   const wpm = wordsPerMinute(counts.spoken, seconds);
   const zoneNow = paceZone(wpm, 'talking');
   const left = Math.max(0, Math.ceil(LIMIT_S - seconds));
-  // The recogniser reported a problem (e.g. it can't listen for this English). Shown whatever the state.
-  const failed = listener.error !== null || listener.state === 'error';
+  // The recogniser stopped for good (e.g. it can't listen for this English). A routine error
+  // while it's still listening restarts by itself, so it shows nothing.
+  const failed = listener.state === 'error';
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 250);
@@ -84,7 +85,7 @@ export default function FreeTalk() {
       done.current = true; // so the 60 s limit can't save this attempt while it stops
       await listener.stop();
     }
-    begin();
+    await begin(); // awaited so ListenError keeps Try again disabled until the mic is starting
   };
 
   const finish = async () => {
@@ -199,7 +200,7 @@ export default function FreeTalk() {
           </View>
         )}
         {failed ? (
-          <ListenError message={listener.error} onRetry={retryAfterError} />
+          <ListenError message={listener.error} code={listener.errorCode} onRetry={retryAfterError} />
         ) : (
           notice && <Text style={[styles.notice, { color: colors.stumble }]}>{notice}</Text>
         )}

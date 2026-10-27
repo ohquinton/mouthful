@@ -317,7 +317,8 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     scroller.current?.scrollTo({ y: 0, animated: true });
     finished.current = false;
     track('session_retry', { where: 'glide' });
-    listener.start();
+    // Returned so the error card's Try again stays disabled until the mic is starting.
+    return listener.start();
   }, [listener]);
 
   /**
@@ -329,7 +330,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     finished.current = true; // no Finish or last-word save while the mic stops; retry() clears it
     const uris = listener.state === 'listening' ? await listener.stop() : listener.recordings;
     deleteRecordingFiles(uris);
-    retry();
+    await retry();
   }, [listener, retry]);
 
   // The session ends itself on the last word.
@@ -342,8 +343,9 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     return <MicGate state={listener.state} onAllowed={() => listener.start({ allowServer: true })} />;
   }
 
-  // The recogniser reported a problem. Shown whatever the listener state, with a way back.
-  const failed = listener.error !== null || listener.state === 'error';
+  // The recogniser stopped for good. A routine error while it's still listening (it restarts
+  // by itself) shows nothing: the words are still inking in.
+  const failed = listener.state === 'error';
   // eslint-disable-next-line react-hooks/refs -- read-only timing refs; see `seconds` above
   const lost = listener.state === 'listening' && startedAt.current > 0 && !a.done && now - lastAdvanceAt.current > LOST_AFTER_MS;
   const offScript = heard.length >= 20 && a.read < 6;
@@ -439,7 +441,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
       )}
 
       {failed && !tooShort && (
-        <ListenError message={listener.error} onRetry={retryAfterError} style={{ ...styles.errorCard, bottom: insets.bottom + 72 }} />
+        <ListenError message={listener.error} code={listener.errorCode} onRetry={retryAfterError} style={{ ...styles.errorCard, bottom: insets.bottom + 72 }} />
       )}
 
       {/* Quiet nudges */}
