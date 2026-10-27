@@ -2,6 +2,16 @@
 // Pure, with no native imports, so they're unit tested (engine/__tests__/listener.test.ts).
 // useListener is thin wiring around these.
 
+export type ListenerState =
+  | 'idle'
+  | 'asking'
+  | 'denied'
+  | 'unavailable'
+  | 'needs-consent' // phone can't transcribe offline and the user hasn't agreed to the server service yet
+  | 'listening'
+  | 'stopped'
+  | 'error'; // listening has stopped for good; see `error` (the message to show) and `errorCode`
+
 /** Whether the platform recogniser can listen for a locale. `unknown` means it gave no list. */
 export type LocaleSupport = 'supported' | 'unsupported' | 'unknown';
 
@@ -30,6 +40,16 @@ export function startGate(o: { onDevice: boolean; allowServer: boolean; locale: 
   return o.allowServer ? 'start' : 'needs-consent';
 }
 
+/**
+ * Server recognition is allowed when the profile allows it now (so turning it off in You takes
+ * effect at the next restart), or when the reader said yes in MicGate for this session
+ * (start({ allowServer: true })). That yes covers this session's restarts only, so it still
+ * works if the profile write hasn't landed yet, and never outlives a stop.
+ */
+export function serverAllowed(o: { profile: boolean | undefined; sessionGrant: boolean }): boolean {
+  return o.profile === true || o.sessionGrant;
+}
+
 export type EndAction = 'restart' | 'needs-consent' | 'stopped';
 
 /**
@@ -48,3 +68,65 @@ export function endAction(o: { wanted: boolean; onDevice: boolean; allowServer: 
  * EXTRA_PREFER_OFFLINE, which is only a hint, so audio may leave the phone.
  */
 export const ANDROID_ON_DEVICE_MIN_API = 33;
+
+/**
+ * What a recogniser error means for the session:
+ * - 'ignore': silence or our own stop/abort. The end handler restarts as usual.
+ * - 'denied': no permission. Listening stops; screens show the denied state.
+ * - 'fatal': restarting can't help (no such language; a call, Siri or another app has the
+ *   audio session, which iOS also reports when the app is backgrounded). State 'error'.
+ * - 'recoverable': a glitch the next restart usually fixes (iOS audio route change when
+ *   AirPods connect, network 1101/1107, Android busy/client). Not shown, unless it keeps
+ *   happening with nothing heard (noteHiccup).
+ */
+export type ErrorKind = 'ignore' | 'denied' | 'fatal' | 'recoverable';
+
+export function classifyError(code: string): ErrorKind {
+  switch (code) {
+    case 'aborted':
+    case 'no-speech':
+    case 'speech-timeout':
+      return 'ignore';
+    case 'not-allowed':
+    case 'service-not-allowed':
+      return 'denied';
+    case 'language-not-supported':
+    case 'interrupted':
+    case 'bad-grammar':
+      return 'fatal';
+    default:
+      return 'recoverable';
+  }
+}
+
+/** Recoverable errors within HICCUP_WINDOW_MS, with nothing heard between them, before giving up. */
+export const HICCUP_LIMIT = 3;
+export const HICCUP_WINDOW_MS = 10_000;
+
+/**
+ * Records a recoverable error. `recent` holds the times of earlier ones since the last result
+ * (a result empties it). Gives up at HICCUP_LIMIT inside the window, so a reader whose mic or
+ * connection has really gone isn't left looking at "listening" while nothing is heard.
+ */
+export function noteHiccup(recent: readonly number[], now: number): { recent: number[]; giveUp: boolean } {
+  const kept = [...recent.filter((t) => now - t < HICCUP_WINDOW_MS), now];
+  return { recent: kept, giveUp: kept.length >= HICCUP_LIMIT };
+}
+
+/** After a glitch, wait a moment before restarting ('busy' means the last session hasn't let go yet). */
+export function restartDelayMs(recentHiccups: number): number {
+  return Math.min(recentHiccups, HICCUP_LIMIT) * 250;
+}
+
+/** The state once the recogniser has ended and won't restart: never hide why it stopped. */
+export function stateAfterEnd(current: ListenerState): ListenerState {
+  switch (current) {
+    case 'error':
+    case 'denied':
+    case 'needs-consent':
+    case 'unavailable':
+      return current;
+    default:
+      return 'stopped';
+  }
+}
