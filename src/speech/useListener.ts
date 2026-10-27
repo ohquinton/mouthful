@@ -117,8 +117,8 @@ export function languageNotSupportedMessage(lang: string): string {
 
 const INTERRUPTED_MESSAGE = 'Listening stopped when something else used the mic. Try again.';
 const STOPPED_MESSAGE = 'The phone stopped listening. Tap Carry on to pick up where you were.';
-const REPEATED_MESSAGE = `It tried ${HICCUP_LIMIT} times and didn’t catch any words. Check nothing is covering the mic, or switch off headphones, then try again.`;
-const NETWORK_MESSAGE = 'The speech service couldn’t be reached. When you’re back online, tap Try again.';
+const REPEATED_MESSAGE = `It tried ${HICCUP_LIMIT} times and didn’t catch any words. Check nothing is covering the mic, or switch off headphones, then tap Carry on.`;
+const NETWORK_MESSAGE = 'The speech service couldn’t be reached. When you’re back online, tap Carry on.';
 
 /**
  * Whether the recogniser can listen for `lang` at all. Only iOS gives a list we can trust:
