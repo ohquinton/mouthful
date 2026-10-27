@@ -3,14 +3,24 @@
  *
  * Error contract (screens rely on this):
  * - Show the "stopped listening" card iff `state === 'error'`. `error` (the message) and
- *   `errorCode` are non-null exactly then, and listening has stopped for good: nothing restarts
- *   until the screen calls start() again, which clears them.
+ *   `errorCode` are non-null exactly then, and listening has stopped: nothing restarts until
+ *   the screen calls start() (Try again: a fresh read) or resume() (Carry on), which clear them.
+ * - `canResume` is true only in 'error' with a code that may come back ('interrupted',
+ *   'repeated-failure', 'network', 'restart-failed'; see canResumeAfter in gate.ts), never for
+ *   'language-not-supported'. resume() restarts listening and KEEPS the transcript and
+ *   recordings so far. It goes through the same gate as start(): on-device check, locale check,
+ *   consent (profile, or a new MicGate yes: the earlier session grant ended with the error), mic
+ *   permission. So it can land in 'needs-consent'; MicGate's start({ allowServer: true }) then
+ *   still keeps the read. It does nothing after unmount or when canResume is false.
  * - Routine recogniser glitches (iOS audio route change when AirPods connect, network
  *   1101/1107, Android busy/client/speech-timeout, silence) are never surfaced. The hook
  *   restarts quietly and the read carries on. If HICCUP_LIMIT of them arrive within
- *   HICCUP_WINDOW_MS with nothing heard in between, it gives up: 'error' / 'repeated-failure'.
+ *   HICCUP_WINDOW_MS with nothing heard in between, it gives up: 'error' with 'network' if the
+ *   last one was the connection, else 'repeated-failure'.
  * - 'denied', 'needs-consent' and 'unavailable' are their own states, not errors, and an
  *   `end` event never overwrites them (or 'error') with 'stopped'.
+ * - getDiagnostics() (tester mode): quiet restarts and recoverable error codes for this attempt,
+ *   counts only. Kept across resume(), zeroed by reset() and by a fresh start().
  * The rules live in ./gate.ts and are unit tested; this file is the wiring.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -20,7 +30,10 @@ import { recordingsFolderUri } from '../store/recordings';
 import { speechLocale, speechLocaleLabel } from '../engine/locale';
 import {
   ANDROID_ON_DEVICE_MIN_API,
+  HICCUP_LIMIT,
+  canResumeAfter,
   classifyError,
+  diagnosticCode,
   endAction,
   localeSupport,
   noteHiccup,
@@ -37,12 +50,22 @@ export type { ListenerState };
 /**
  * Why the listener is in 'error', for screens that want to offer a way out.
  * - 'language-not-supported': this phone can't listen for the chosen English; `error` says
- *   "This phone can’t listen for X English. Pick another in You." Never preceded by a consent ask.
+ *   "This phone can’t listen for X English. Choose a different English in the You tab."
+ *   Never preceded by a consent ask. The only code without Carry on.
  * - 'interrupted': a call, Siri, an alarm or leaving the app took the audio session.
- * - 'repeated-failure': routine glitches kept coming with nothing heard (mic or connection gone).
+ * - 'network': routine glitches kept coming with nothing heard, and the last was the connection.
+ * - 'repeated-failure': the same, for anything else (mic covered or gone, headphones).
  * - 'restart-failed': the native start threw when restarting mid-session.
  */
-export type ListenerErrorCode = 'language-not-supported' | 'interrupted' | 'repeated-failure' | 'restart-failed';
+export type ListenerErrorCode = 'language-not-supported' | 'interrupted' | 'network' | 'repeated-failure' | 'restart-failed';
+
+/** Tester-mode counts for one attempt. Codes and numbers only, never words. */
+export type ListenerDiagnostics = {
+  /** Quiet restarts that turned the mic back on (iOS session ends, glitches). */
+  restarts: number;
+  /** Recoverable recogniser errors by library code ('network', 'audio-capture', …; else 'other'). */
+  glitches: Record<string, number>;
+};
 
 type Options = {
   /** The profile's answer: may audio go to the platform's server recognition? Read live. */
@@ -89,12 +112,13 @@ export function onDeviceSupported(lang = 'en-US'): boolean {
 
 /** The message for a variety the phone can't listen for. */
 export function languageNotSupportedMessage(lang: string): string {
-  return `This phone can’t listen for ${speechLocaleLabel(lang)} English. Pick another in You.`;
+  return `This phone can’t listen for ${speechLocaleLabel(lang)} English. Choose a different English in the You tab.`;
 }
 
 const INTERRUPTED_MESSAGE = 'Listening stopped when something else used the mic. Try again.';
-const STOPPED_MESSAGE = 'The phone stopped listening. Try again.';
-const NETWORK_MESSAGE = 'Lost the connection to the speech service. Check your connection and try again.';
+const STOPPED_MESSAGE = 'The phone stopped listening. Tap Carry on to pick up where you were.';
+const REPEATED_MESSAGE = `It tried ${HICCUP_LIMIT} times and didn’t catch any words. Check nothing is covering the mic, or switch off headphones, then try again.`;
+const NETWORK_MESSAGE = 'The speech service couldn’t be reached. When you’re back online, tap Try again.';
 
 /**
  * Whether the recogniser can listen for `lang` at all. Only iOS gives a list we can trust:
@@ -138,7 +162,11 @@ export function useListener(hints: string[], opts: Options = {}) {
     optsRef.current = opts;
   });
   const sessionGrant = useRef(false); // MicGate's yes, for this session's restarts only
-  const pausedForConsent = useRef(false); // a restart stopped mid-session to ask; keep the transcript
+  // The next start() continues this read (transcript, recordings, diagnostics) instead of
+  // starting fresh: set when a restart stopped mid-session to ask for consent, or by resume().
+  const keepRead = useRef(false);
+  const errorCodeRef = useRef<ListenerErrorCode | null>(null); // errorCode, for callbacks
+  const diagnostics = useRef<ListenerDiagnostics>({ restarts: 0, glitches: {} });
   const recordingsRef = useRef<string[]>([]);
   const endWaiters = useRef<((uris: string[]) => void)[]>([]);
   const unmounted = useRef(false);
@@ -152,13 +180,18 @@ export function useListener(hints: string[], opts: Options = {}) {
     if (restartTimer.current) clearTimeout(restartTimer.current);
     restartTimer.current = null;
   };
-  /** Ends the session for good and shows the error card. */
+  const setFailure = (code: ListenerErrorCode | null, message: string | null) => {
+    errorCodeRef.current = code;
+    setErrorCode(code);
+    setError(message);
+  };
+  /** Stops the session and shows the error card. Only resume() continues this read. */
   const fail = (code: ListenerErrorCode, message: string) => {
     wanted.current = false;
     sessionGrant.current = false;
+    keepRead.current = false; // a plain start() (Try again) after an error is a fresh read
     cancelRestart();
-    setErrorCode(code);
-    setError(message);
+    setFailure(code, message);
     setState('error');
   };
 
@@ -223,12 +256,13 @@ export function useListener(hints: string[], opts: Options = {}) {
       // On-device went away, or consent was withdrawn. Don't use the server without a yes.
       wanted.current = false;
       sessionGrant.current = false;
-      pausedForConsent.current = true;
+      keepRead.current = true;
       setState('needs-consent');
       return;
     }
     try {
       startNative(onDevice);
+      diagnostics.current.restarts++;
     } catch {
       fail('restart-failed', STOPPED_MESSAGE);
     }
@@ -279,9 +313,15 @@ export function useListener(hints: string[], opts: Options = {}) {
     }
     // Recoverable: say nothing, let the end handler restart, unless it keeps happening.
     if (!wanted.current) return;
+    const key = diagnosticCode(e.error);
+    const glitches = diagnostics.current.glitches;
+    glitches[key] = (glitches[key] ?? 0) + 1;
     const { recent, giveUp } = noteHiccup(hiccups.current, Date.now());
     hiccups.current = recent;
-    if (giveUp) fail('repeated-failure', e.error === 'network' ? NETWORK_MESSAGE : STOPPED_MESSAGE);
+    if (giveUp) {
+      if (e.error === 'network') fail('network', NETWORK_MESSAGE);
+      else fail('repeated-failure', REPEATED_MESSAGE);
+    }
   });
 
   /**
@@ -289,7 +329,8 @@ export function useListener(hints: string[], opts: Options = {}) {
    * 'unavailable', 'needs-consent' (show MicGate), 'denied', or 'error' with
    * errorCode 'language-not-supported' (never asks for consent first).
    * `{ allowServer: true }` is MicGate's yes: it lasts through this session's restarts only.
-   * After a mid-session 'needs-consent', starting again keeps the transcript so far.
+   * After a mid-session 'needs-consent' or a resume(), starting again keeps the read so far;
+   * otherwise (including Try again after an error) it starts fresh.
    * If the screen closes or stop() is called while this waits (permission prompt, locale
    * check), it gives up without turning the mic on.
    */
@@ -297,8 +338,13 @@ export function useListener(hints: string[], opts: Options = {}) {
     const turn = ++generation.current;
     const stale = () => unmounted.current || turn !== generation.current;
     cancelRestart();
+    // Each way out of 'error' below clears the message with it, so the card shows iff 'error'.
+    const leave = (next: ListenerState) => {
+      setFailure(null, null);
+      setState(next);
+    };
     if (!ExpoSpeechRecognitionModule.isRecognitionAvailable()) {
-      setState('unavailable');
+      leave('unavailable');
       return;
     }
     const lang = optsRef.current.lang ?? 'en-US';
@@ -313,46 +359,67 @@ export function useListener(hints: string[], opts: Options = {}) {
       return;
     }
     if (gate === 'needs-consent') {
-      setState('needs-consent');
+      leave('needs-consent');
       return;
     }
-    setState('asking');
+    leave('asking');
     const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
     if (stale()) return;
     if (!perm.granted) {
       setState('denied');
       return;
     }
-    if (!pausedForConsent.current) {
+    if (keepRead.current) {
+      // Words still interim when listening stopped are part of the read: don't let the next
+      // interim result replace them.
+      finalText.current = `${finalText.current} ${interim.current}`.trim();
+      interim.current = '';
+    } else {
       finalText.current = '';
       interim.current = '';
       setTranscript('');
       setRecordings([]);
       recordingsRef.current = [];
+      diagnostics.current = { restarts: 0, glitches: {} };
     }
-    pausedForConsent.current = false;
+    keepRead.current = false;
     sessionGrant.current = grant;
     hiccups.current = [];
-    setError(null);
-    setErrorCode(null);
     wanted.current = true;
     setLastHeardAt(Date.now());
     startNative(onDevice);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fail and cancelRestart only touch refs and stable setters
   }, [startNative]);
 
+  /**
+   * Carry on after an error that may come back (canResume): listens again and keeps the
+   * transcript and recordings so far. Same gate as start(), so it can land in 'needs-consent'
+   * (MicGate's yes then continues the read), 'denied', or 'error' again. No-op otherwise.
+   */
+  const resume = useCallback(async () => {
+    if (unmounted.current || !canResumeAfter(errorCodeRef.current)) return;
+    keepRead.current = true;
+    await start();
+  }, [start]);
+
   /** Forget the last attempt straight away, so a retry starts from a clean page. */
   const reset = useCallback(() => {
     finalText.current = '';
     interim.current = '';
-    pausedForConsent.current = false;
+    keepRead.current = false;
     hiccups.current = [];
+    diagnostics.current = { restarts: 0, glitches: {} };
     setTranscript('');
     setRecordings([]);
     recordingsRef.current = [];
-    setError(null);
-    setErrorCode(null);
+    setFailure(null, null);
   }, []);
+
+  /** A copy of this attempt's counts, for tester mode to save with the session. */
+  const getDiagnostics = useCallback(
+    (): ListenerDiagnostics => ({ restarts: diagnostics.current.restarts, glitches: { ...diagnostics.current.glitches } }),
+    [],
+  );
 
   /** Stops listening. Resolves with any saved recordings once the recogniser has finished (max 1.5 s). */
   const stop = useCallback((): Promise<string[]> => {
@@ -382,7 +449,9 @@ export function useListener(hints: string[], opts: Options = {}) {
     };
   }, []);
 
-  return { state, transcript, error, errorCode, lastHeardAt, recordings, start, stop, reset };
+  const canResume = state === 'error' && canResumeAfter(errorCode);
+
+  return { state, transcript, error, errorCode, canResume, lastHeardAt, recordings, start, resume, stop, reset, getDiagnostics };
 }
 
 /** The words for the consent screen, per platform. */

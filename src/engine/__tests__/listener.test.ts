@@ -4,7 +4,9 @@ import { Platform } from 'react-native';
 import {
   HICCUP_LIMIT,
   HICCUP_WINDOW_MS,
+  canResumeAfter,
   classifyError,
+  diagnosticCode,
   endAction,
   localeSupport,
   noteHiccup,
@@ -202,5 +204,31 @@ describe('serverAllowed: consent follows the profile, plus a one-session yes fro
   it('honours the yes given for this session even before the profile catches up', () => {
     expect(serverAllowed({ profile: false, sessionGrant: true })).toBe(true);
     expect(serverAllowed({ profile: undefined, sessionGrant: true })).toBe(true);
+  });
+});
+
+describe('canResumeAfter: Carry on only when listening could really pick up again', () => {
+  it.each(['interrupted', 'repeated-failure', 'network', 'restart-failed'])('offers it after %s', (code) => {
+    expect(canResumeAfter(code)).toBe(true);
+  });
+
+  it('never offers it for a variety the phone can’t listen for, or with no error', () => {
+    expect(canResumeAfter('language-not-supported')).toBe(false);
+    expect(canResumeAfter(null)).toBe(false);
+    expect(canResumeAfter(undefined)).toBe(false);
+  });
+});
+
+describe('diagnosticCode: tester diagnostics hold codes, never words', () => {
+  it('keeps the library’s short codes', () => {
+    expect(diagnosticCode('network')).toBe('network');
+    expect(diagnosticCode('audio-capture')).toBe('audio-capture');
+  });
+
+  it('counts anything that could be native text as other', () => {
+    expect(diagnosticCode('Error Domain=kAFAssistantErrorDomain Code=1101')).toBe('other');
+    expect(diagnosticCode('the night shift')).toBe('other');
+    expect(diagnosticCode('x'.repeat(40))).toBe('other');
+    expect(diagnosticCode(undefined)).toBe('other');
   });
 });
