@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { Platform, View } from 'react-native';
 import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated';
+import Svg, { Circle, Line, Polyline, Rect, Text as SvgText } from 'react-native-svg';
+import { Colors } from '../theme';
 
 // SVG text doesn't inherit the app font; on web it would fall back to a serif.
 const FONT = Platform.OS === 'web' ? 'system-ui, -apple-system, sans-serif' : undefined;
-import Svg, { Circle, Line, Polyline, Rect, Text as SvgText } from 'react-native-svg';
-import { Colors } from '../theme';
 
 const AnimatedPolyline = Animated.createAnimatedComponent(Polyline);
 

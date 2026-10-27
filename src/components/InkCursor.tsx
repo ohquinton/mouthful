@@ -18,15 +18,16 @@ export function InkCursor({ box, color, visible }: { box: WordBox | undefined; c
   useEffect(() => {
     if (!box) return;
     // Jump (don't slide) on the first placement and across lines, so it never sweeps diagonally over text.
-    const sameLine = Math.abs(box.y - y.value) < 4 && o.value > 0;
-    x.value = sameLine ? withTiming(box.x, MOVE) : box.x;
-    y.value = box.y;
-    w.value = sameLine ? withTiming(box.w, MOVE) : box.w;
-    h.value = box.h;
+    // get()/set() instead of .value: same behaviour, and the React Compiler lint can follow it.
+    const sameLine = Math.abs(box.y - y.get()) < 4 && o.get() > 0;
+    x.set(sameLine ? withTiming(box.x, MOVE) : box.x);
+    y.set(box.y);
+    w.set(sameLine ? withTiming(box.w, MOVE) : box.w);
+    h.set(box.h);
   }, [box, x, y, w, h, o]);
 
   useEffect(() => {
-    o.value = withTiming(visible && box ? 1 : 0, { duration: 200 });
+    o.set(withTiming(visible && box ? 1 : 0, { duration: 200 }));
   }, [visible, box, o]);
 
   const style = useAnimatedStyle(() => ({

@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Animated, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { WordStatus } from '../engine/align';
 import { Colors, fonts } from '../theme';
@@ -23,7 +23,8 @@ type Props = {
  * sometimes wrong, and the app shouldn't argue with the reader.
  */
 function GlideWordBase({ index, display, status, corrected, isPacer, breath, colors, onMeasure, onCorrect }: Props) {
-  const ink = useRef(new Animated.Value(status === 'pending' ? 0 : 1)).current;
+  // Created once per word (lazy state, not a ref read during render). Starts at the word's current status.
+  const [ink] = useState(() => new Animated.Value(status === 'pending' ? 0 : 1));
 
   useEffect(() => {
     Animated.timing(ink, { toValue: status === 'pending' ? 0 : 1, duration: 120, useNativeDriver: false }).start();

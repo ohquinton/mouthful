@@ -13,7 +13,7 @@ export function useVoiceLevel() {
   const onLevel = useCallback(
     (l: number) => {
       // Smooth and clamp so it breathes instead of jittering.
-      level.value = withTiming(Math.min(1, l * 1.4), { duration: 140, easing: Easing.out(Easing.quad) });
+      level.set(withTiming(Math.min(1, l * 1.4), { duration: 140, easing: Easing.out(Easing.quad) }));
     },
     [level],
   );
