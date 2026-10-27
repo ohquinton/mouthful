@@ -1,7 +1,18 @@
 // Privacy and consent decisions for the recogniser. The hook (speech/useListener) is thin
 // wiring around these, so the rules that keep audio on the phone are tested here.
 import { Platform } from 'react-native';
-import { endAction, localeSupport, startGate } from '../../speech/gate';
+import {
+  HICCUP_LIMIT,
+  HICCUP_WINDOW_MS,
+  classifyError,
+  endAction,
+  localeSupport,
+  noteHiccup,
+  restartDelayMs,
+  serverAllowed,
+  startGate,
+  stateAfterEnd,
+} from '../../speech/gate';
 
 const libOnDevice = jest.fn((_lang?: string) => true);
 jest.mock('expo-speech-recognition', () => ({
@@ -108,5 +119,88 @@ describe('endAction: when iOS ends a session mid-read', () => {
   it('stops when the session is over', () => {
     expect(endAction({ wanted: false, onDevice: true, allowServer: true })).toBe('stopped');
     expect(endAction({ wanted: false, onDevice: false, allowServer: false })).toBe('stopped');
+  });
+});
+
+describe('classifyError: only errors that really stop listening reach the screen', () => {
+  it('ignores silence and our own stop, which the end handler restarts from', () => {
+    for (const code of ['no-speech', 'speech-timeout', 'aborted']) expect(classifyError(code)).toBe('ignore');
+  });
+
+  it('treats permission errors as denied', () => {
+    expect(classifyError('not-allowed')).toBe('denied');
+    expect(classifyError('service-not-allowed')).toBe('denied');
+  });
+
+  it('treats an unsupported language and an interruption (call, Siri, app switch) as fatal', () => {
+    expect(classifyError('language-not-supported')).toBe('fatal');
+    expect(classifyError('interrupted')).toBe('fatal');
+  });
+
+  it('treats routine glitches as recoverable: AirPods route change, network blips, a busy or flaky service', () => {
+    for (const code of ['audio-capture', 'network', 'busy', 'client', 'unknown', 'too-many-requests']) {
+      expect(classifyError(code)).toBe('recoverable');
+    }
+  });
+});
+
+describe('noteHiccup: give up only when recoverable errors keep coming with nothing heard', () => {
+  it('keeps going for one or two hiccups', () => {
+    let recent: number[] = [];
+    for (let i = 1; i < HICCUP_LIMIT; i++) {
+      const r = noteHiccup(recent, i * 100);
+      expect(r.giveUp).toBe(false);
+      recent = r.recent;
+    }
+  });
+
+  it(`gives up at ${HICCUP_LIMIT} inside the window`, () => {
+    let r = { recent: [] as number[], giveUp: false };
+    for (let i = 0; i < HICCUP_LIMIT; i++) r = noteHiccup(r.recent, 1000 + i * 500);
+    expect(r.giveUp).toBe(true);
+  });
+
+  it('forgets hiccups older than the window, so a long read with rare blips never gives up', () => {
+    let r = { recent: [] as number[], giveUp: false };
+    for (let i = 0; i < 10; i++) {
+      r = noteHiccup(r.recent, i * (HICCUP_WINDOW_MS / 2 + 1));
+      expect(r.giveUp).toBe(false);
+    }
+  });
+});
+
+describe('restartDelayMs: back off a little after a glitch, never after a routine end', () => {
+  it('restarts at once after silence or a time limit', () => {
+    expect(restartDelayMs(0)).toBe(0);
+  });
+
+  it('waits longer after each recent glitch, and stays well under a second', () => {
+    expect(restartDelayMs(1)).toBeGreaterThan(0);
+    expect(restartDelayMs(2)).toBeGreaterThan(restartDelayMs(1));
+    expect(restartDelayMs(HICCUP_LIMIT)).toBeLessThan(1000);
+  });
+});
+
+describe('stateAfterEnd: the end event never hides why listening stopped', () => {
+  it('keeps error, denied, needs-consent and unavailable', () => {
+    for (const s of ['error', 'denied', 'needs-consent', 'unavailable'] as const) expect(stateAfterEnd(s)).toBe(s);
+  });
+
+  it('turns a live session into stopped', () => {
+    expect(stateAfterEnd('listening')).toBe('stopped');
+    expect(stateAfterEnd('asking')).toBe('stopped');
+  });
+});
+
+describe('serverAllowed: consent follows the profile, plus a one-session yes from MicGate', () => {
+  it('follows the profile, so turning it off in You takes effect at the next restart', () => {
+    expect(serverAllowed({ profile: true, sessionGrant: false })).toBe(true);
+    expect(serverAllowed({ profile: false, sessionGrant: false })).toBe(false);
+    expect(serverAllowed({ profile: undefined, sessionGrant: false })).toBe(false);
+  });
+
+  it('honours the yes given for this session even before the profile catches up', () => {
+    expect(serverAllowed({ profile: false, sessionGrant: true })).toBe(true);
+    expect(serverAllowed({ profile: undefined, sessionGrant: true })).toBe(true);
   });
 });
