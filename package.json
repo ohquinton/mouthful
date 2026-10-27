@@ -36,6 +36,8 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/react": "~19.3.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~58.0.4",
     "jest": "^30.5.2",
     "patch-package": "^8.0.1",
     "ts-jest": "^29.4.15",
@@ -48,7 +50,8 @@
     "web": "expo start --web",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "lint": "expo lint"
   },
   "private": true
 }
