@@ -20,6 +20,7 @@ import { resolvePassage } from '../../content/resolve';
 import { saveSession } from '../../store/sessions';
 import { deleteRecordingFiles } from '../../store/recordings';
 import { encodeStatuses } from '../../engine/review';
+import { paceSegments, paceSteadiness } from '../../engine/steadiness';
 import { recordCorrection, recordWords, resultsFromSession } from '../../store/words';
 import { useProfile } from '../../store/profile';
 import { markStep } from '../../plan';
@@ -107,6 +108,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
   const skipToastShown = useRef(false);
   const finished = useRef(false);
   const firstWordLag = useRef<number | undefined>(undefined);
+  const reachedAt = useRef<(number | undefined)[]>([]); // when Glide first reached each word, for steadiness
   const boxes = useRef<WordBox[]>([]);
   const scroller = useRef<ScrollViewInstance>(null);
   const toast = useRef(new Animated.Value(0)).current;
@@ -181,6 +183,8 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
       pauses.current++;
     }
     for (let k = prevNext.current; k < a.next; k++) {
+      // Keep the first time: if the recogniser revises and the pointer steps back, the reader still said it then.
+      reachedAt.current[k] ??= t;
       if (words[k]?.sentenceEnd) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
     if (a.skipped > 0 && !skipToastShown.current) {
@@ -212,7 +216,9 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     const fillersPerMin = +(a.fillerCount / (secs / 60)).toFixed(1);
     const attempted = a.read + a.skipped;
     const accuracy = attempted ? Math.round((a.read / attempted) * 100) : 0;
-    const stats = { wpm: wordsPerMinute(a.spoken, secs), fillersPerMin, accuracy, midSentencePauses: pauses.current, seconds: secs };
+    const segments = paceSegments(words, reachedAt.current);
+    const steady = paceSteadiness(segments);
+    const stats = { wpm: wordsPerMinute(a.spoken, secs), fillersPerMin, accuracy, midSentencePauses: pauses.current, seconds: secs, steadiness: steady?.score };
     const topFiller = Object.entries(a.fillers).sort((x, y) => y[1] - x[1])[0]?.[0];
     const stumbled = stumbledWords(words, a);
     const sessionId = `${Date.now()}`;
@@ -237,6 +243,8 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
       corrected: [...corrected].map((i) => words[i].display.replace(/[^A-Za-z'’-]/g, '')),
       recordings: recordings.length ? recordings : undefined,
       habits: a.habitCount ? a.habits : undefined,
+      segments: segments.length ? segments : undefined,
+      steadiness: steady?.score,
       review: tester
         ? {
             statuses: encodeStatuses(a.status, corrected),
@@ -256,6 +264,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
       accuracy,
       fillers_per_min: fillersPerMin,
       corrections: corrected.size,
+      steadiness: steady?.score ?? null,
       seconds: Math.round(secs),
       recorded: recordings.length > 0,
     });
@@ -270,6 +279,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     startedAt.current = 0;
     voiceAt.current = 0;
     firstWordLag.current = undefined;
+    reachedAt.current = [];
     lastAdvanceAt.current = 0;
     prevNext.current = 0;
     pauses.current = 0;

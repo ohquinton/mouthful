@@ -10,7 +10,10 @@ import { recordCorrection } from '../store/words';
 import { useProfile } from '../store/profile';
 import { getMoment } from '../content/moments';
 import { DICTIONARY } from '../content/wordpacks';
-import { sourceOf } from '../content/resolve';
+import { resolvePassage, sourceOf } from '../content/resolve';
+import { preparePassage, PassageWord } from '../engine/align';
+import { paceSteadiness, PaceSegment } from '../engine/steadiness';
+import { PaceStrip } from '../components/PaceStrip';
 import { requirePro } from '../pro';
 import { track } from '../analytics';
 import { fonts, space, useColors } from '../theme';
@@ -26,6 +29,7 @@ export default function Tape() {
   const [prev, setPrev] = useState<SavedSession>();
   const [days, setDays] = useState(0);
   const [shown, setShown] = useState(0);
+  const [passageWords, setPassageWords] = useState<PassageWord[]>([]);
   const count = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -33,6 +37,7 @@ export default function Tape() {
       const i = all.findIndex((x) => x.id === id);
       if (i < 0) return;
       setS(all[i]);
+      if (all[i].segments) resolvePassage(all[i].passageId).then((p) => p && setPassageWords(preparePassage(p.text)));
       setPrev(all.slice(0, i).reverse().find((x) => x.passageId === all[i].passageId) ?? all[i - 1]);
       setDays(streak(all).days);
       // The one celebratory moment: the score counts up over 600ms.
@@ -48,12 +53,19 @@ export default function Tape() {
   const [lo, hi] = PACE_BANDS[ctx];
   const zone = paceZone(s.wpm, ctx);
   const delta = prev ? s.score - prev.score : null;
+  const steady = s.segments ? paceSteadiness(s.segments) : undefined;
   const line = coachingLine(
-    { wpm: s.wpm, fillersPerMin: s.fillersPerMin, accuracy: s.accuracy, midSentencePauses: s.pauses, seconds: s.seconds },
+    { wpm: s.wpm, fillersPerMin: s.fillersPerMin, accuracy: s.accuracy, midSentencePauses: s.pauses, seconds: s.seconds, steadiness: steady?.score ?? s.steadiness },
     s.topFiller,
     ctx,
   );
   const moment = getMoment(profile.moment?.id);
+  const snippet = (seg: PaceSegment) =>
+    passageWords
+      .slice(seg.start, seg.start + 4)
+      .map((w) => w.display)
+      .join(' ')
+      .replace(/[,;:.!?]+$/, '');
   const habitList = Object.entries(s.habits ?? {}).sort((x, y) => y[1] - x[1]).slice(0, 4);
 
   const sayIt = async (word: string) => {
@@ -123,6 +135,10 @@ export default function Tape() {
         <Text style={[styles.fine, { color: colors.muted }]}>
           Habit words, not scored: {habitList.map(([w, n]) => `“${w}” ×${n}`).join(' · ')}. Fillers count only um, uh and erm.
         </Text>
+      )}
+
+      {steady && s.segments && passageWords.length > 0 && (
+        <PaceStrip segments={s.segments} steady={steady} band={[lo, hi]} snippet={snippet} colors={colors} />
       )}
 
       <Text style={[styles.coach, { color: colors.ink }]}>{line}</Text>

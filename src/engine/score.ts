@@ -1,3 +1,5 @@
+import { UNSTEADY_BELOW } from './steadiness';
+
 // Pace targets depend on what you're doing. Reading aloud, presenting and talking
 // have different natural speeds, so there's no single "correct" pace.
 export type PaceContext = 'reading' | 'presenting' | 'talking';
@@ -17,6 +19,8 @@ export type SessionStats = {
   accuracy: number | null; // null in free talk
   midSentencePauses: number;
   seconds: number;
+  /** 0–100 from engine/steadiness.ts. Undefined when there weren't enough stretches to tell. */
+  steadiness?: number;
 };
 
 export function wordsPerMinute(spoken: number, seconds: number): number {
@@ -59,6 +63,7 @@ export function coachingLine(s: SessionStats, topFiller?: string, ctx: PaceConte
   if (s.wpm > hi + 15) return `You ran at ${s.wpm}. Breathe at every full stop.`;
   if (s.accuracy !== null && s.accuracy < 85) return 'A few words slipped past. Slow down on the long ones.';
   if (s.fillersPerMin >= 3) return `Lots of "${topFiller ?? 'um'}". Swap each one for a silent beat.`;
+  if (s.steadiness !== undefined && s.steadiness < UNSTEADY_BELOW) return 'Your pace drifted between sentences. Give every sentence the same speed, like the pacer.';
   if (s.midSentencePauses >= 3) return 'You paused mid-sentence a few times. Look one phrase ahead.';
   if (s.wpm > hi) return `Slightly quick at ${s.wpm}. Let the commas breathe.`;
   if (s.wpm && s.wpm < lo - 20) return `Steady but slow at ${s.wpm}. Try reading a phrase ahead with your eyes.`;

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { correctedAccuracy, sessionScore } from '../engine/score';
 import type { ReviewMarks } from '../engine/review';
+import type { PaceSegment } from '../engine/steadiness';
 
 export type SavedSession = {
   id: string;
@@ -24,6 +25,8 @@ export type SavedSession = {
   corrected?: string[]; // words the user marked "I said it"
   recordings?: string[]; // local file URIs (Day 1 and re-tests, with consent)
   habits?: Record<string, number>; // like, so, you know: reported on the Tape, never scored
+  segments?: PaceSegment[]; // pace of each stretch of the passage (engine/steadiness.ts)
+  steadiness?: number; // 0–100; shown on the Tape, not part of the score
   /** Tester mode only (supervised beta). Stays on the phone; never sent anywhere. */
   review?: {
     statuses: string; // see engine/review.ts
