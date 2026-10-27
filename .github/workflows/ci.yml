@@ -18,6 +18,4 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run typecheck
-      # Lint has known errors until the Wave 2 fixes merge. Remove continue-on-error then.
       - run: npm run lint
-        continue-on-error: true

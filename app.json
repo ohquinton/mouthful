@@ -32,7 +32,7 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Mouthful listens while you practise so it can follow along. Recordings are only kept on this phone, and only if you choose.",
+          "microphonePermission": "Mouthful listens while you practise so it can follow along. Recordings are kept only if you choose, on this phone (and in its backup, if you use one).",
           "speechRecognitionPermission": "Mouthful turns your speech into text to follow your reading and check your pace and fillers. Depending on your phone and the English you pick, your speech may be sent to Apple to be transcribed. Mouthful asks you first."
         }
       ],
@@ -41,7 +41,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Mouthful listens while you practise so it can follow along. Recordings are only kept on this phone, and only if you choose.",
+          "microphonePermission": "Mouthful listens while you practise so it can follow along. Recordings are kept only if you choose, on this phone (and in its backup, if you use one).",
           "enableBackgroundPlayback": false
         }
       ]

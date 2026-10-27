@@ -23,6 +23,7 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
 
 ## Layout
 
+- `test/` — tests outside the engine (analytics opt-out, tester review cleanup)
 - `src/engine/` — pure TypeScript, unit tested in `__tests__`. **Any change here needs a test.**
   - `align.ts` — Glide matching, hesitations vs habit words, corrections, sentence context
   - `score.ts` — pace bands, score, coaching line, pacer
@@ -69,7 +70,7 @@ Today shows the active moment's plan (`PlanCard`): learn the words → say them 
 ## Commands
 
 ```bash
-npm test                  # engine tests (131)
+npm test                  # engine + store tests (136)
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)
