@@ -1,19 +1,18 @@
 // Streaks count calendar days, not 24-hour steps. The day clocks spring forward is only
 // 23 hours long, so stepping back 24 h from just after midnight jumps over a whole day.
-// Run in Toronto time so 8 March 2026 (spring-forward) really is in the gap, whatever
-// zone the machine running jest is set to.
+// The zone comes from test/globalSetup.js (MOUTHFUL_TEST_TZ, default America/Toronto), so
+// 8 March 2026 (spring-forward) is really in the gap; setting process.env.TZ in here wouldn't
+// reach Node's clock. In a zone without Toronto's transitions (CI also runs Asia/Kolkata) the
+// clock-change tests are skipped by name and the plain calendar tests still run.
 import { SavedSession, streak, thisWeek } from '../src/store/sessions';
 
-const ORIGINAL_TZ = process.env.TZ;
-beforeAll(() => {
-  process.env.TZ = 'America/Toronto';
-});
-afterAll(() => {
-  if (ORIGINAL_TZ === undefined) delete process.env.TZ;
-  else process.env.TZ = ORIGINAL_TZ;
-});
-
 const at = (month: number, day: number, h = 12, m = 0) => new Date(2026, month - 1, day, h, m).getTime();
+
+const hours = (a: number, b: number) => (b - a) / 3_600_000;
+/** Spring-forward 8 March and fall-back 1 November 2026, as in Toronto (same check as days.test.ts). */
+const hasTorontoDst = hours(at(3, 2, 0, 30), at(3, 9, 0, 30)) === 167 && hours(at(10, 29, 23, 30), at(11, 5, 23, 30)) === 169;
+const dstIt = hasTorontoDst ? it : it.skip;
+const dstName = (name: string) => (hasTorontoDst ? name : `${name} (skipped: no Toronto DST in ${process.env.TZ ?? 'this zone'})`);
 
 const session = (t: number): SavedSession => ({
   id: String(t),
@@ -31,22 +30,22 @@ const session = (t: number): SavedSession => ({
 });
 
 describe('streak', () => {
-  it('really is testing a clock change: 8 March is 23 hours long', () => {
-    expect((at(3, 9, 0, 30) - at(3, 8, 0, 30)) / 3_600_000).toBe(23);
+  dstIt(dstName('really is testing a clock change: 8 March is 23 hours long'), () => {
+    expect(hours(at(3, 8, 0, 30), at(3, 9, 0, 30))).toBe(23);
   });
 
-  it('counts three days across spring-forward, just after midnight', () => {
+  dstIt(dstName('counts three days across spring-forward, just after midnight'), () => {
     const sessions = [at(3, 7), at(3, 8), at(3, 9, 0, 10)].map(session);
     expect(streak(sessions, at(3, 9, 0, 30))).toEqual({ days: 3, freezeUsed: false });
   });
 
-  it('keeps yesterday’s streak just after midnight on the short night', () => {
+  dstIt(dstName('keeps yesterday’s streak just after midnight on the short night'), () => {
     // Nothing yet today (9 March): the streak is still the two days before.
     const sessions = [at(3, 7), at(3, 8)].map(session);
     expect(streak(sessions, at(3, 9, 0, 30))).toEqual({ days: 2, freezeUsed: false });
   });
 
-  it('counts a week across fall-back as 7 days', () => {
+  dstIt(dstName('counts a week across fall-back as 7 days'), () => {
     const sessions = [1, 2, 3, 4, 5, 6, 7].map((d) => session(at(11, d, 23, 30)));
     expect(streak(sessions, at(11, 7, 23, 45))).toEqual({ days: 7, freezeUsed: false });
   });
@@ -72,7 +71,7 @@ describe('streak', () => {
 });
 
 describe('thisWeek', () => {
-  it('marks the days read, Monday first, across spring-forward', () => {
+  dstIt(dstName('marks the days read, Monday first, across spring-forward'), () => {
     // Monday 9 March 2026; Sunday 8 March was the short day.
     const week = thisWeek([session(at(3, 9, 0, 10)), session(at(3, 11))], new Date(at(3, 11, 9)));
     expect(week.map((d) => d.done)).toEqual([true, false, true, false, false, false, false]);
