@@ -31,6 +31,8 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
   - `review.ts` — beta review metrics (false red/green per 100 words, uncaught errors)
   - `steadiness.ts` — pace by stretch of the passage (breaths left out) and a 0–100 steadiness; shown on the Tape as `PaceStrip`, not part of the score
   - `locale.ts` — which English the recogniser listens for (reader's choice in You, else the phone's region)
+  - `days.ts` — calendar-day maths (`daysBetween`, `calendarDay`), safe across clock changes
+- `src/speech/gate.ts` — when speech counts as on-device (Android only from API 33) and whether a variety is supported
 - `src/speech/useListener.ts` — recogniser wrapper: on-device/consent, restarts, voice level, optional recording, `reset()` for retries
 - `src/store/recordings.ts` — the recordings folder; delete-all sweeps strays from older builds too
 - `src/content/` — passages, Word Packs (6), moments (interview, presentation, raise, meeting), scripts
@@ -67,7 +69,7 @@ Today shows the active moment's plan (`PlanCard`): learn the words → say them 
 ## Commands
 
 ```bash
-npm test                  # engine tests (96)
+npm test                  # engine tests (131)
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)
@@ -91,5 +93,7 @@ npx eas-cli@latest build --profile development --platform ios
 - First-word lag is a proxy for highlight delay (voice level crossing a threshold → first inked word). It isn't measured on web, which has no voice levels.
 - Very short Free talk sessions inflate fillers per minute.
 - Steadiness is timed from when Glide reaches each word, so recogniser bursts add noise. Stretches under 1.5 s of speech are dropped, but an even reader on a bursty (server) recogniser may still score lower than they should. Check it against recordings in the beta before using it in the score. Reading only: Free talk has no sentences to time.
+- Android counts as on-device only from Android 13 (API 33). Below that the library uses the network recogniser even when asked for on-device. Android can't check a variety is supported before consent, so an unsupported one can still fail after the reader agrees.
+- Steadiness leaves out steps over 2.5 s (the Pauses tile covers those) and steps touching a skipped word. A tail under 8 words after the last full stop isn't timed.
 - Plan steps 1, 2 and 5 are free even for Pro packs (deliberate hook); steps 3–4 are Pro.
 - `patches/expo-speech-recognition+58.0.0.patch` makes iOS check on-device support for the locale we listen in (the library only checked the device default, and iOS silently falls back to the server). Android's on-device check still ignores locale. Re-check the patch when upgrading the library.
