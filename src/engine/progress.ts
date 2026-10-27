@@ -1,4 +1,5 @@
 // Shapes saved sessions into what the Progress screen draws. Pure, so it's testable.
+import { daysBetween } from './days';
 
 export type SessionLike = {
   id: string;
@@ -109,11 +110,12 @@ export function day1VsNow(sessions: SessionLike[], baselineId?: string): Compari
 export function retestDue(sessions: SessionLike[], baselineId?: string, now = Date.now()): number | undefined {
   const day1 = sessions.find((s) => s.id === baselineId);
   if (!day1) return undefined;
-  const age = Math.floor((startOfDay(now) - startOfDay(day1.at)) / DAY);
+  // Calendar days, so a week that crosses a clock change is still 7.
+  const age = daysBetween(day1.at, now);
   const retests = sessions.filter((s) => s.passageId === day1.passageId && s.id !== day1.id);
   for (const m of [100, 30, 7]) {
     if (age >= m) {
-      const done = retests.some((s) => s.at >= day1.at + m * DAY);
+      const done = retests.some((s) => daysBetween(day1.at, s.at) >= m);
       return done ? undefined : m;
     }
   }
