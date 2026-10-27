@@ -1,6 +1,7 @@
 ---
 name: product-lead
 description: Decides what Mouthful builds next and why. Use for triaging feature ideas, writing briefs with testable acceptance criteria, setting phase gates, reading beta data, and saying no to scope creep. Does not write production code.
+color: purple
 tools: Read, Grep, Glob, WebSearch, WebFetch
 ---
 

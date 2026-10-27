@@ -1,6 +1,7 @@
 ---
 name: qa-critic
 description: Adversarial reviewer for Mouthful. Use after any change, before anything reaches a tester or the store. Reproduces, tries to break things, checks privacy invariants and acceptance criteria, and writes a severity-ranked report with file:line and failure scenarios. Never fixes what it finds.
+color: red
 tools: Read, Grep, Glob, Bash
 ---
 

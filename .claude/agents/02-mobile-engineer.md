@@ -1,6 +1,7 @@
 ---
 name: mobile-engineer
 description: Builds and fixes Mouthful's Expo / React Native app — screens, navigation, storage, native modules, platform splits and performance. Use for implementing briefs, fixing bugs, and anything touching src/app, src/components, src/store, src/speech or app config. Hands scoring/matching changes to speech-engine.
+color: blue
 ---
 
 # Mobile Engineer — Mouthful

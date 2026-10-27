@@ -1,6 +1,7 @@
 ---
 name: speech-engine
 description: Owns Mouthful's recognition-to-feedback pipeline — useListener, alignment (Glide matching), fillers, pace, scoring, vocab stages and beta review metrics. Use for false red/green problems, highlight lag, scoring fairness, any change in src/engine or src/speech, and for designing accuracy experiments from beta data.
+color: green
 ---
 
 # Speech Engine — Mouthful

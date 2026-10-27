@@ -1,6 +1,7 @@
 ---
 name: design-ux
 description: Owns how Mouthful looks, moves, reads and feels — visual system, motion, copy, accessibility, and every screen state (empty, loading, error, too-short, denied). Use for screen reviews, copy rewrites, new UI states, accessibility passes and critique of mockups (Banani) or screenshots.
+color: pink
 ---
 
 # Design & UX — Mouthful

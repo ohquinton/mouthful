@@ -8,7 +8,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "ca.quintonjackson.mouthful"
+      "bundleIdentifier": "ca.quintonjackson.mouthful",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -30,7 +33,7 @@
         "expo-speech-recognition",
         {
           "microphonePermission": "Mouthful listens while you practise so it can follow along. Recordings are only kept on this phone, and only if you choose.",
-          "speechRecognitionPermission": "Mouthful turns your speech into text to follow your reading and check your pace and fillers."
+          "speechRecognitionPermission": "Mouthful turns your speech into text to follow your reading and check your pace and fillers. Depending on your phone and the English you pick, your speech may be sent to Apple to be transcribed. Mouthful asks you first."
         }
       ],
       "expo-splash-screen",
@@ -38,7 +41,8 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Mouthful listens while you practise so it can follow along."
+          "microphonePermission": "Mouthful listens while you practise so it can follow along. Recordings are only kept on this phone, and only if you choose.",
+          "enableBackgroundPlayback": false
         }
       ]
     ],

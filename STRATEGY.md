@@ -75,16 +75,17 @@ As built, the ceiling is a lifestyle app (~$20k/yr at the old 500-subscriber goa
 
 ## Open decisions for Quinton
 
-- Score habit words in Free talk? (recommended: yes)
-- Build Fade mode now, or after the device beta? (recommended: build now; it's the product)
 - Moment Pass pricing and whether to keep the annual trial.
+
+Decided 2026-10-27 (see DECISIONS.md): habit words stay unscored in Free talk; Fade mode waits for
+the Phase 1 gate and starts as two levels (full text → keywords). Both are in PARKED.md.
 
 ## Next steps
 
 1. qa-critic review of the 2026-10-27 commits; fix findings.
 2. Push to a private GitHub repo.
 3. Apple Developer account → first development build → test on the iPhone (nothing has run on a device yet).
-4. Free talk fillers decision, then Fade mode.
+4. After Phase 1: Fade mode (2 levels) if false red ≤ ~2/100 for accented readers; watch word if the hand-tally supports it.
 5. Beta with 10 readers (half ESL), per TESTING.md. Ask each: "Would you pay $10 to use this before your next interview?"
 
 ## Smaller bugs noted, not yet fixed

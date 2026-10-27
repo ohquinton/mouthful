@@ -1,6 +1,7 @@
 ---
 name: release-privacy
 description: Gatekeeper for anything that leaves the development machine — TestFlight and App Store builds, privacy promises and disclosures, subscriptions and RevenueCat, analytics, tester consent, naming/trademark. Use before any build goes to testers or review, when adding any SDK or data flow, and when writing store listings or the privacy policy. Can veto releases.
+color: orange
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 
