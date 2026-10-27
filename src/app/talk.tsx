@@ -58,9 +58,15 @@ export default function FreeTalk() {
     prevHeard.current = listener.lastHeardAt;
   }, [listener.lastHeardAt, startedAt]);
 
-  /** Every attempt (first go, retry, after consent) starts from a clean slate. */
+  /**
+   * Every attempt (first go, retry, after consent) starts from a clean slate. That includes a
+   * consent ask in the middle of a talk (on-device recognition went away at a restart): Free
+   * talk is one unscripted minute, so a fresh minute is more honest than scoring a talk with a
+   * consent screen in the middle of it, and the timer, pauses and transcript all reset together.
+   */
   const begin = async (override?: { allowServer?: boolean }) => {
-    const isRetry = notice !== null || failed;
+    // Words already heard means this replaces an attempt (e.g. after a mid-talk consent ask).
+    const isRetry = notice !== null || failed || heard.length > 0;
     listener.reset();
     pauses.current = 0;
     prevHeard.current = 0;

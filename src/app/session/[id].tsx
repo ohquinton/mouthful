@@ -109,6 +109,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
   const finished = useRef(false);
   const firstWordLag = useRef<number | undefined>(undefined);
   const reachedAt = useRef<(number | undefined)[]>([]); // when Glide first reached each word, for steadiness
+  const gateOpenedAt = useRef(0); // when a mid-read consent ask (MicGate) took over the screen
   const boxes = useRef<WordBox[]>([]);
   const scroller = useRef<ScrollViewInstance>(null);
   const [toast] = useState(() => new Animated.Value(0));
@@ -204,6 +205,25 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     lastAdvanceAt.current = t;
   }, [a.next, a.skipped, heard.length, words, height, showToast]);
 
+  // The listener can stop mid-read to ask for consent (on-device recognition went away at a
+  // restart). The transcript is kept, so the read carries on after a yes, but the time spent on
+  // the consent screen isn't reading: move the clock forward by it, so it doesn't count toward
+  // pace, the pacer or the gap that makes a pause. reachedAt is left alone on purpose: the step
+  // across the gate includes reading the consent screen, tapping, the permission check and the
+  // recogniser starting again, so in practice it's over the 2.5 s that steadiness drops as a stop.
+  useEffect(() => {
+    if (listener.state === 'needs-consent') {
+      if (startedAt.current && !gateOpenedAt.current) gateOpenedAt.current = Date.now();
+      // No word yet: the voice we heard before the gate isn't the start of the read.
+      if (!startedAt.current) voiceAt.current = 0;
+    } else if (listener.state === 'listening' && gateOpenedAt.current) {
+      const away = Date.now() - gateOpenedAt.current;
+      startedAt.current += away;
+      lastAdvanceAt.current += away;
+      gateOpenedAt.current = 0;
+    }
+  }, [listener.state]);
+
   const finish = useCallback(async () => {
     if (finished.current) return;
     finished.current = true;
@@ -286,6 +306,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     firstWordLag.current = undefined;
     reachedAt.current = [];
     lastAdvanceAt.current = 0;
+    gateOpenedAt.current = 0;
     prevNext.current = 0;
     pauses.current = 0;
     skipToastShown.current = false;
