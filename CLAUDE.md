@@ -38,6 +38,19 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
 - `src/purchases.native.ts` — RevenueCat (phones). `src/purchases.ts` — web/test stub.
 - `src/analytics.ts` — PostHog batch client. Event names, numbers and allowlisted short codes only; free text is dropped before sending.
 
+## Running the agent team (no collisions)
+
+Agents live in `.claude/agents/`. Only the main session hands out work and merges it.
+
+1. **Start clean.** `git status` must be empty before agents start. Commit or stash first.
+2. **Readers run in parallel, freely.** qa-critic, release-privacy and product-lead can't edit files (their `tools` lists), so any number can run at once.
+3. **Writers get their own worktree.** mobile-engineer, speech-engine and design-ux always run with worktree isolation, so each edits its own copy of the repo on its own branch, never `main` directly.
+4. **One owner per file per wave.** Before launching writers, list the files each will touch. If two writers need the same file, run them one after the other, not together. Default ownership: speech-engine owns `src/engine/` and `src/speech/`; mobile-engineer owns `src/app/`, `src/store/`, `src/components/`; design-ux reviews and proposes copy, and edits only when given the files.
+5. **Shared files are main-session only:** `package.json`, `package-lock.json`, `app.json`, `CLAUDE.md`, `patches/`, `src/theme.ts`, `src/brand.ts`. A writer that needs a change there says so in its handoff instead of making it.
+6. **Merge one branch at a time.** After each merge into `main`: `npm test` and `npm run typecheck` must pass before the next merge. A failing merge is reverted and sent back to its author.
+7. **qa-critic reviews every merged change** before the next wave starts, never the agent that wrote it.
+8. **Waves:** read (review, audit, decide) → write (fixes and features, isolated) → merge one by one → qa-critic → next wave.
+
 ## Tester mode (supervised beta only)
 
 Hidden: tap the version line on the You tab 7 times, or build with `EXPO_PUBLIC_TESTER_MODE=1`. When on, every reading session is recorded and keeps its transcript, statuses and first-word lag (`SavedSession.review`), all on the phone. `/review` lets you mark errors against the recording and copies numbers-only rows for the beta sheet. See TESTING.md.
