@@ -6,7 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { normalise, preparePassage, PassageWord } from '../engine/align';
 import { REVIEW_HEADER, reviewMetrics, reviewRow, ReviewMarks, toggleMark } from '../engine/review';
 import { resolvePassage, sourceOf } from '../content/resolve';
-import { loadSessions, SavedSession, updateSession } from '../store/sessions';
+import { listenerSummary, loadSessions, SavedSession, updateSession } from '../store/sessions';
 import { ReplayButton } from '../components/Replay';
 import { PrimaryButton, SecondaryButton } from '../components/ui';
 import { fonts, space, useColors } from '../theme';
@@ -68,7 +68,7 @@ function ReviewList() {
     <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={[styles.wrap, { paddingTop: insets.top + space(1), paddingBottom: insets.bottom + space(3) }]}>
       <Header title="Review sessions" />
       <Text style={[styles.lead, { color: colors.muted }]}>
-        Open each session, play the recording, and mark every word {' '}Mouthful got wrong. Then copy the numbers into the beta sheet before you reset for the next tester.
+        Open each session, play the recording, and mark every word {' '}Mouthful got wrong. Then copy the numbers into the beta sheet before you reset for the next tester. The restarts and glitches line isn’t in the copy: type it in by hand.
       </Text>
       {rows.length === 0 && <Text style={[styles.lead, { color: colors.ink }]}>No tester sessions yet. Do a reading session with tester mode on.</Text>}
       {rows.map(({ s, statuses }) => {
@@ -87,6 +87,8 @@ function ReviewList() {
                 {new Date(s.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {m.falseRedPer100} false red /100 ·{' '}
                 {s.recordings?.length ? 'recorded' : 'no audio'}
               </Text>
+              {/* Not in the copied row (engine/review.ts): copy these into the sheet by hand. */}
+              <Text style={[styles.rowSub, { color: colors.muted }]}>{listenerSummary(s.review)}</Text>
             </View>
             <Ionicons name={s.review!.reviewed ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={s.review!.reviewed ? colors.good : colors.line} />
           </Pressable>
@@ -156,6 +158,8 @@ function ReviewOne({ id }: { id: string }) {
           </View>
         ))}
       </View>
+
+      <Text style={[styles.howTo, { color: colors.muted }]}>Listener: {listenerSummary(s.review)}</Text>
 
       <Text style={[styles.howTo, { color: colors.muted }]}>
         Tap a <Text style={{ color: colors.stumble, fontWeight: '700' }}>red</Text> word if you hear it on the recording. Tap a green or

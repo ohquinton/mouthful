@@ -157,6 +157,22 @@ export function recordingUris(sessions: SavedSession[]): string[] {
   return sessions.flatMap((s) => s.recordings ?? []);
 }
 
+/**
+ * Tester mode: the listener's restarts and glitch codes for one session, as one line for /review
+ * ("2 restarts · audio-capture 3, network 1"). The beta sheet's copied row is engine/review.ts
+ * and doesn't carry these, so Quinton copies them from the screen by hand.
+ */
+export function listenerSummary(review: SavedSession['review']): string {
+  const d = review?.listener;
+  if (!d) return 'Listener counts weren’t saved for this session.'; // before Wave 4b, or not tester mode
+  const restarts = d.restarts === 1 ? '1 restart' : `${d.restarts} restarts`;
+  const codes = Object.entries(d.glitches)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([code, n]) => `${code} ${n}`);
+  return `${restarts} · ${codes.length ? codes.join(', ') : 'no glitches'}`;
+}
+
 /** How many sessions still hold tester mode's review data (what the phone heard, marks). */
 export function reviewCount(sessions: SavedSession[]): number {
   return sessions.filter((s) => s.review).length;

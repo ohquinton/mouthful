@@ -1,7 +1,7 @@
 // Switching tester mode off offers to delete what it kept (transcripts and marks).
 // The sessions and their scores must survive; only the review data goes.
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { clearSessionReviews, loadSessions, reviewCount, saveSession, SavedSession } from '../src/store/sessions';
+import { clearSessionReviews, listenerSummary, loadSessions, reviewCount, saveSession, SavedSession } from '../src/store/sessions';
 
 const base = (id: string): SavedSession => ({
   id,
@@ -41,5 +41,34 @@ describe('clearSessionReviews', () => {
     expect(await clearSessionReviews()).toBe(0);
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+describe('listenerSummary (tester diagnostics on /review)', () => {
+  const review = (listener?: { restarts: number; glitches: Record<string, number> }) => ({
+    statuses: 'rr',
+    transcript: '',
+    marks: { said: [], notSaid: [] },
+    listener,
+  });
+
+  it('lists restarts and glitch codes, most frequent first', () => {
+    expect(listenerSummary(review({ restarts: 2, glitches: { network: 1, 'audio-capture': 3 } }))).toBe('2 restarts · audio-capture 3, network 1');
+  });
+
+  it('uses the singular and says when nothing went wrong', () => {
+    expect(listenerSummary(review({ restarts: 1, glitches: {} }))).toBe('1 restart · no glitches');
+    expect(listenerSummary(review({ restarts: 0, glitches: { other: 0 } }))).toBe('0 restarts · no glitches');
+  });
+
+  it('copes with sessions saved before the counts existed', () => {
+    expect(listenerSummary(review())).toBe('Listener counts weren’t saved for this session.');
+    expect(listenerSummary(undefined)).toBe('Listener counts weren’t saved for this session.');
+  });
+
+  it('keeps the counts when the session is saved and loaded', async () => {
+    await AsyncStorage.clear();
+    await saveSession({ ...base('d'), review: review({ restarts: 3, glitches: { network: 2 } }) });
+    expect((await loadSessions())[0].review?.listener).toEqual({ restarts: 3, glitches: { network: 2 } });
   });
 });
