@@ -20,7 +20,8 @@ describe('analytics', () => {
     process.env.EXPO_PUBLIC_POSTHOG_KEY = 'phc_test';
     const fetchMock = jest.fn().mockResolvedValue({ ok: true });
     (globalThis as any).fetch = fetchMock as any;
-    const { track } = require('../../analytics');
+    const { track, setAnalyticsEnabled } = require('../../analytics');
+    setAnalyticsEnabled(true); // the profile has loaded with no opt-out; nothing is sent before that
     for (let i = 0; i < 10; i++) track('session_complete', { wpm: 150 + i, accuracy: 96 });
     await new Promise((r) => setTimeout(r, 20));
     expect(fetchMock).toHaveBeenCalledTimes(1);

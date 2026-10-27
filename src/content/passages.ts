@@ -1,5 +1,6 @@
 // Original passages. Rules (see CLAUDE.md): 60–120 words, at least one comma-heavy
 // sentence, two "trip words" of 3+ syllables, things adults actually say out loud.
+import { calendarDay } from '../engine/days';
 
 export type Level = 'Steady' | 'Flowing' | 'Sharp';
 
@@ -57,10 +58,11 @@ export const PASSAGES: Passage[] = [
 
 /**
  * Days since 1970 on the reader's own calendar. Counting from `getTime()` would roll over
- * at UTC midnight (7 pm in Toronto), swapping today's read mid-evening.
+ * at UTC midnight (7 pm in Toronto), swapping today's read mid-evening. Kept as its own name
+ * because prompts.ts uses it; the maths lives in engine/days.ts.
  */
 export function localDay(date = new Date()): number {
-  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000);
+  return calendarDay(date);
 }
 
 export function passageOfTheDay(date = new Date()): Passage {

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { correctedAccuracy, sessionScore } from '../engine/score';
 import type { ReviewMarks } from '../engine/review';
 import type { PaceSegment } from '../engine/steadiness';
+import { calendarDay } from '../engine/days';
 
 export type SavedSession = {
   id: string;
@@ -112,21 +113,24 @@ const dayKey = (t: number) => new Date(t).toDateString();
  * automatically (streak freeze), because streaks that punish cause churn.
  */
 export function streak(sessions: SavedSession[], now = Date.now()): { days: number; freezeUsed: boolean } {
-  const days = new Set(sessions.map((s) => dayKey(s.at)));
+  // Step back one calendar day at a time (a whole number), never 24 hours: the day clocks
+  // spring forward is 23 hours long and the day they fall back is 25, so 24-hour steps
+  // skip a day or count one twice.
+  const days = new Set(sessions.map((s) => calendarDay(s.at)));
   let count = 0;
   let freezeUsed = false;
   let sinceFreeze = 7;
-  let cursor = new Date(now);
-  if (!days.has(dayKey(cursor.getTime()))) cursor = new Date(now - 86_400_000);
+  let day = calendarDay(now);
+  if (!days.has(day)) day -= 1; // nothing yet today: the streak can still run to yesterday
   for (let guard = 0; guard < 3650; guard++) {
-    if (days.has(dayKey(cursor.getTime()))) {
+    if (days.has(day)) {
       count++;
       sinceFreeze++;
-    } else if (sinceFreeze >= 7 && count > 0 && days.has(dayKey(cursor.getTime() - 86_400_000))) {
+    } else if (sinceFreeze >= 7 && count > 0 && days.has(day - 1)) {
       freezeUsed = true;
       sinceFreeze = 0;
     } else break;
-    cursor = new Date(cursor.getTime() - 86_400_000);
+    day -= 1;
   }
   return { days: count, freezeUsed };
 }

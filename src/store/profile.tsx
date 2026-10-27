@@ -2,7 +2,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadSessions, recordingUris } from './sessions';
 import { deleteAllRecordings } from './recordings';
-import { setAnalyticsEnabled } from '../analytics';
+import { resetAnalytics, setAnalyticsEnabled } from '../analytics';
 
 export type Goal = 'meetings' | 'video' | 'esl' | 'confidence';
 
@@ -55,8 +55,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     AsyncStorage.getItem(KEY)
-      .then((raw) => raw && apply({ ...DEFAULT, ...(JSON.parse(raw) as Partial<Profile>) }))
-      .catch(() => {})
+      .then((raw) => {
+        if (raw) apply({ ...DEFAULT, ...(JSON.parse(raw) as Partial<Profile>) });
+        else setAnalyticsEnabled(true); // a fresh install: on, as the You tab says
+      })
+      // Couldn't read the profile, so we can't tell whether the reader opted out: send nothing this launch.
+      .catch(() => setAnalyticsEnabled(false))
       .finally(() => setReady(true));
   }, [apply]);
 
@@ -82,6 +86,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     try {
       await AsyncStorage.clear();
     } catch {}
+    // Like a fresh install: analytics on (DEFAULT has no opt-out), but under a new anonymous id.
+    await resetAnalytics();
   }, [apply]);
 
   const value = useMemo(() => ({ profile, ready, update, reset }), [profile, ready, update, reset]);

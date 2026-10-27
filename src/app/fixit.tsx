@@ -143,8 +143,9 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
-  // The recogniser reported a problem (e.g. it can't listen for this English). Shown whatever the state.
-  const failed = listener.error !== null || listener.state === 'error';
+  // The recogniser stopped for good (e.g. it can't listen for this English). A routine error
+  // while it's still listening restarts by itself, so it shows nothing.
+  const failed = listener.state === 'error';
 
   /** Start listening again from a clean page. The step stays where it was. */
   const retryListening = async () => {
@@ -152,7 +153,7 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
     listener.reset();
     setHeardFrom(0); // the transcript starts empty again
     setCleared(false);
-    listener.start();
+    await listener.start(); // awaited so ListenError keeps Try again disabled until the mic is starting
   };
 
   if (gateStates.includes(listener.state)) {
@@ -241,7 +242,7 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
 
       {failed ? (
         <View style={styles.errorWrap}>
-          <ListenError message={listener.error} onRetry={retryListening} />
+          <ListenError message={listener.error} code={listener.errorCode} onRetry={retryListening} />
         </View>
       ) : (
         <View style={styles.listenRow}>

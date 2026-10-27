@@ -109,6 +109,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
   const finished = useRef(false);
   const firstWordLag = useRef<number | undefined>(undefined);
   const reachedAt = useRef<(number | undefined)[]>([]); // when Glide first reached each word, for steadiness
+  const gateOpenedAt = useRef(0); // when a mid-read consent ask (MicGate) took over the screen
   const boxes = useRef<WordBox[]>([]);
   const scroller = useRef<ScrollViewInstance>(null);
   const [toast] = useState(() => new Animated.Value(0));
@@ -204,6 +205,25 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     lastAdvanceAt.current = t;
   }, [a.next, a.skipped, heard.length, words, height, showToast]);
 
+  // The listener can stop mid-read to ask for consent (on-device recognition went away at a
+  // restart). The transcript is kept, so the read carries on after a yes, but the time spent on
+  // the consent screen isn't reading: move the clock forward by it, so it doesn't count toward
+  // pace, the pacer or the gap that makes a pause. reachedAt is left alone on purpose: the step
+  // across the gate includes reading the consent screen, tapping, the permission check and the
+  // recogniser starting again, so in practice it's over the 2.5 s that steadiness drops as a stop.
+  useEffect(() => {
+    if (listener.state === 'needs-consent') {
+      if (startedAt.current && !gateOpenedAt.current) gateOpenedAt.current = Date.now();
+      // No word yet: the voice we heard before the gate isn't the start of the read.
+      if (!startedAt.current) voiceAt.current = 0;
+    } else if (listener.state === 'listening' && gateOpenedAt.current) {
+      const away = Date.now() - gateOpenedAt.current;
+      startedAt.current += away;
+      lastAdvanceAt.current += away;
+      gateOpenedAt.current = 0;
+    }
+  }, [listener.state]);
+
   const finish = useCallback(async () => {
     if (finished.current) return;
     finished.current = true;
@@ -219,7 +239,9 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     const fillersPerMin = +(a.fillerCount / (secs / 60)).toFixed(1);
     const attempted = a.read + a.skipped;
     const accuracy = attempted ? Math.round((a.read / attempted) * 100) : 0;
-    const segments = paceSegments(words, reachedAt.current);
+    // The recogniser's statuses (raw), not the corrected ones: a word the reader tapped as said
+    // was still a skip when Glide stamped its timing, so its steps can't be timed.
+    const segments = paceSegments(words, reachedAt.current, raw.status);
     const steady = paceSteadiness(segments);
     const stats = { wpm: wordsPerMinute(a.spoken, secs), fillersPerMin, accuracy, midSentencePauses: pauses.current, seconds: secs, steadiness: steady?.score };
     const topFiller = Object.entries(a.fillers).sort((x, y) => y[1] - x[1])[0]?.[0];
@@ -274,7 +296,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (isBaseline && !profile.onboarded) router.replace({ pathname: '/onboarding/day1', params: { id: sessionId } });
     else router.replace({ pathname: '/tape', params: { id: sessionId } });
-  }, [a, listener, passage, words, pace, corrected, profile, update, step, isBaseline, tester]);
+  }, [a, raw, listener, passage, words, pace, corrected, profile, update, step, isBaseline, tester]);
 
   /** A real restart: clean transcript, timer, corrections, marks and pauses, then listen again. */
   const retry = useCallback(() => {
@@ -284,6 +306,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     firstWordLag.current = undefined;
     reachedAt.current = [];
     lastAdvanceAt.current = 0;
+    gateOpenedAt.current = 0;
     prevNext.current = 0;
     pauses.current = 0;
     skipToastShown.current = false;
@@ -294,7 +317,8 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     scroller.current?.scrollTo({ y: 0, animated: true });
     finished.current = false;
     track('session_retry', { where: 'glide' });
-    listener.start();
+    // Returned so the error card's Try again stays disabled until the mic is starting.
+    return listener.start();
   }, [listener]);
 
   /**
@@ -306,7 +330,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     finished.current = true; // no Finish or last-word save while the mic stops; retry() clears it
     const uris = listener.state === 'listening' ? await listener.stop() : listener.recordings;
     deleteRecordingFiles(uris);
-    retry();
+    await retry();
   }, [listener, retry]);
 
   // The session ends itself on the last word.
@@ -319,8 +343,9 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     return <MicGate state={listener.state} onAllowed={() => listener.start({ allowServer: true })} />;
   }
 
-  // The recogniser reported a problem. Shown whatever the listener state, with a way back.
-  const failed = listener.error !== null || listener.state === 'error';
+  // The recogniser stopped for good. A routine error while it's still listening (it restarts
+  // by itself) shows nothing: the words are still inking in.
+  const failed = listener.state === 'error';
   // eslint-disable-next-line react-hooks/refs -- read-only timing refs; see `seconds` above
   const lost = listener.state === 'listening' && startedAt.current > 0 && !a.done && now - lastAdvanceAt.current > LOST_AFTER_MS;
   const offScript = heard.length >= 20 && a.read < 6;
@@ -416,7 +441,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
       )}
 
       {failed && !tooShort && (
-        <ListenError message={listener.error} onRetry={retryAfterError} style={{ ...styles.errorCard, bottom: insets.bottom + 72 }} />
+        <ListenError message={listener.error} code={listener.errorCode} onRetry={retryAfterError} style={{ ...styles.errorCard, bottom: insets.bottom + 72 }} />
       )}
 
       {/* Quiet nudges */}
