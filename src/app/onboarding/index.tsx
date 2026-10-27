@@ -125,7 +125,7 @@ export default function Onboarding() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.keepTitle, { color: colors.ink }]}>Keep my Day 1 recording</Text>
                 <Text style={[styles.keepSub, { color: colors.muted }]}>
-                  Off unless you turn it on. Saved only on this phone, so you can hear the difference on day 7 and day 30. Delete it any time in You.
+                  Off unless you turn it on. Kept on this phone, and in its backup if you use one, so you can hear the difference on day 7 and day 30. Delete it any time in You.
                 </Text>
               </View>
               <Switch value={keep} onValueChange={setKeep} accessibilityLabel="Keep my Day 1 recording on this phone" />

@@ -56,6 +56,9 @@ export function sanitise(props: Props): Props {
 }
 
 let distinctId: string | null = null;
+// The reader can turn analytics off in You. The profile provider calls setAnalyticsEnabled
+// on load and on every change, because this module can't read React state.
+let enabled = true;
 let queue: { event: string; properties: Props; timestamp: string }[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -75,7 +78,7 @@ async function getId(): Promise<string> {
 
 async function flush() {
   timer = null;
-  if (!KEY || !queue.length) return;
+  if (!KEY || !enabled || !queue.length) return;
   const batch = queue;
   queue = [];
   const id = await getId();
@@ -94,10 +97,25 @@ async function flush() {
 }
 
 export function track(event: EventName, properties: Props = {}) {
-  if (!KEY) return;
+  if (!KEY || !enabled) return;
   queue.push({ event, properties: sanitise(properties), timestamp: new Date().toISOString() });
   if (queue.length >= 10) flush();
   else if (!timer) timer = setTimeout(flush, 8000);
 }
 
+/** True when this build has a PostHog key, so there is something to opt out of. */
 export const analyticsEnabled = !!KEY;
+
+/**
+ * Turns sending on or off. Off also drops anything queued but not yet sent, so events
+ * from before the reader opted out never leave the phone.
+ */
+export function setAnalyticsEnabled(on: boolean) {
+  enabled = on;
+  if (on) return;
+  queue = [];
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+  }
+}

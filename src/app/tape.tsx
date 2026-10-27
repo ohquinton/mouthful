@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,7 +30,7 @@ export default function Tape() {
   const [days, setDays] = useState(0);
   const [shown, setShown] = useState(0);
   const [passageWords, setPassageWords] = useState<PassageWord[]>([]);
-  const count = useRef(new Animated.Value(0)).current;
+  const [count] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     loadSessions().then((all) => {

@@ -1,14 +1,15 @@
 // iOS / Android: real subscriptions through RevenueCat.
 //
-// Setup (once): create products `mouthful_pro_annual` ($39.99/yr, 7-day trial) and
+// Setup (once): create products `mouthful_pro_annual` ($39.99/yr, 7-day free trial as an
+// introductory offer, which trialOffer() reads) and
 // `mouthful_pro_monthly` ($6.99/mo) in App Store Connect, add them to the RevenueCat
 // "default" offering as the Annual and Monthly packages, and attach the "pro" entitlement.
 // Then set EXPO_PUBLIC_REVENUECAT_IOS_KEY (and _ANDROID_KEY) in .env.
 //
 // With no key: development builds unlock Pro locally for testing; production builds refuse.
 import { Platform } from 'react-native';
-import Purchases, { type CustomerInfo, type PurchasesPackage } from 'react-native-purchases';
-import { ENTITLEMENT, PlanId, PurchaseCancelled, PurchasesNotConfigured } from './purchases.shared';
+import Purchases, { INTRO_ELIGIBILITY_STATUS, type CustomerInfo, type PurchasesPackage } from 'react-native-purchases';
+import { ENTITLEMENT, PlanId, PurchaseCancelled, PurchasesNotConfigured, TrialOffer } from './purchases.shared';
 
 export * from './purchases.shared';
 
@@ -39,6 +40,39 @@ export async function storePrices(): Promise<Partial<Record<PlanId, string>> | n
   try {
     const [annual, monthly] = await Promise.all([packageFor('annual'), packageFor('monthly')]);
     return { annual: annual?.product.priceString, monthly: monthly?.product.priceString };
+  } catch {
+    return null;
+  }
+}
+
+const DAYS_PER: Record<string, number> = { DAY: 1, WEEK: 7, MONTH: 30, YEAR: 365 };
+const toDays = (unit: string, count: number) => (DAYS_PER[unit] ?? 0) * count;
+
+/**
+ * The free trial this person can actually get on a plan, or null. Apple rejects paywalls that
+ * promise a trial to someone who already used it (Guideline 3.1.2), so anything short of a
+ * clear yes from the store (unknown, offline, not configured) means no trial copy.
+ */
+export async function trialOffer(plan: PlanId): Promise<TrialOffer> {
+  if (!(await initPurchases())) return null;
+  try {
+    const pkg = await packageFor(plan);
+    if (!pkg) return null;
+    const product = pkg.product;
+    if (Platform.OS === 'ios') {
+      const intro = product.introPrice;
+      if (!intro || intro.price !== 0) return null; // no intro, or a discount rather than a free trial
+      const result = await Purchases.checkTrialOrIntroductoryPriceEligibility([product.identifier]);
+      if (result[product.identifier]?.status !== INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE) return null;
+      const days = toDays(intro.periodUnit, intro.periodNumberOfUnits * Math.max(1, intro.cycles));
+      return days > 0 ? { days } : null;
+    }
+    // Android's eligibility check always says "unknown", but Google Play only includes the free
+    // phase in the default offer for people who can still get it.
+    const free = product.defaultOption?.freePhase;
+    if (!free) return null;
+    const days = toDays(free.billingPeriod.unit, free.billingPeriod.value * Math.max(1, free.billingCycleCount ?? 1));
+    return days > 0 ? { days } : null;
   } catch {
     return null;
   }

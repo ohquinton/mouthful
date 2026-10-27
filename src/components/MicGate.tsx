@@ -41,7 +41,8 @@ export function MicGate({ state, onAllowed }: { state: ListenerState; onAllowed:
           hitSlop={8}
           onPress={() => {
             track('server_recognition_consent', { allowed: false });
-            router.canGoBack() ? router.back() : router.replace('/');
+            if (router.canGoBack()) router.back();
+            else router.replace('/');
           }}
         >
           <Text style={[styles.link, { color: colors.muted }]}>Not now</Text>

@@ -5,11 +5,12 @@ import { useColors } from '../../theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const icon =
-  (name: IconName, active: IconName) =>
-  ({ color, focused }: { color: unknown; focused: boolean }) => (
-    <Ionicons name={focused ? active : name} size={24} color={(color ?? undefined) as React.ComponentProps<typeof Ionicons>['color']} />
-  );
+const icon = (name: IconName, active: IconName) => {
+  function TabIcon({ color, focused }: { color: unknown; focused: boolean }) {
+    return <Ionicons name={focused ? active : name} size={24} color={(color ?? undefined) as React.ComponentProps<typeof Ionicons>['color']} />;
+  }
+  return TabIcon;
+};
 
 export default function TabsLayout() {
   const colors = useColors();

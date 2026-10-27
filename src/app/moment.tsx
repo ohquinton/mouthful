@@ -33,7 +33,8 @@ export default function MomentPicker() {
     const same = profile.moment?.id === id;
     await update({ moment: { id, date, startedAt: Date.now(), done: same ? profile.moment?.done ?? [] : [], scriptId: same ? profile.moment?.scriptId : undefined } });
     track('moment_start', { moment: id, days_out: when });
-    router.canGoBack() ? router.back() : router.replace('/');
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
   };
 
   return (
@@ -100,7 +101,8 @@ export default function MomentPicker() {
             hitSlop={8}
             onPress={async () => {
               await update({ moment: null });
-              router.canGoBack() ? router.back() : router.replace('/');
+              if (router.canGoBack()) router.back();
+              else router.replace('/');
             }}
           >
             <Text style={[styles.clear, { color: colors.muted }]}>I’m not preparing for anything right now</Text>

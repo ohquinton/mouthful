@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { ScrollViewInstance } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +16,7 @@ import {
 } from '../../engine/align';
 import { PaceContext, pacerIndex, pacerWpm, paceZone, sessionScore, wordsPerMinute } from '../../engine/score';
 import type { Passage } from '../../content/passages';
-import { resolvePassage } from '../../content/resolve';
+import { resolvePassage, sourceOf } from '../../content/resolve';
 import { saveSession } from '../../store/sessions';
 import { deleteRecordingFiles } from '../../store/recordings';
 import { encodeStatuses } from '../../engine/review';
@@ -30,9 +30,9 @@ import { GlideWord, WordBox } from '../../components/GlideWord';
 import { InkCursor } from '../../components/InkCursor';
 import { useVoiceLevel, VoiceRibbon } from '../../components/VoiceRibbon';
 import { MicGate, gateStates } from '../../components/MicGate';
+import { ListenError } from '../../components/ListenError';
 import { space, useColors } from '../../theme';
 import { DICTIONARY } from '../../content/wordpacks';
-import { sourceOf } from '../../content/resolve';
 
 const MID_SENTENCE_PAUSE_MS = 2000;
 const BREATH_PAUSE_MS = 450;
@@ -56,7 +56,7 @@ export default function GlideSession() {
   if (passage === null) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.bg }]}>
-        <Text style={[styles.body, { color: colors.ink }]}>That passage doesn't exist.</Text>
+        <Text style={[styles.body, { color: colors.ink }]}>That passage doesn’t exist.</Text>
         <Pressable onPress={() => router.back()}>
           <Text style={[styles.link, { color: colors.muted }]}>Go back</Text>
         </Pressable>
@@ -95,7 +95,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     lang: listenLocale(profile.speechLang),
   });
 
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [notice, setNotice] = useState<string | null>(null);
   const [breathFilled, setBreathFilled] = useState<Set<number>>(new Set());
   const [corrected, setCorrected] = useState<Set<number>>(new Set());
@@ -111,7 +111,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
   const reachedAt = useRef<(number | undefined)[]>([]); // when Glide first reached each word, for steadiness
   const boxes = useRef<WordBox[]>([]);
   const scroller = useRef<ScrollViewInstance>(null);
-  const toast = useRef(new Animated.Value(0)).current;
+  const [toast] = useState(() => new Animated.Value(0));
 
   const onMeasure = useCallback((idx: number, box: Partial<WordBox>) => {
     boxes.current[idx] = { ...(boxes.current[idx] ?? { x: 0, y: 0, w: 0, h: 0 }), ...box };
@@ -132,6 +132,9 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     return () => clearInterval(t);
   }, []);
 
+  // Timing refs are read during render on purpose: the 250 ms clock re-renders the screen, and
+  // moving them into state would add renders to Glide's hot path. Nothing here writes a ref.
+  // eslint-disable-next-line react-hooks/refs -- startedAt is set once by the pointer effect; the clock re-renders
   const seconds = startedAt.current ? (now - startedAt.current) / 1000 : 0;
   const wpm = wordsPerMinute(a.spoken, seconds);
   const zone = paceZone(wpm, pace);
@@ -294,8 +297,21 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     listener.start();
   }, [listener]);
 
+  /**
+   * Try again after a recogniser error (e.g. it can't listen for this English). The mic may
+   * still be on if the error wasn't fatal, so stop it first, and don't keep audio from an
+   * attempt that won't be saved.
+   */
+  const retryAfterError = useCallback(async () => {
+    finished.current = true; // no Finish or last-word save while the mic stops; retry() clears it
+    const uris = listener.state === 'listening' ? await listener.stop() : listener.recordings;
+    deleteRecordingFiles(uris);
+    retry();
+  }, [listener, retry]);
+
   // The session ends itself on the last word.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to the recogniser reaching the last word; finish() is guarded by finished.current
     if (a.done) finish();
   }, [a.done, finish]);
 
@@ -303,10 +319,15 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     return <MicGate state={listener.state} onAllowed={() => listener.start({ allowServer: true })} />;
   }
 
+  // The recogniser reported a problem. Shown whatever the listener state, with a way back.
+  const failed = listener.error !== null || listener.state === 'error';
+  // eslint-disable-next-line react-hooks/refs -- read-only timing refs; see `seconds` above
   const lost = listener.state === 'listening' && startedAt.current > 0 && !a.done && now - lastAdvanceAt.current > LOST_AFTER_MS;
   const offScript = heard.length >= 20 && a.read < 6;
   const zoneColor = zone === 'good' ? colors.good : zone === 'fast' ? colors.stumble : zone === 'slow' ? colors.ember : colors.line;
+  // Word boxes are measured by onLayout into a ref; the cursor reads the latest one each render.
   const cursorBox = boxes.current[a.next];
+  // eslint-disable-next-line react-hooks/refs -- read-only timing ref; see `seconds` above
   const showPacer = pacer !== null && startedAt.current > 0 && Math.abs(pacer - a.next) >= 2;
 
   return (
@@ -326,6 +347,10 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
       <View style={[styles.progressTrack, { backgroundColor: colors.line }]}>
         <View style={[styles.progressFill, { backgroundColor: colors.signal, width: `${(a.next / words.length) * 100}%` }]} />
       </View>
+      {/* Static on purpose (principle 6): the reader should know, without anything moving. Web can't record. */}
+      {tester && (
+        <Text style={[styles.testerTag, { color: colors.muted }]}>{Platform.OS === 'web' ? 'Tester mode · not recording on web' : 'Recording · tester mode'}</Text>
+      )}
 
       {/* The passage. Only the words, the ink cursor and the footer move. */}
       <ScrollView
@@ -334,6 +359,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.flow}>
+          {/* eslint-disable-next-line react-hooks/refs -- cursorBox comes from the measured-boxes ref (see above); reading it here is what moves the cursor */}
           <InkCursor box={cursorBox} color={colors.signalSoft} visible={listener.state === 'listening' && !a.done} />
           {words.map((w, i) => (
             <GlideWord
@@ -362,7 +388,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
           accessibilityRole="button"
         >
           <Text style={[styles.coldEyebrow, { color: colors.muted }]}>COLD READ</Text>
-          <Text style={[styles.h2, { color: colors.ink }]}>You haven't seen this one.</Text>
+          <Text style={[styles.h2, { color: colors.ink }]}>You haven’t seen this one.</Text>
           <Text style={[styles.body, { color: colors.muted, textAlign: 'center' }]}>
             Like the real thing: no rehearsal. Tap, then start reading straight away.
           </Text>
@@ -389,8 +415,12 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
         </View>
       )}
 
+      {failed && !tooShort && (
+        <ListenError message={listener.error} onRetry={retryAfterError} style={{ ...styles.errorCard, bottom: insets.bottom + 72 }} />
+      )}
+
       {/* Quiet nudges */}
-      {!tooShort && (lost || offScript || listener.state === 'asking') && (
+      {!tooShort && !failed && (lost || offScript || listener.state === 'asking') && (
         <View style={[styles.nudge, { backgroundColor: colors.surface, borderColor: colors.line }]}>
           <Text style={[styles.nudgeText, { color: colors.ink }]}>
             {listener.state === 'asking'
@@ -424,7 +454,6 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
         </View>
       </View>
       <View style={[styles.paceLine, { backgroundColor: zoneColor, bottom: insets.bottom }]} />
-      {listener.error ? <Text style={[styles.err, { color: colors.stumble }]}>{listener.error}</Text> : null}
     </View>
   );
 }
@@ -451,7 +480,8 @@ const styles = StyleSheet.create({
   nudgeText: { fontSize: 15, fontWeight: '500' },
   toast: { position: 'absolute', bottom: 170, alignSelf: 'center', borderRadius: 12, paddingHorizontal: space(2), paddingVertical: 12, maxWidth: '86%' },
   toastText: { fontSize: 15, textAlign: 'center' },
-  err: { position: 'absolute', bottom: 80, alignSelf: 'center', fontSize: 13 },
+  errorCard: { position: 'absolute', left: space(2), right: space(2), alignSelf: 'auto' },
+  testerTag: { fontSize: 12, fontWeight: '600', paddingHorizontal: space(3), paddingTop: space(0.75) },
   cold: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: space(4), gap: space(2) },
   coldEyebrow: { fontSize: 12, fontWeight: '600', letterSpacing: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space(4), gap: space(2) },
