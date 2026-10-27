@@ -88,9 +88,20 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
 4. After Phase 1: Fade mode (2 levels) if false red ≤ ~2/100 for accented readers; watch word if the hand-tally supports it.
 5. Beta with 10 readers (half ESL), per TESTING.md. Ask each: "Would you pay $10 to use this before your next interview?"
 
+## Wave 4 backlog (qa-critic, 2026-10-27: no S0/S1; fix the S2s before the phone beta)
+
+- S2: Finish while the `interrupted` card is up saves a session that counts the call as reading time (wpm ~20). Hide Finish while failed, or shift the clock like the consent gate (`session/[id].tsx`, src/app).
+- S2: `interrupted` (call, Siri, alarm) throws the read away; add "Carry on" that restarts and keeps the transcript, like `pausedForConsent` (src/speech + src/app).
+- S3: glitch cap could end a silent read on spurious iOS 1101/1107 right after a restart; count error codes on device before trusting it (src/speech).
+- S3: `test/globalSetup.js` forces Toronto, so no CI run in a zone without DST; respect an explicit TZ or add a second CI job (main session).
+- S3: analytics queue unbounded before the profile loads; cap ~100 (src/analytics.ts).
+- S3: Reset all data turns analytics back on for someone who opted out, silently (product-lead decision).
+- S3: listenerHook tests: 3 glitches over >10 s, needs-consent surviving end, the gateOpenedAt shift.
+- Release: repo is PUBLIC; decide private + separate public `mouthful-site` for the policy. privacyUrl in brand.ts is still example.com.
+- After restart: RevenueCat project, `pro` entitlement, `default` offering, iOS app via the MCP (store products wait for the Apple Developer account).
+
 ## Smaller bugs noted, not yet fixed
 
 - Cold read is gated twice (7-day streak, then Pro): reads as bait (`app/(tabs)/index.tsx`).
 - Reminder id is still `cadence-daily-read` (`reminders.ts`).
-- Paywall: no Privacy/Terms links (App Store rejection), trial copy ignores eligibility, icon is the Expo placeholder.
 - Jest prints a leaked-timer warning (likely the analytics flush timer).
