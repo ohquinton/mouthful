@@ -109,7 +109,9 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
   const finished = useRef(false);
   const firstWordLag = useRef<number | undefined>(undefined);
   const reachedAt = useRef<(number | undefined)[]>([]); // when Glide first reached each word, for steadiness
-  const gateOpenedAt = useRef(0); // when a mid-read consent ask (MicGate) took over the screen
+  // When the read stopped mid-way without being over: a consent ask (MicGate) or the error card
+  // (e.g. iOS `interrupted` by a call). 0 while listening. See the pause effect below.
+  const pausedAt = useRef(0);
   const boxes = useRef<WordBox[]>([]);
   const scroller = useRef<ScrollViewInstance>(null);
   const [toast] = useState(() => new Animated.Value(0));
@@ -135,8 +137,9 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
 
   // Timing refs are read during render on purpose: the 250 ms clock re-renders the screen, and
   // moving them into state would add renders to Glide's hot path. Nothing here writes a ref.
+  // While paused the clock stands still, so live pace and the pacer don't sag during a call.
   // eslint-disable-next-line react-hooks/refs -- startedAt is set once by the pointer effect; the clock re-renders
-  const seconds = startedAt.current ? (now - startedAt.current) / 1000 : 0;
+  const seconds = startedAt.current ? ((pausedAt.current || now) - startedAt.current) / 1000 : 0;
   const wpm = wordsPerMinute(a.spoken, seconds);
   const zone = paceZone(wpm, pace);
   const pacerAt = pacerWpm(pace);
@@ -205,29 +208,35 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     lastAdvanceAt.current = t;
   }, [a.next, a.skipped, heard.length, words, height, showToast]);
 
-  // The listener can stop mid-read to ask for consent (on-device recognition went away at a
-  // restart). The transcript is kept, so the read carries on after a yes, but the time spent on
-  // the consent screen isn't reading: move the clock forward by it, so it doesn't count toward
-  // pace, the pacer or the gap that makes a pause. reachedAt is left alone on purpose: the step
-  // across the gate includes reading the consent screen, tapping, the permission check and the
-  // recogniser starting again, so in practice it's over the 2.5 s that steadiness drops as a stop.
+  // The listener can stop mid-read without the read being over:
+  // - 'needs-consent': on-device recognition went away at a restart, so MicGate asks.
+  // - 'error': the recogniser stopped for good (e.g. iOS `interrupted` by a phone call). The card
+  //   offers Try again now, and a "Carry on" that keeps the transcript is coming.
+  // Either way the time away isn't reading. Stamp when it began; if listening resumes with the
+  // transcript kept, move the clock forward by the time away, so it doesn't count toward pace,
+  // the pacer or the gap that makes a pause. Only the first stamp counts (error, then a consent
+  // ask on resume, is one pause, shifted once). retry() clears the stamp, since it restarts the
+  // clock anyway. reachedAt is left alone on purpose: the step across a pause includes the
+  // screen, the tap and the recogniser starting again, so it's over the 2.5 s that steadiness
+  // drops as a stop.
   useEffect(() => {
-    if (listener.state === 'needs-consent') {
-      if (startedAt.current && !gateOpenedAt.current) gateOpenedAt.current = Date.now();
-      // No word yet: the voice we heard before the gate isn't the start of the read.
+    if (listener.state === 'needs-consent' || listener.state === 'error') {
+      if (startedAt.current && !pausedAt.current) pausedAt.current = Date.now();
+      // No word yet: the voice we heard before the pause isn't the start of the read.
       if (!startedAt.current) voiceAt.current = 0;
-    } else if (listener.state === 'listening' && gateOpenedAt.current) {
-      const away = Date.now() - gateOpenedAt.current;
+    } else if (listener.state === 'listening' && pausedAt.current) {
+      const away = Date.now() - pausedAt.current;
       startedAt.current += away;
       lastAdvanceAt.current += away;
-      gateOpenedAt.current = 0;
+      pausedAt.current = 0;
     }
   }, [listener.state]);
 
   const finish = useCallback(async () => {
     if (finished.current) return;
     finished.current = true;
-    const recordings = await listener.stop();
+    // Finish from the error card: the recogniser has already stopped, so don't wait on it.
+    const recordings = listener.state === 'error' ? listener.recordings : await listener.stop();
     if (a.spoken < MIN_WORDS_TO_SCORE) {
       // Stay finished (the mic is off) until they choose Try again. Don't keep audio we won't use.
       deleteRecordingFiles(recordings);
@@ -235,7 +244,10 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
       setTooShort(true);
       return;
     }
-    const secs = Math.max(1, (Date.now() - startedAt.current) / 1000);
+    // Up to the pause if there is one: Finish from the error card saves the words read before the
+    // call, timed up to the call, not up to now.
+    const endedAt = pausedAt.current || Date.now();
+    const secs = Math.max(1, (endedAt - startedAt.current) / 1000);
     const fillersPerMin = +(a.fillerCount / (secs / 60)).toFixed(1);
     const attempted = a.read + a.skipped;
     const accuracy = attempted ? Math.round((a.read / attempted) * 100) : 0;
@@ -306,7 +318,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     firstWordLag.current = undefined;
     reachedAt.current = [];
     lastAdvanceAt.current = 0;
-    gateOpenedAt.current = 0;
+    pausedAt.current = 0;
     prevNext.current = 0;
     pauses.current = 0;
     skipToastShown.current = false;
@@ -374,7 +386,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
       </View>
       {/* Static on purpose (principle 6): the reader should know, without anything moving. Web can't record. */}
       {tester && (
-        <Text style={[styles.testerTag, { color: colors.muted }]}>{Platform.OS === 'web' ? 'Tester mode · not recording on web' : 'Recording · tester mode'}</Text>
+        <Text style={[styles.testerTag, { color: colors.muted }]}>{Platform.OS === 'web' ? 'Tester · not recording on web' : 'Recording · tester mode'}</Text>
       )}
 
       {/* The passage. Only the words, the ink cursor and the footer move. */}
@@ -440,10 +452,6 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
         </View>
       )}
 
-      {failed && !tooShort && (
-        <ListenError message={listener.error} code={listener.errorCode} onRetry={retryAfterError} style={{ ...styles.errorCard, bottom: insets.bottom + 72 }} />
-      )}
-
       {/* Quiet nudges */}
       {!tooShort && !failed && (lost || offScript || listener.state === 'asking') && (
         <View style={[styles.nudge, { backgroundColor: colors.surface, borderColor: colors.line }]}>
@@ -460,6 +468,19 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
         <Animated.View style={[styles.toast, { backgroundColor: colors.card, opacity: toast }]}>
           <Text style={[styles.toastText, { color: colors.cardInk }]}>{notice}</Text>
         </Animated.View>
+      )}
+
+      {/* In the layout, not floating: it sits on the footer and the passage shrinks above it, so it
+          never covers the text and the line being read (kept ~30% down) stays in view (principle 6). */}
+      {failed && !tooShort && (
+        <View style={styles.errorDock}>
+          <ListenError
+            message={listener.error}
+            code={listener.errorCode}
+            onRetry={retryAfterError}
+            lastWord={words[a.next - 1]?.display.replace(/[^\w'’-]/g, '')}
+          />
+        </View>
       )}
 
       {/* Footer: voice ribbon, live pace, pacer, finish */}
@@ -505,7 +526,7 @@ const styles = StyleSheet.create({
   nudgeText: { fontSize: 15, fontWeight: '500' },
   toast: { position: 'absolute', bottom: 170, alignSelf: 'center', borderRadius: 12, paddingHorizontal: space(2), paddingVertical: 12, maxWidth: '86%' },
   toastText: { fontSize: 15, textAlign: 'center' },
-  errorCard: { position: 'absolute', left: space(2), right: space(2), alignSelf: 'auto' },
+  errorDock: { paddingHorizontal: space(2), paddingTop: space(1) },
   testerTag: { fontSize: 12, fontWeight: '600', paddingHorizontal: space(3), paddingTop: space(0.75) },
   cold: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: space(4), gap: space(2) },
   coldEyebrow: { fontSize: 12, fontWeight: '600', letterSpacing: 1 },
