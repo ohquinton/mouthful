@@ -35,6 +35,8 @@ export type SavedSession = {
     marks: ReviewMarks;
     firstWordLagMs?: number; // voice detected → first word inked
     reviewed?: boolean;
+    /** The listener's quiet restarts and recoverable error codes (counts only). Added in Wave 4b. */
+    listener?: { restarts: number; glitches: Record<string, number> };
   };
 };
 

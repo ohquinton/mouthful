@@ -39,7 +39,8 @@ export function ListenError({
   const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const card = errorCard(code, message, !!onResume, lastWord);
-  const canResume = card.primary === 'resume' && !!onResume;
+  // Only set when the card offers Carry on (errorCard checks onResume was passed).
+  const resume = card.primary === 'resume' ? onResume : undefined;
 
   const run = async (action: () => void | Promise<void>) => {
     if (inFlight.current) return;
@@ -64,13 +65,13 @@ export function ListenError({
       <Text style={[styles.body, { color: colors.muted }]}>{card.body}</Text>
       <View style={styles.row}>
         <Pressable
-          onPress={() => run(canResume && onResume ? onResume : onRetry)}
+          onPress={() => run(resume ?? onRetry)}
           disabled={busy}
           style={[styles.btn, { backgroundColor: colors.button, opacity: busy ? 0.6 : 1 }]}
           accessibilityRole="button"
           accessibilityState={{ disabled: busy, busy }}
         >
-          <Text style={styles.btnText}>{busy ? 'Starting…' : canResume ? 'Carry on' : 'Try again'}</Text>
+          <Text style={styles.btnText}>{busy ? 'Starting…' : resume ? 'Carry on' : 'Try again'}</Text>
         </Pressable>
         {card.startOver && (
           <Pressable onPress={() => run(onRetry)} disabled={busy} hitSlop={8} accessibilityRole="button">
