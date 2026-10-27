@@ -9,7 +9,7 @@ import { deleteAllRecordings, listRecordings } from '../../store/recordings';
 import { analyticsEnabled, track } from '../../analytics';
 import { countdownLabel, getMoment } from '../../content/moments';
 import { listenLocale, onDeviceSupported, serverServiceName } from '../../speech/useListener';
-import { SPEECH_LOCALES, speechLocaleLabel } from '../../engine/locale';
+import { SPEECH_LOCALES } from '../../engine/locale';
 import { BRAND } from '../../brand';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { cancelDailyReminder, formatTime, REMINDER_OPTIONS, scheduleDailyReminder } from '../../reminders';
@@ -99,9 +99,9 @@ export default function You() {
     try {
       const r = await restore();
       if (r.pro) await update({ pro: true });
-      setNote(r.pro ? 'Pro restored.' : 'No previous purchase found on this Apple ID.');
+      setNote(r.pro ? 'Pro restored.' : 'No earlier purchase found for this account.');
     } catch (e) {
-      setNote(e instanceof PurchasesNotConfigured ? e.message : 'Restore failed. Check your connection and try again.');
+      setNote(e instanceof PurchasesNotConfigured ? e.message : 'Couldn’t reach the store. Check your connection and try again.');
     }
   };
 
@@ -186,23 +186,26 @@ export default function You() {
       </View>
 
       <SectionTitle>Privacy</SectionTitle>
-      <Text style={[styles.body, { color: colors.muted }]}>
-        {BRAND.name} listens only while you practise.{' '}
-        {onDevice
-          ? 'This phone turns your speech into text itself, so your voice isn’t sent anywhere.'
-          : profile.allowServerRecognition
-            ? `This device can’t transcribe ${speechLocaleLabel(lang)} English offline, so you agreed to use its speech service, which receives your audio while you practise.`
-            : `This device can’t transcribe ${speechLocaleLabel(lang)} English offline. We’ll ask before using a speech service.`}{' '}
-        Sessions, scripts and recordings are kept on this phone, and in your phone’s own backup if you use one. They’re never
-        sent to us.
-      </Text>
+      {/* Short lines, one idea each: what's heard, where it goes, where it's kept. */}
+      <View style={styles.lines}>
+        <Text style={[styles.body, { color: colors.muted }]}>{BRAND.name} listens only while you practise.</Text>
+        <Text style={[styles.body, { color: colors.muted }]}>
+          {onDevice
+            ? 'This phone turns your voice into text by itself. Nothing is sent anywhere.'
+            : profile.allowServerRecognition
+              ? `To follow your reading, this phone sends your voice to ${serverServiceName()} while you practise.`
+              : 'This phone can’t do this by itself for your English. We’ll ask before sending your voice anywhere.'}
+        </Text>
+        <Text style={[styles.body, { color: colors.muted }]}>
+          Your sessions, scripts and recordings stay on this phone (and its backup, if you use one). We never receive them.
+        </Text>
+      </View>
       {profile.allowServerRecognition === true && (
         <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.line }]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.momentTitle, { color: colors.ink }]}>Use {serverServiceName()}</Text>
             <Text style={[styles.momentSub, { color: colors.muted }]}>
-              Only when this phone can’t listen offline. Turn off to stop sending audio there. We’ll ask again before the next session
-              that needs it.
+              Turn off to stop sending your voice there. We’ll ask before the next session that needs it.
             </Text>
           </View>
           <Switch value onValueChange={(v) => {
@@ -233,7 +236,7 @@ export default function You() {
             For before-and-after replay. Kept on this phone, and in its backup if you use one.
           </Text>
         </View>
-        <Switch value={profile.keepRecordings === true} onValueChange={(v) => update({ keepRecordings: v })} accessibilityLabel="Keep recordings on this phone" />
+        <Switch value={profile.keepRecordings === true} onValueChange={(v) => update({ keepRecordings: v })} accessibilityLabel="Keep Day 1 and re-test recordings" />
       </View>
       {profile.keepRecordings !== true && recCount > 0 && (
         <Text style={[styles.body, { color: colors.muted }]}>
@@ -321,9 +324,9 @@ export default function You() {
       {reviewsLeft > 0 && (
         <View style={styles.confirm}>
           <Text style={[styles.body, { color: colors.ink }]}>
-            Tester mode is off. What the phone heard is still kept with {reviewsLeft === 1 ? '1 session' : `${reviewsLeft} sessions`}.
-            Delete it now? Scores stay. Recordings are separate: delete them under Privacy.
+            Tester mode is off. {reviewsLeft === 1 ? '1 session still keeps' : `${reviewsLeft} sessions still keep`} what the phone heard.
           </Text>
+          <Text style={[styles.body, { color: colors.ink }]}>Delete that now? Scores stay. Recordings are under Privacy.</Text>
           <View style={styles.confirmRow}>
             <Pressable onPress={deleteReviews} hitSlop={8} accessibilityRole="button">
               <Text style={[styles.link, { color: colors.stumble }]}>Delete it</Text>
@@ -356,6 +359,7 @@ const styles = StyleSheet.create({
   links: { gap: space(2), marginTop: space(1) },
   link: { fontSize: 16, fontWeight: '600' },
   confirm: { gap: space(1) },
+  lines: { gap: space(0.75) },
   confirmRow: { flexDirection: 'row', gap: space(3) },
   version: { fontSize: 13, marginTop: space(2) },
   momentRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 16, padding: space(2), minHeight: 64 },
