@@ -16,6 +16,8 @@ export type Profile = {
   keepRecordings?: boolean;
   /** Supervised beta only: record every reading session and keep what the phone heard, for review. */
   testerMode?: boolean;
+  /** Which English the recogniser listens for, e.g. "en-IN". Unset: the phone's region (engine/locale.ts). */
+  speechLang?: string;
   baselineSessionId?: string;
   reminder?: { hour: number; minute: number } | null;
   pro: boolean;

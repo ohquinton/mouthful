@@ -13,7 +13,7 @@ import { recordWords } from '../store/words';
 import { useProfile } from '../store/profile';
 import { markStep } from '../plan';
 import { track } from '../analytics';
-import { useListener } from '../speech/useListener';
+import { listenLocale, useListener } from '../speech/useListener';
 import { useVoiceLevel, VoiceRibbon } from '../components/VoiceRibbon';
 import { MicGate, gateStates } from '../components/MicGate';
 import { fonts, space, useColors } from '../theme';
@@ -54,7 +54,7 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
   const { profile } = useProfile();
   const { level, onLevel } = useVoiceLevel();
   const hints = useMemo(() => items.map((i) => i.word), [items]);
-  const listener = useListener(hints, { allowServer: profile.allowServerRecognition, onLevel });
+  const listener = useListener(hints, { allowServer: profile.allowServerRecognition, onLevel, lang: listenLocale(profile.speechLang) });
   const [i, setI] = useState(0);
   const [phase, setPhase] = useState<Phase>('alone');
   const [heardFrom, setHeardFrom] = useState(0); // ignore transcript from before this step

@@ -37,6 +37,7 @@
     "@types/jest": "^30.0.0",
     "@types/react": "~19.3.0",
     "jest": "^30.5.2",
+    "patch-package": "^8.0.1",
     "ts-jest": "^29.4.15",
     "typescript": "~6.0.3"
   },
@@ -46,7 +47,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "patch-package"
   },
   "private": true
 }

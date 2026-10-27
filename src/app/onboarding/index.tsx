@@ -6,7 +6,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { MomentId, MOMENTS } from '../../content/moments';
 import { useProfile } from '../../store/profile';
-import { onDeviceSupported } from '../../speech/useListener';
+import { listenLocale, onDeviceSupported } from '../../speech/useListener';
 import { track } from '../../analytics';
 import { BRAND } from '../../brand';
 import { PrimaryButton } from '../../components/ui';
@@ -26,7 +26,7 @@ export default function Onboarding() {
   // Off until they choose: recordings are kept only with an explicit yes.
   const [keep, setKeep] = useState(false);
   const [inked, setInked] = useState(0);
-  const offline = onDeviceSupported();
+  const offline = onDeviceSupported(listenLocale(profile.speechLang));
 
   // The hook demonstrates Glide on its own: words ink in at a calm reading pace.
   useEffect(() => {

@@ -24,7 +24,7 @@ import { recordCorrection, recordWords, resultsFromSession } from '../../store/w
 import { useProfile } from '../../store/profile';
 import { markStep } from '../../plan';
 import { track } from '../../analytics';
-import { useListener } from '../../speech/useListener';
+import { listenLocale, useListener } from '../../speech/useListener';
 import { GlideWord, WordBox } from '../../components/GlideWord';
 import { InkCursor } from '../../components/InkCursor';
 import { useVoiceLevel, VoiceRibbon } from '../../components/VoiceRibbon';
@@ -91,6 +91,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     // Explicit yes only: Day 1 with "keep recordings" on, or every read in supervised tester mode.
     record: (isBaseline && profile.keepRecordings === true) || tester,
     onLevel: onVoice,
+    lang: listenLocale(profile.speechLang),
   });
 
   const [now, setNow] = useState(Date.now());

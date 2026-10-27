@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { recordingsFolderUri } from '../store/recordings';
+import { speechLocale, speechLocaleLabel } from '../engine/locale';
 
 export type ListenerState =
   | 'idle'
@@ -20,12 +21,35 @@ type Options = {
   record?: boolean;
   /** Emit a 0–1 voice level for the voice ribbon. */
   onLevel?: (level: number) => void;
+  /** Which English to listen for, e.g. "en-IN". See engine/locale.ts. */
+  lang?: string;
 };
 
-/** True when speech never leaves the device. */
-export function onDeviceSupported(): boolean {
+/** The phone's locale, e.g. "en-CA". Hermes and browsers both expose it through Intl. */
+function deviceLocale(): string | undefined {
   try {
-    return Platform.OS !== 'web' && ExpoSpeechRecognitionModule.supportsOnDeviceRecognition();
+    return Intl.DateTimeFormat().resolvedOptions().locale;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The English variety to listen for: the reader's choice in You, else the phone's region. */
+export function listenLocale(chosen?: string): string {
+  return speechLocale(chosen, deviceLocale());
+}
+
+/**
+ * True when speech in this locale never leaves the device. On iOS each locale is checked on
+ * its own (patches/expo-speech-recognition): asking for on-device in a locale that can't do it
+ * would silently fall back to Apple's servers. Android's check takes no locale.
+ */
+export function onDeviceSupported(lang = 'en-US'): boolean {
+  try {
+    if (Platform.OS === 'web') return false;
+    return Platform.OS === 'ios'
+      ? ExpoSpeechRecognitionModule.supportsOnDeviceRecognition(lang)
+      : ExpoSpeechRecognitionModule.supportsOnDeviceRecognition();
   } catch {
     return false;
   }
@@ -56,14 +80,15 @@ export function useListener(hints: string[], opts: Options = {}) {
   const publish = () => setTranscript(`${finalText.current} ${interim.current}`.trim());
 
   const startNative = useCallback(() => {
-    const onDevice = onDeviceSupported();
+    const lang = optsRef.current.lang ?? 'en-US';
+    const onDevice = onDeviceSupported(lang);
     let canRecord = false;
     try {
       canRecord = !!optsRef.current.record && Platform.OS !== 'web' && ExpoSpeechRecognitionModule.supportsRecording();
     } catch {}
     const folderUri = canRecord ? recordingsFolderUri() : undefined;
     ExpoSpeechRecognitionModule.start({
-      lang: 'en-US',
+      lang,
       interimResults: true,
       continuous: true,
       maxAlternatives: 1,
@@ -133,6 +158,11 @@ export function useListener(hints: string[], opts: Options = {}) {
     }
     // "no-speech" and "aborted" are routine; the end handler restarts if needed.
     if (e.error === 'no-speech' || e.error === 'aborted') return;
+    if (e.error === 'language-not-supported') {
+      wanted.current = false;
+      setError(`This phone can’t listen for ${speechLocaleLabel(optsRef.current.lang ?? 'en-US')} English. Pick another in You.`);
+      return;
+    }
     setError(e.message || e.error);
   });
 
@@ -141,7 +171,7 @@ export function useListener(hints: string[], opts: Options = {}) {
       setState('unavailable');
       return;
     }
-    if (!onDeviceSupported() && !(override?.allowServer ?? optsRef.current.allowServer)) {
+    if (!onDeviceSupported(optsRef.current.lang) && !(override?.allowServer ?? optsRef.current.allowServer)) {
       setState('needs-consent');
       return;
     }

@@ -8,7 +8,7 @@ import { countFreeTalk, tokenise } from '../engine/align';
 import { paceZone, sessionScore, wordsPerMinute } from '../engine/score';
 import { promptOfTheDay } from '../content/prompts';
 import { saveSession } from '../store/sessions';
-import { useListener } from '../speech/useListener';
+import { listenLocale, useListener } from '../speech/useListener';
 import { PrimaryButton } from '../components/ui';
 import { useProfile } from '../store/profile';
 import { track } from '../analytics';
@@ -25,7 +25,7 @@ export default function FreeTalk() {
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
   const { level, onLevel } = useVoiceLevel();
-  const listener = useListener([], { allowServer: profile.allowServerRecognition, onLevel });
+  const listener = useListener([], { allowServer: profile.allowServerRecognition, onLevel, lang: listenLocale(profile.speechLang) });
   const [shuffle, setShuffle] = useState(0);
   const [startedAt, setStartedAt] = useState(0);
   const [now, setNow] = useState(Date.now());

@@ -8,7 +8,8 @@ import { clearSessionRecordings, loadSessions, recordingUris } from '../../store
 import { deleteAllRecordings, listRecordings } from '../../store/recordings';
 import { track } from '../../analytics';
 import { countdownLabel, getMoment } from '../../content/moments';
-import { onDeviceSupported } from '../../speech/useListener';
+import { listenLocale, onDeviceSupported } from '../../speech/useListener';
+import { SPEECH_LOCALES, speechLocaleLabel } from '../../engine/locale';
 import { analyticsEnabled } from '../../analytics';
 import { BRAND } from '../../brand';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -76,6 +77,8 @@ export default function You() {
   };
 
   const moment = getMoment(profile.moment?.id);
+  const lang = listenLocale(profile.speechLang);
+  const onDevice = onDeviceSupported(lang);
 
   const chip = (selected: boolean) => [
     styles.chip,
@@ -132,14 +135,35 @@ export default function You() {
 
       {note && <Text style={[styles.note, { color: colors.muted }]}>{note}</Text>}
 
+      <SectionTitle>English the phone listens for</SectionTitle>
+      <Text style={[styles.body, { color: colors.muted }]}>
+        Pick the one closest to how you speak. Speech recognition hears words more clearly when it expects your kind of English.
+      </Text>
+      <View style={styles.chips}>
+        {SPEECH_LOCALES.map((l) => {
+          const on = l.id === lang;
+          return (
+            <Pressable
+              key={l.id}
+              style={chip(on)}
+              onPress={() => update({ speechLang: l.id })}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: on }}
+            >
+              <Text style={[styles.chipText, { color: colors.ink }]}>{l.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <SectionTitle>Privacy</SectionTitle>
       <Text style={[styles.body, { color: colors.muted }]}>
         {BRAND.name} listens only while you practise.{' '}
-        {onDeviceSupported()
+        {onDevice
           ? 'This phone turns your speech into text itself, so your voice isn’t sent anywhere.'
           : profile.allowServerRecognition
-            ? 'This device can’t transcribe offline, so you agreed to use its speech service, which receives your audio while you practise.'
-            : 'This device can’t transcribe offline. We’ll ask before using a speech service.'}{' '}
+            ? `This device can’t transcribe ${speechLocaleLabel(lang)} English offline, so you agreed to use its speech service, which receives your audio while you practise.`
+            : `This device can’t transcribe ${speechLocaleLabel(lang)} English offline. We’ll ask before using a speech service.`}{' '}
         Sessions, scripts and recordings stay on this device.
         {analyticsEnabled ? ' We collect anonymous usage counts (like “session finished”) to improve the app, never your words or voice.' : ''}
       </Text>
