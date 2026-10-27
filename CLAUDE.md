@@ -70,7 +70,7 @@ Today shows the active moment's plan (`PlanCard`): learn the words → say them 
 ## Commands
 
 ```bash
-npm test                  # engine + store tests (136)
+npm test                  # engine + store tests (184)
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)
@@ -96,5 +96,6 @@ npx eas-cli@latest build --profile development --platform ios
 - Steadiness is timed from when Glide reaches each word, so recogniser bursts add noise. Stretches under 1.5 s of speech are dropped, but an even reader on a bursty (server) recogniser may still score lower than they should. Check it against recordings in the beta before using it in the score. Reading only: Free talk has no sentences to time.
 - Android counts as on-device only from Android 13 (API 33). Below that the library uses the network recogniser even when asked for on-device. Android can't check a variety is supported before consent, so an unsupported one can still fail after the reader agrees.
 - Steadiness leaves out steps over 2.5 s (the Pauses tile covers those) and steps touching a skipped word. A tail under 8 words after the last full stop isn't timed.
+- Recoverable recogniser errors (AirPods, network blips, busy) are hidden and restarted; 3 in 10 s with nothing heard ends the session with `repeated-failure`. iOS `interrupted` (call, Siri, backgrounding) is fatal: the reader sees the card and Try again. The cap is unverified on Android phones.
 - Plan steps 1, 2 and 5 are free even for Pro packs (deliberate hook); steps 3–4 are Pro.
 - `patches/expo-speech-recognition+58.0.0.patch` makes iOS check on-device support for the locale we listen in (the library only checked the device default, and iOS silently falls back to the server). Android's on-device check still ignores locale. Re-check the patch when upgrading the library.
