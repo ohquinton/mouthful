@@ -8,6 +8,12 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Toronto has daylight saving; Kolkata doesn't, so day maths must hold in both.
+        tz: [America/Toronto, Asia/Kolkata]
+    env:
+      MOUTHFUL_TEST_TZ: ${{ matrix.tz }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
