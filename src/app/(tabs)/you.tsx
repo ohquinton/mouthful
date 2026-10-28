@@ -7,6 +7,7 @@ import { useProfile } from '../../store/profile';
 import { clearSessionRecordings, clearSessionReviews, loadSessions, recordingUris, reviewCount } from '../../store/sessions';
 import { deleteAllRecordings, listRecordings } from '../../store/recordings';
 import { analyticsEnabled, track } from '../../analytics';
+import { crashReportsConfigured, sendTestCrashReport } from '../../sentry';
 import { countdownLabel, getMoment } from '../../content/moments';
 import { listenLocale, onDeviceSupported, serverServiceName } from '../../speech/useListener';
 import { SPEECH_LOCALES } from '../../engine/locale';
@@ -213,20 +214,37 @@ export default function You() {
             }} accessibilityLabel={`Use ${serverServiceName()}`} />
         </View>
       )}
-      {analyticsEnabled && (
+      {/* One switch for both: usage counts (analytics.ts) and crash reports (sentry.ts). Shown when either is set up. */}
+      {(analyticsEnabled || crashReportsConfigured) && (
         <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.line }]}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.momentTitle, { color: colors.ink }]}>Share anonymous usage counts</Text>
+            <Text style={[styles.momentTitle, { color: colors.ink }]}>Share anonymous usage counts and crash reports</Text>
             <Text style={[styles.momentSub, { color: colors.muted }]}>
-              Counts like “session finished” help us improve the app. Never your words or voice.
+              Counts like “session finished” and crash reports help us fix the app. Never your words or voice.
             </Text>
           </View>
           <Switch
             value={profile.analyticsOptOut !== true}
             onValueChange={(v) => update({ analyticsOptOut: !v })}
-            accessibilityLabel="Share anonymous usage counts"
+            accessibilityLabel="Share anonymous usage counts and crash reports"
           />
         </View>
+      )}
+      {/* Tester mode only: proves on a phone that crash reports arrive, and arrive scrubbed. */}
+      {showTester && crashReportsConfigured && profile.analyticsOptOut !== true && (
+        <Pressable
+          onPress={() =>
+            setPrivacyNote(
+              sendTestCrashReport()
+                ? 'Test crash report sent.'
+                : 'Crash reports aren’t running. They’re off on web, and after sharing is switched off they stay off until the app is reopened.',
+            )
+          }
+          hitSlop={8}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.link, { color: colors.signal }]}>Send a test crash report</Text>
+        </Pressable>
       )}
       {privacyNote && <Text style={[styles.note, { color: colors.muted }]}>{privacyNote}</Text>}
       <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.line }]}>

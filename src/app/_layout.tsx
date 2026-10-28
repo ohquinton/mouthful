@@ -8,10 +8,11 @@ import { BricolageGrotesque_700Bold, BricolageGrotesque_800ExtraBold } from '@ex
 import { ProfileProvider, useProfile } from '../store/profile';
 import { hasPro, initPurchases } from '../purchases';
 import { useColors } from '../theme';
+import { wrapRoot } from '../sentry';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-export default function RootLayout() {
+function RootLayout() {
   const colors = useColors();
   const [loaded, failed] = useFonts({
     Literata_500Medium,
@@ -48,6 +49,10 @@ export default function RootLayout() {
     </ProfileProvider>
   );
 }
+
+// Reports render errors as crash reports, once the profile provider has started Sentry
+// (it waits for the reader's choice). Before that, or with sharing off, it does nothing.
+export default wrapRoot(RootLayout);
 
 /** On launch, the store is the source of truth for Pro (when purchases are configured). */
 function EntitlementSync() {

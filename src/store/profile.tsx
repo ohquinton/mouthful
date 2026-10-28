@@ -2,6 +2,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { keptAfterReset, wipeAllData } from './resetData';
 import { setAnalyticsEnabled } from '../analytics';
+import { setCrashReportsEnabled } from '../sentry';
 
 export type Goal = 'meetings' | 'video' | 'esl' | 'confidence';
 
@@ -38,6 +39,12 @@ type Ctx = {
 
 const ProfileContext = createContext<Ctx | null>(null);
 
+/** One switch in You covers both usage counts and crash reports, so they always move together. */
+function setSharing(on: boolean) {
+  setAnalyticsEnabled(on);
+  setCrashReportsEnabled(on);
+}
+
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile>(DEFAULT);
   const [ready, setReady] = useState(false);
@@ -49,17 +56,17 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const apply = useCallback((next: Profile) => {
     latest.current = next;
     setProfile(next);
-    setAnalyticsEnabled(!next.analyticsOptOut);
+    setSharing(!next.analyticsOptOut);
   }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(KEY)
       .then((raw) => {
         if (raw) apply({ ...DEFAULT, ...(JSON.parse(raw) as Partial<Profile>) });
-        else setAnalyticsEnabled(true); // a fresh install: on, as the You tab says
+        else setSharing(true); // a fresh install: on, as the You tab says
       })
       // Couldn't read the profile, so we can't tell whether the reader opted out: send nothing this launch.
-      .catch(() => setAnalyticsEnabled(false))
+      .catch(() => setSharing(false))
       .finally(() => setReady(true));
   }, [apply]);
 
