@@ -30,7 +30,8 @@ export type EventName =
   | 'purchase_result'
   | 'recording_played'
   | 'recordings_deleted'
-  | 'session_retry';
+  | 'session_retry'
+  | 'session_resume'; // Carry on after the recogniser stopped; `error` is the listener's code
 
 type Props = Record<string, string | number | boolean | null | undefined>;
 

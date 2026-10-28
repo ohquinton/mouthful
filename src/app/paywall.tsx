@@ -94,9 +94,9 @@ export default function Paywall() {
       if (r.pro) {
         await update({ pro: true });
         close();
-      } else setError('No previous purchase found on this Apple ID.');
+      } else setError('No earlier purchase found for this account.');
     } catch (e) {
-      setError(e instanceof PurchasesNotConfigured ? e.message : 'Restore failed. Try again.');
+      setError(e instanceof PurchasesNotConfigured ? e.message : 'Couldn’t reach the store. Check your connection and try again.');
     }
   };
 
@@ -146,7 +146,8 @@ export default function Paywall() {
         })}
       </ScrollView>
 
-      {error && <Text style={[styles.error, { color: colors.stumble }]}>{error}</Text>}
+      {/* Ink, not red: a store hiccup isn't the reader's mistake. */}
+      {error && <Text style={[styles.error, { color: colors.ink }]}>{error}</Text>}
       <PrimaryButton label={plan === 'annual' && trial ? 'Start free trial' : 'Subscribe'} busy={busy} onPress={buy} />
       <Text style={[styles.fine, { color: colors.muted }]}>
         {plan === 'annual'
@@ -157,18 +158,18 @@ export default function Paywall() {
       </Text>
       <View style={styles.legal}>
         <Pressable onPress={() => openLink(BRAND.privacyUrl)} hitSlop={8} accessibilityRole="link">
-          <Text style={[styles.legalLink, { color: colors.muted }]}>Privacy Policy</Text>
+          <Text style={[styles.legalLink, { color: colors.muted }]}>Privacy policy</Text>
         </Pressable>
         <Text style={[styles.legalDot, { color: colors.muted }]}>·</Text>
         <Pressable onPress={() => openLink(BRAND.termsUrl)} hitSlop={8} accessibilityRole="link">
-          <Text style={[styles.legalLink, { color: colors.muted }]}>Terms of Use</Text>
+          <Text style={[styles.legalLink, { color: colors.muted }]}>Terms of use</Text>
         </Pressable>
       </View>
       <View style={styles.footer}>
-        <Pressable onPress={close} hitSlop={8}>
+        <Pressable onPress={close} hitSlop={8} accessibilityRole="button">
           <Text style={[styles.footerLink, { color: colors.ink }]}>Not now</Text>
         </Pressable>
-        <Pressable onPress={onRestore} hitSlop={8}>
+        <Pressable onPress={onRestore} hitSlop={8} accessibilityRole="button">
           <Text style={[styles.footerLink, { color: colors.muted }]}>Restore purchases</Text>
         </Pressable>
       </View>
@@ -189,12 +190,13 @@ const styles = StyleSheet.create({
   plan: { flexDirection: 'row', alignItems: 'center', borderRadius: 18, padding: space(2), minHeight: 72 },
   planTitle: { fontSize: 17, fontWeight: '700' },
   planNote: { fontSize: 14, marginTop: 2 },
-  planPrice: { fontSize: 20, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  planPrice: { fontSize: 24, fontWeight: '700', fontVariant: ['tabular-nums'] },
   planPer: { fontSize: 14, fontWeight: '500' },
   error: { fontSize: 14, textAlign: 'center' },
   fine: { fontSize: 13, textAlign: 'center', lineHeight: 18 },
-  legal: { flexDirection: 'row', justifyContent: 'center', gap: space(1) },
-  legalLink: { fontSize: 13, textDecorationLine: 'underline' },
+  legal: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: space(1) },
+  // paddingVertical + hitSlop make a tap target of at least 44 pt.
+  legalLink: { fontSize: 13, textDecorationLine: 'underline', paddingVertical: 10 },
   legalDot: { fontSize: 13 },
   footer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: space(1) },
   footerLink: { fontSize: 15, fontWeight: '600', paddingVertical: 8 },

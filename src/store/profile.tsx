@@ -1,8 +1,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { loadSessions, recordingUris } from './sessions';
-import { deleteAllRecordings } from './recordings';
-import { resetAnalytics, setAnalyticsEnabled } from '../analytics';
+import { keptAfterReset, wipeAllData } from './resetData';
+import { setAnalyticsEnabled } from '../analytics';
 
 export type Goal = 'meetings' | 'video' | 'esl' | 'confidence';
 
@@ -78,16 +77,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   );
 
   const reset = useCallback(async () => {
-    apply(DEFAULT);
-    // Audio files first: once the database is cleared we'd no longer know where they are.
-    try {
-      deleteAllRecordings(recordingUris(await loadSessions()));
-    } catch {}
-    try {
-      await AsyncStorage.clear();
-    } catch {}
-    // Like a fresh install: analytics on (DEFAULT has no opt-out), but under a new anonymous id.
-    await resetAnalytics();
+    // Like a fresh install, except an analytics opt-out stays (resetData.ts). Captured before
+    // apply() replaces latest.current.
+    const kept = keptAfterReset(latest.current);
+    const next: Profile = { ...DEFAULT, ...kept };
+    apply(next);
+    // Deletes the audio, clears storage, saves `next` back only if something was kept, and
+    // starts analytics over under a new anonymous id.
+    await wipeAllData(KEY, kept.analyticsOptOut ? next : null);
   }, [apply]);
 
   const value = useMemo(() => ({ profile, ready, update, reset }), [profile, ready, update, reset]);

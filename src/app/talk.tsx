@@ -63,8 +63,8 @@ export default function FreeTalk() {
   }, [listener.lastHeardAt, startedAt]);
 
   // Stop the minute when the recogniser stops for good. If listening resumes with the transcript
-  // kept (the coming "Carry on"), move the start forward by the time away, so the call doesn't
-  // use up the minute or drag pace down. Try again goes through begin(), which clears the stamp.
+  // kept (Carry on), move the start forward by the time away, so the call doesn't use up the
+  // minute or drag pace down. Try again goes through begin(), which clears the stamp.
   useEffect(() => {
     if (listener.state === 'error') {
       // Forget the last word's time, so the gap across the call isn't counted as a pause.
@@ -108,6 +108,17 @@ export default function FreeTalk() {
     await begin(); // awaited so ListenError keeps Try again disabled until the mic is starting
   };
 
+  /**
+   * Carry on after the recogniser stopped: the talk so far and what's left of the minute stay
+   * (the clock stood still while the card was up). If resuming needs a consent ask, MicGate's
+   * yes goes through begin(), so that becomes a fresh minute, as for any mid-talk consent ask.
+   */
+  const resumeAfterError = async () => {
+    if (done.current) return;
+    track('session_resume', { where: 'talk', error: listener.errorCode });
+    await listener.resume(); // awaited so ListenError keeps Carry on disabled until the mic is starting
+  };
+
   const finish = async () => {
     if (done.current) return;
     done.current = true;
@@ -118,7 +129,7 @@ export default function FreeTalk() {
       // The guard resets in begin(), which the Try again button calls.
       setStartedAt(0);
       track('session_too_short', { spoken: counts.spoken, kind: 'talk' });
-      setNotice(counts.spoken === 0 ? 'The mic didn’t hear anything. Hold the phone a little closer and try again.' : `Only ${counts.spoken} words came through. Try again a little closer to the mic.`);
+      setNotice(counts.spoken === 0 ? 'The mic didn’t hear anything. Hold the phone a little closer and try again.' : `Only ${counts.spoken} ${counts.spoken === 1 ? 'word' : 'words'} came through. Try again a little closer to the mic.`);
       return;
     }
     const fillersPerMin = +(counts.fillerCount / (secs / 60)).toFixed(1);
@@ -176,7 +187,8 @@ export default function FreeTalk() {
       <View style={styles.body}>
         <Text style={[styles.eyebrow, { color: colors.muted }]}>TODAY’S PROMPT</Text>
         <Text style={[styles.prompt, { color: colors.ink }]}>{prompt}</Text>
-        {!running && (
+        {/* Not while a talk is paused or resuming: the prompt shouldn't change mid-talk. */}
+        {!running && !pausedAt && (
           <Pressable onPress={() => setShuffle((n) => n + 1)} hitSlop={8}>
             <Text style={[styles.shuffle, { color: colors.signal }]}>Different prompt</Text>
           </Pressable>
@@ -221,7 +233,12 @@ export default function FreeTalk() {
           </View>
         )}
         {failed ? (
-          <ListenError message={listener.error} code={listener.errorCode} onRetry={retryAfterError} />
+          <ListenError
+            message={listener.error}
+            code={listener.errorCode}
+            onRetry={retryAfterError}
+            onResume={listener.canResume ? resumeAfterError : undefined}
+          />
         ) : (
           notice && <Text style={[styles.notice, { color: colors.stumble }]}>{notice}</Text>
         )}
