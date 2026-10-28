@@ -176,7 +176,7 @@ describe('routine recogniser glitches never show "stopped listening" over a work
       emit('end');
       jest.advanceTimersByTime(1000);
     }
-    expect(h.l.error).toBe('It tried 3 times and didn’t catch any words. Check nothing is covering the mic, or switch off headphones, then try again.');
+    expect(h.l.error).toBe('It tried 3 times and didn’t catch any words. Check nothing is covering the mic, or switch off headphones, then tap Carry on.');
   });
 
   it('says the speech service couldn’t be reached when the network keeps failing, with its own code', async () => {
@@ -188,7 +188,7 @@ describe('routine recogniser glitches never show "stopped listening" over a work
     }
     expect(h.l.state).toBe('error');
     expect(h.l.errorCode).toBe('network');
-    expect(h.l.error).toBe('The speech service couldn’t be reached. When you’re back online, tap Try again.');
+    expect(h.l.error).toBe('The speech service couldn’t be reached. When you’re back online, tap Carry on.');
     expectContract(h.l);
   });
 

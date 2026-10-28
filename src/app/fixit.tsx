@@ -156,6 +156,15 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
     await listener.start(); // awaited so ListenError keeps Try again disabled until the mic is starting
   };
 
+  /**
+   * Carry on after the recogniser stopped: listen again on the same word and step. The
+   * transcript is kept, so `heardFrom` still points past what was heard before.
+   */
+  const resumeListening = async () => {
+    track('session_resume', { where: 'fixit', error: listener.errorCode });
+    await listener.resume();
+  };
+
   if (gateStates.includes(listener.state)) {
     return <MicGate state={listener.state} onAllowed={() => listener.start({ allowServer: true })} />;
   }
@@ -242,7 +251,12 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
 
       {failed ? (
         <View style={styles.errorWrap}>
-          <ListenError message={listener.error} code={listener.errorCode} onRetry={retryListening} />
+          <ListenError
+            message={listener.error}
+            code={listener.errorCode}
+            onRetry={retryListening}
+            onResume={listener.canResume ? resumeListening : undefined}
+          />
         </View>
       ) : (
         <View style={styles.listenRow}>

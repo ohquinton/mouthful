@@ -211,7 +211,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
   // The listener can stop mid-read without the read being over:
   // - 'needs-consent': on-device recognition went away at a restart, so MicGate asks.
   // - 'error': the recogniser stopped for good (e.g. iOS `interrupted` by a phone call). The card
-  //   offers Try again now, and a "Carry on" that keeps the transcript is coming.
+  //   offers Carry on (resumeAfterError: keeps the transcript) or Start over (retry).
   // Either way the time away isn't reading. Stamp when it began; if listening resumes with the
   // transcript kept, move the clock forward by the time away, so it doesn't count toward pace,
   // the pacer or the gap that makes a pause. Only the first stamp counts (error, then a consent
@@ -229,8 +229,12 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
       startedAt.current += away;
       lastAdvanceAt.current += away;
       pausedAt.current = 0;
+      // Back to the line being read: MicGate (a consent ask on the way back) replaced the passage,
+      // so the scroll position may have been lost. prevNext is where the pointer is.
+      const pos = boxes.current[Math.min(prevNext.current, words.length - 1)];
+      if (pos) scroller.current?.scrollTo({ y: Math.max(0, pos.y + height * 0.12 - height * 0.3), animated: false });
     }
-  }, [listener.state]);
+  }, [listener.state, words.length, height]);
 
   const finish = useCallback(async () => {
     if (finished.current) return;
@@ -288,6 +292,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
             transcript: listener.transcript,
             marks: { said: [], notSaid: [] },
             firstWordLagMs: firstWordLag.current,
+            listener: listener.getDiagnostics(),
           }
         : undefined,
     });
@@ -344,6 +349,18 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     deleteRecordingFiles(uris);
     await retry();
   }, [listener, retry]);
+
+  /**
+   * Carry on after the recogniser stopped (a call, the connection, the mic). Keeps the transcript,
+   * so the inked words, the pointer, corrections and breath marks all stay. The pause effect
+   * above moves the clock forward by the time away once listening starts again. ListenError
+   * disables its buttons while this runs, so it can't start twice.
+   */
+  const resumeAfterError = useCallback(async () => {
+    if (finished.current) return; // Finish already saved or ended this read
+    track('session_resume', { where: 'glide', error: listener.errorCode });
+    await listener.resume();
+  }, [listener]);
 
   // The session ends itself on the last word.
   useEffect(() => {
@@ -435,23 +452,6 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
         </Pressable>
       )}
 
-      {tooShort && (
-        <View style={[styles.retry, { backgroundColor: colors.surface, borderColor: colors.line, bottom: insets.bottom + 72 }]} accessibilityLiveRegion="polite">
-          <Text style={[styles.retryTitle, { color: colors.ink }]}>Didn’t catch enough to score</Text>
-          <Text style={[styles.retryBody, { color: colors.muted }]}>
-            {a.spoken === 0 ? 'The mic didn’t hear anything.' : `Only ${a.spoken} words came through.`} Hold the phone a little closer and read at a normal volume.
-          </Text>
-          <View style={styles.retryRow}>
-            <Pressable onPress={retry} style={[styles.retryBtn, { backgroundColor: colors.button }]} accessibilityRole="button">
-              <Text style={styles.primaryText}>Try again</Text>
-            </Pressable>
-            <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button">
-              <Text style={[styles.link, { color: colors.muted }]}>Not now</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
-
       {/* Quiet nudges */}
       {!tooShort && !failed && (lost || offScript || listener.state === 'asking') && (
         <View style={[styles.nudge, { backgroundColor: colors.surface, borderColor: colors.line }]}>
@@ -478,8 +478,29 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
             message={listener.error}
             code={listener.errorCode}
             onRetry={retryAfterError}
+            onResume={listener.canResume ? resumeAfterError : undefined}
             lastWord={words[a.next - 1]?.display.replace(/[^\w'’-]/g, '')}
           />
+        </View>
+      )}
+
+      {/* Docked like the error card: the passage shrinks above it instead of being covered. */}
+      {tooShort && (
+        <View style={styles.errorDock}>
+          <View style={[styles.retry, { backgroundColor: colors.surface, borderColor: colors.line }]} accessibilityLiveRegion="polite">
+            <Text style={[styles.retryTitle, { color: colors.ink }]}>Didn’t catch enough to score</Text>
+            <Text style={[styles.retryBody, { color: colors.muted }]}>
+              {a.spoken === 0 ? 'The mic didn’t hear anything.' : a.spoken === 1 ? 'Only 1 word came through.' : `Only ${a.spoken} words came through.`} Hold the phone a little closer and read at a normal volume.
+            </Text>
+            <View style={styles.retryRow}>
+              <Pressable onPress={retry} style={[styles.retryBtn, { backgroundColor: colors.button }]} accessibilityRole="button">
+                <Text style={styles.primaryText}>Try again</Text>
+              </Pressable>
+              <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button">
+                <Text style={[styles.link, { color: colors.muted }]}>Not now</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       )}
 
@@ -536,7 +557,7 @@ const styles = StyleSheet.create({
   primary: { borderRadius: 14, paddingHorizontal: space(3), paddingVertical: 14, marginTop: space(1) },
   primaryText: { color: '#fff', fontSize: 17, fontWeight: '600' },
   link: { fontSize: 16, padding: space(1) },
-  retry: { position: 'absolute', left: space(2), right: space(2), borderWidth: 1, borderRadius: 18, padding: space(2), gap: space(1) },
+  retry: { borderWidth: 1, borderRadius: 18, padding: space(2), gap: space(1) },
   retryTitle: { fontSize: 18, fontWeight: '700' },
   retryBody: { fontSize: 15, lineHeight: 21 },
   retryRow: { flexDirection: 'row', alignItems: 'center', gap: space(2), marginTop: space(0.5) },

@@ -2,30 +2,18 @@ import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import type { ListenerErrorCode } from '../speech/useListener';
+import { errorCard } from './listenErrorCard';
 import { space, useColors } from '../theme';
-
-/**
- * The card's title for each way the recogniser can stop. The body is the listener's message.
- * The message is checked too, as a fallback: a 'repeated-failure' can be the mic or the
- * connection and only the message says which, and a card should never pair the generic title
- * with the language body if the code didn't come through.
- */
-export function errorTitle(code: ListenerErrorCode | null, message: string | null): string {
-  const text = message ?? '';
-  if (code === 'language-not-supported' || /can[’']t listen for/i.test(text)) return 'Can’t listen for this English';
-  if (code === 'interrupted') return 'Paused';
-  if (/connection|network/i.test(text)) return 'Lost the connection';
-  if (code === 'repeated-failure') return 'The phone isn’t hearing you';
-  return 'The phone stopped listening';
-}
 
 /**
  * Shown when the recogniser has stopped for good (useListener's state is 'error'), with a way back.
  * - 'language-not-supported': the phone can't listen for the chosen English. Try again won't
  *   help until they pick another, so it also offers a way to the You tab.
- * - 'interrupted' with `onResume`: something else took the mic. "Carry on" keeps the read so
- *   far; "Start over" is the usual retry. We don't say it was a call, because we don't know.
- * - anything else: Try again.
+ * - any code that may come back ('interrupted', 'network', 'repeated-failure', 'restart-failed'),
+ *   when the screen passes `onResume`: "Carry on" keeps the read so far; "Start over" is the
+ *   usual retry.
+ * - otherwise: Try again.
+ * What it says and shows per code is errorCard() in listenErrorCard.ts (unit tested).
  * Screens render it only when `listener.state === 'error'`. A routine error while the
  * listener is still listening (it restarts by itself) shows nothing.
  */
@@ -40,7 +28,7 @@ export function ListenError({
   message: string | null;
   code: ListenerErrorCode | null;
   onRetry: () => void | Promise<void>;
-  /** Carry on from where the read stopped. Only offered for 'interrupted'. */
+  /** Carry on from where the read stopped. Offered for every code that may come back. */
   onResume?: () => void | Promise<void>;
   /** The last word Glide reached, for "You got to …". */
   lastWord?: string;
@@ -50,10 +38,9 @@ export function ListenError({
   // Each action can take up to 1.5 s (the mic stopping). A second tap meanwhile would start it twice.
   const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
-  const language = code === 'language-not-supported' || /can[’']t listen for/i.test(message ?? '');
-  // Carry on only makes sense after an interruption; other errors would just fail again.
-  const resume = code === 'interrupted' ? onResume : undefined;
-  const canResume = !!resume;
+  const card = errorCard(code, message, !!onResume, lastWord);
+  // Only set when the card offers Carry on (errorCard checks onResume was passed).
+  const resume = card.primary === 'resume' ? onResume : undefined;
 
   const run = async (action: () => void | Promise<void>) => {
     if (inFlight.current) return;
@@ -67,21 +54,15 @@ export function ListenError({
     }
   };
 
-  const title = errorTitle(code, message);
-  const body = canResume
-    ? `Something else used the mic, so listening stopped.${lastWord ? ` You got to “${lastWord}”.` : ''}`
-    : message || 'Something went wrong with speech recognition.';
-  const label = canResume ? `Paused. ${lastWord ? `Carry on from ${lastWord}, or start over.` : 'Carry on, or start over.'}` : undefined;
-
   return (
     <View
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.line }, style]}
       accessibilityLiveRegion="polite"
       accessibilityRole="alert"
-      accessibilityLabel={label}
+      accessibilityLabel={card.label}
     >
-      <Text style={[styles.title, { color: colors.ink }]}>{title}</Text>
-      <Text style={[styles.body, { color: colors.muted }]}>{body}</Text>
+      <Text style={[styles.title, { color: colors.ink }]}>{card.title}</Text>
+      <Text style={[styles.body, { color: colors.muted }]}>{card.body}</Text>
       <View style={styles.row}>
         <Pressable
           onPress={() => run(resume ?? onRetry)}
@@ -90,15 +71,15 @@ export function ListenError({
           accessibilityRole="button"
           accessibilityState={{ disabled: busy, busy }}
         >
-          <Text style={styles.btnText}>{busy ? 'Starting…' : canResume ? 'Carry on' : 'Try again'}</Text>
+          <Text style={styles.btnText}>{busy ? 'Starting…' : resume ? 'Carry on' : 'Try again'}</Text>
         </Pressable>
-        {canResume && (
+        {card.startOver && (
           <Pressable onPress={() => run(onRetry)} disabled={busy} hitSlop={8} accessibilityRole="button">
             <Text style={[styles.link, { color: colors.signal }]}>Start over</Text>
           </Pressable>
         )}
         {/* dismissTo leaves this screen for the You tab, where the English to listen for is chosen. */}
-        {language && (
+        {card.chooseEnglish && (
           <Pressable onPress={() => router.dismissTo('/you')} hitSlop={8} accessibilityRole="button">
             <Text style={[styles.link, { color: colors.signal }]}>Choose another English</Text>
           </Pressable>
