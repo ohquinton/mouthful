@@ -25,6 +25,8 @@ export type Profile = {
   reminder?: { hour: number; minute: number } | null;
   pro: boolean;
   paywallSeen: boolean;
+  /** The full paywall after the free script run has opened once (pro.ts ahaPaywallDue). After that, soft walls only. */
+  ahaPaywallShown?: boolean;
 };
 
 const KEY = 'mouthful.profile.v1';
