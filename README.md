@@ -32,6 +32,11 @@ Copy `.env.example` to `.env`.
   products in the `default` offering as the Annual and Monthly packages. Paste the public iOS key into
   `EXPO_PUBLIC_REVENUECAT_IOS_KEY`. Without a key, development builds unlock Pro locally for testing
   and production builds refuse to sell anything.
+
+  **Free:** plans, Glide, the free Word Pack, streaks, one script and one completed run of its part 1.
+  **Pro:** every script, unlimited rehearsal (repeats and parts 2+), Fix-it, the library, every pack,
+  cold read outside the plan, full history. The full paywall shows once, after the free run; everything
+  after that is a soft wall (docs/briefs/aha-before-paywall.md).
 - **PostHog** (analytics). Create a project, paste its API key into `EXPO_PUBLIC_POSTHOG_KEY`.
   Without a key nothing is sent. Only event names, numbers and short codes are sent, never transcripts, audio
   or script text. `track()` drops any other text property before it leaves the phone.
