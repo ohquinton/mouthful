@@ -1,0 +1,493 @@
+{
+  "_source": "Ported from the Fade experiment (branch worktree-agent-a8f8e4f1d0fc2114a, commit de4351f, src/engine/fade-lab/fixtures.ts). Synthetic scripts written for the experiment, no tester data. Transcripts are generated from these in resync.test.ts.",
+  "scripts": [
+    {
+      "id": "about-yourself",
+      "kind": "interview",
+      "text": "I'm a data analyst with three years of experience in retail and logistics. At my current company, I built the weekly dashboard that our regional managers use to plan staffing. Before that, I spent a year cleaning supplier data, which taught me to really care about the boring details. What I enjoy most is turning a messy question into a simple chart that someone can act on. I'm looking for a team where analysis actually changes decisions, and from what I've read, your planning group works exactly that way. I'd love to bring that experience here.",
+      "fillerDrops": [
+        "really",
+        "exactly"
+      ],
+      "clause": "which taught me to really care about the boring details",
+      "synonyms": [
+        [
+          "experience",
+          "background"
+        ],
+        [
+          "company",
+          "job"
+        ],
+        [
+          "built",
+          "made"
+        ],
+        [
+          "regional",
+          "area"
+        ],
+        [
+          "plan",
+          "schedule"
+        ],
+        [
+          "spent",
+          "worked"
+        ],
+        [
+          "enjoy",
+          "like"
+        ],
+        [
+          "messy",
+          "complicated"
+        ],
+        [
+          "simple",
+          "clear"
+        ],
+        [
+          "decisions",
+          "choices"
+        ]
+      ],
+      "swap": 1,
+      "paraphrase": {
+        "sentence": 4,
+        "text": "i want to join a team where the analysis really drives decisions and it sounds like your planning group does that"
+      }
+    },
+    {
+      "id": "weakness",
+      "kind": "interview",
+      "text": "My biggest weakness used to be saying yes to everything. Early in my career, I would take on extra projects because I wanted to be helpful, and then my own deadlines would slip. Last year I started blocking two hours every morning for my main work, and I check new requests against our quarterly priorities before I agree. It has made a real difference. I missed no deadlines in the last six months, and my manager noticed that my updates became much more predictable. I still like helping people, but now I do it deliberately.",
+      "fillerDrops": [
+        "own",
+        "much"
+      ],
+      "clause": "and my manager noticed that my updates became much more predictable",
+      "synonyms": [
+        [
+          "biggest",
+          "greatest"
+        ],
+        [
+          "career",
+          "job"
+        ],
+        [
+          "extra",
+          "additional"
+        ],
+        [
+          "helpful",
+          "useful"
+        ],
+        [
+          "started",
+          "began"
+        ],
+        [
+          "blocking",
+          "setting aside"
+        ],
+        [
+          "main",
+          "core"
+        ],
+        [
+          "priorities",
+          "goals"
+        ],
+        [
+          "difference",
+          "change"
+        ],
+        [
+          "noticed",
+          "saw"
+        ],
+        [
+          "deliberately",
+          "on purpose"
+        ]
+      ],
+      "swap": 3,
+      "paraphrase": {
+        "sentence": 2,
+        "text": "so last year i began reserving the first two hours of each morning for my core work and now i compare any new request with our priorities before saying yes"
+      }
+    },
+    {
+      "id": "conflict",
+      "kind": "interview",
+      "text": "In my last role, two senior engineers disagreed about whether to rebuild our billing system or patch it. The argument had stalled the project for almost three weeks. I set up a short meeting and asked each of them to write down the risks they were most worried about. Once the lists were side by side, we saw that they mostly agreed on the problems and only differed on timing. We agreed to patch the urgent issues first and schedule the rebuild for the next quarter. The project moved again within days, and both of them later said the meeting helped.",
+      "fillerDrops": [
+        "almost",
+        "mostly"
+      ],
+      "clause": "and both of them later said the meeting helped",
+      "synonyms": [
+        [
+          "senior",
+          "experienced"
+        ],
+        [
+          "disagreed",
+          "argued"
+        ],
+        [
+          "rebuild",
+          "rewrite"
+        ],
+        [
+          "patch",
+          "fix"
+        ],
+        [
+          "argument",
+          "disagreement"
+        ],
+        [
+          "stalled",
+          "blocked"
+        ],
+        [
+          "short",
+          "quick"
+        ],
+        [
+          "worried",
+          "concerned"
+        ],
+        [
+          "problems",
+          "issues"
+        ],
+        [
+          "urgent",
+          "critical"
+        ],
+        [
+          "schedule",
+          "plan"
+        ],
+        [
+          "helped",
+          "worked"
+        ]
+      ],
+      "swap": 1,
+      "paraphrase": {
+        "sentence": 3,
+        "text": "when we put the two lists next to each other it was clear they agreed on the problems and only disagreed about the timing"
+      }
+    },
+    {
+      "id": "status-update",
+      "kind": "meeting",
+      "text": "Quick update on the onboarding project. We finished the new signup flow on Tuesday, and early numbers show completion going from sixty to seventy one percent. The main risk right now is the payment integration, because the vendor has not confirmed their testing window. I have asked for a date by Friday. If we do not hear back, we will launch without the discount codes and add them in the following sprint. Next week, the team is focusing on the welcome emails and fixing the bugs that support flagged. Let me know if you need anything from us before then.",
+      "fillerDrops": [
+        "early",
+        "right"
+      ],
+      "clause": "because the vendor has not confirmed their testing window",
+      "synonyms": [
+        [
+          "finished",
+          "completed"
+        ],
+        [
+          "signup",
+          "sign up"
+        ],
+        [
+          "risk",
+          "concern"
+        ],
+        [
+          "payment",
+          "billing"
+        ],
+        [
+          "vendor",
+          "supplier"
+        ],
+        [
+          "confirmed",
+          "given us"
+        ],
+        [
+          "asked",
+          "requested"
+        ],
+        [
+          "launch",
+          "ship"
+        ],
+        [
+          "focusing",
+          "working"
+        ],
+        [
+          "fixing",
+          "sorting out"
+        ],
+        [
+          "flagged",
+          "raised"
+        ]
+      ],
+      "swap": 1,
+      "paraphrase": {
+        "sentence": 5,
+        "text": "next week we are working on the welcome emails and the bugs support told us about"
+      }
+    },
+    {
+      "id": "raise",
+      "kind": "raise",
+      "text": "Thanks for making time today. I want to talk about my compensation. Over the past year, I have taken over the vendor contracts, trained three new hires, and reduced our monthly software costs by about eighteen percent. I also stepped in to lead the audit when Priya was on leave. I looked at salary data for similar roles in our area, and the typical range is between eighty five and ninety five thousand. I am currently at seventy eight. I would like to discuss moving to ninety thousand, effective at the next review cycle. I am committed to this team, and I think this reflects the role I am already doing.",
+      "fillerDrops": [
+        "also",
+        "already"
+      ],
+      "clause": "and reduced our monthly software costs by about eighteen percent",
+      "synonyms": [
+        [
+          "compensation",
+          "pay"
+        ],
+        [
+          "past",
+          "last"
+        ],
+        [
+          "contracts",
+          "agreements"
+        ],
+        [
+          "trained",
+          "onboarded"
+        ],
+        [
+          "stepped",
+          "jumped"
+        ],
+        [
+          "lead",
+          "run"
+        ],
+        [
+          "similar",
+          "comparable"
+        ],
+        [
+          "typical",
+          "usual"
+        ],
+        [
+          "discuss",
+          "talk about"
+        ],
+        [
+          "committed",
+          "dedicated"
+        ],
+        [
+          "reflects",
+          "matches"
+        ]
+      ],
+      "swap": 2,
+      "paraphrase": {
+        "sentence": 4,
+        "text": "based on salary data for roles like mine around here the usual range is eighty five to ninety five thousand"
+      }
+    },
+    {
+      "id": "churn-talk",
+      "kind": "presentation",
+      "text": "Good morning, everyone. Today I want to walk you through why our customer churn rose last quarter and what we are going to do about it. The short version is that most of the customers we lost had never finished setting up their accounts. They signed up, got stuck on the integration step, and quietly left within a month. So our plan has three parts: a simpler setup guide, a check-in call during the first week, and an alert when an account stalls. I will show you the data first, then the plan, and then I would love your questions.",
+      "fillerDrops": [
+        "everyone",
+        "quietly"
+      ],
+      "clause": "and what we are going to do about it",
+      "synonyms": [
+        [
+          "walk",
+          "take"
+        ],
+        [
+          "churn",
+          "turnover"
+        ],
+        [
+          "rose",
+          "went up"
+        ],
+        [
+          "finished",
+          "completed"
+        ],
+        [
+          "accounts",
+          "profiles"
+        ],
+        [
+          "stuck",
+          "blocked"
+        ],
+        [
+          "simpler",
+          "easier"
+        ],
+        [
+          "alert",
+          "warning"
+        ],
+        [
+          "stalls",
+          "stops"
+        ],
+        [
+          "questions",
+          "thoughts"
+        ]
+      ],
+      "swap": 2,
+      "paraphrase": {
+        "sentence": 4,
+        "text": "our plan is an easier setup guide a call in the first week and an alert if an account gets stuck"
+      }
+    },
+    {
+      "id": "why-this-job",
+      "kind": "interview",
+      "text": "I want this job because it sits right where my two interests meet: healthcare and software. I spent four years as a nurse, so I know how much time clinicians lose to clumsy tools. Then I retrained as a developer and spent the last two years building scheduling features for a hospital network. Your product is used by thousands of nurses every day, and the reviews say it is fast but hard to learn. I think my background could help close that gap. I would bring both the clinical perspective and the engineering skills to make it easier.",
+      "fillerDrops": [
+        "right",
+        "much"
+      ],
+      "clause": "so i know how much time clinicians lose to clumsy tools",
+      "synonyms": [
+        [
+          "interests",
+          "passions"
+        ],
+        [
+          "spent",
+          "worked"
+        ],
+        [
+          "clinicians",
+          "doctors and nurses"
+        ],
+        [
+          "clumsy",
+          "bad"
+        ],
+        [
+          "retrained",
+          "trained"
+        ],
+        [
+          "building",
+          "making"
+        ],
+        [
+          "thousands",
+          "lots"
+        ],
+        [
+          "fast",
+          "quick"
+        ],
+        [
+          "hard",
+          "difficult"
+        ],
+        [
+          "background",
+          "experience"
+        ],
+        [
+          "skills",
+          "ability"
+        ]
+      ],
+      "swap": 3,
+      "paraphrase": {
+        "sentence": 5,
+        "text": "i can bring the clinical side and the engineering side to make it simpler"
+      }
+    },
+    {
+      "id": "handover",
+      "kind": "meeting",
+      "text": "Before I hand over the warehouse project, here is where things stand. The new shelving is installed in two of the three zones, and the third zone is scheduled for the week of the twelfth. Picking errors have dropped by about a third since the barcode scanners went in. The open issue is the forklift charging station, which still needs an electrician to sign off. Anika has the contractor's details and the budget sheet. If anything comes up, she is the best person to ask, and I am happy to answer questions by email for the next month.",
+      "fillerDrops": [
+        "about",
+        "still"
+      ],
+      "clause": "and the third zone is scheduled for the week of the twelfth",
+      "synonyms": [
+        [
+          "shelving",
+          "shelves"
+        ],
+        [
+          "installed",
+          "in"
+        ],
+        [
+          "zones",
+          "areas"
+        ],
+        [
+          "errors",
+          "mistakes"
+        ],
+        [
+          "dropped",
+          "fallen"
+        ],
+        [
+          "scanners",
+          "readers"
+        ],
+        [
+          "issue",
+          "problem"
+        ],
+        [
+          "charging",
+          "power"
+        ],
+        [
+          "electrician",
+          "inspector"
+        ],
+        [
+          "contractor's",
+          "builder's"
+        ],
+        [
+          "budget",
+          "cost"
+        ],
+        [
+          "happy",
+          "glad"
+        ]
+      ],
+      "swap": 3,
+      "paraphrase": {
+        "sentence": 2,
+        "text": "since the scanners went in picking mistakes are down by about a third"
+      }
+    }
+  ]
+}
