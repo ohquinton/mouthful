@@ -70,7 +70,7 @@ Today shows the active moment's plan (`PlanCard`): learn the words → say them 
 ## Commands
 
 ```bash
-npm test                  # engine + store tests (287); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
+npm test                  # engine + store tests (296); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)
@@ -97,6 +97,7 @@ npx eas-cli@latest build --profile development --platform ios
 - Android counts as on-device only from Android 13 (API 33). Below that the library uses the network recogniser even when asked for on-device. Android can't check a variety is supported before consent, so an unsupported one can still fail after the reader agrees.
 - Steadiness leaves out steps over 2.5 s (the Pauses tile covers those) and steps touching a skipped word. A tail under 8 words after the last full stop isn't timed.
 - Recoverable recogniser errors (AirPods, network blips, busy) are hidden and restarted; 3 in 10 s with nothing heard ends the session with `repeated-failure`. iOS `interrupted` (call, Siri, backgrounding), `network` and `repeated-failure` stop listening; `resume()` (Carry on) keeps the read, while `language-not-supported` only offers Try again. The cap is unverified on Android phones.
+- Steadiness leaves out resync jumps and re-reads (same `reachedAt` stamp on 3+ words, or next to a skipped word). A one-word gap later backfilled can still read ~12% fast in that sentence, and a real drag right after a red word may be dropped. Exact fix if needed: stamp heard-token counts per word in the session screen.
 - Glide resyncs after skips and re-reads: 3 unconfirmed words, then a unique 2-word match nearby or 3+ words further away. Resuming on stopwords or habit words takes 4–8 words. A re-read doesn't move the pointer; it inks the red words it covers. Parameters: `RESYNC_AFTER` 3, `NEAR_SENTENCES` 2, `CARRY_ON` 2, `MAX_ANCHOR` 6.
 - Plan steps 1, 2 and 5 are free even for Pro packs (deliberate hook); steps 3–4 are Pro.
 - `patches/expo-speech-recognition+58.0.0.patch` makes iOS check on-device support for the locale we listen in (the library only checked the device default, and iOS silently falls back to the server). Android's on-device check still ignores locale. Re-check the patch when upgrading the library.
