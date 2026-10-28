@@ -17,7 +17,9 @@ import {
 import { PaceContext, pacerIndex, pacerWpm, paceZone, sessionScore, wordsPerMinute } from '../../engine/score';
 import type { Passage } from '../../content/passages';
 import { resolvePassage, sourceOf } from '../../content/resolve';
-import { saveSession } from '../../store/sessions';
+import { loadSessions, saveSession } from '../../store/sessions';
+import { loadScripts } from '../../content/scripts';
+import { canRehearse, isFreeRun } from '../../pro';
 import { deleteRecordingFiles } from '../../store/recordings';
 import { encodeStatuses } from '../../engine/review';
 import { paceSegments, paceSteadiness } from '../../engine/steadiness';
@@ -46,13 +48,38 @@ function defaultPace(id: string): PaceContext {
 export default function GlideSession() {
   const { id, cold, step, pace } = useLocalSearchParams<{ id: string; cold?: string; step?: string; pace?: PaceContext }>();
   const colors = useColors();
+  const { profile, ready } = useProfile();
   const [passage, setPassage] = useState<Passage | null | undefined>(undefined);
+  // Whether this read is the free reader's one free script run (pro.ts). Undefined until checked.
+  const [freeRun, setFreeRun] = useState<{ yes: boolean; day1At?: number }>();
 
   useEffect(() => {
     resolvePassage(id ?? '').then((p) => setPassage(p ?? null));
   }, [id]);
 
-  if (passage === undefined) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  // The one rehearse gate. PlanCard, scripts/[id], the Tape's "Read it again" and deep links all
+  // land here, so a script part never starts without canRehearse() saying yes. Waits for the
+  // profile, so a Pro reader opening a deep link at launch isn't walled by the default profile.
+  useEffect(() => {
+    if (!ready || !passage) return;
+    let live = true;
+    loadSessions().then((sessions) => {
+      if (!live) return;
+      const args = { pro: profile.pro, sessions, passageId: passage.id };
+      if (!canRehearse(args)) {
+        // Replace, not push: closing the wall goes back to where they came from, never into a
+        // session that would start the mic.
+        router.replace({ pathname: '/paywall', params: { feature: 'rehearse' } });
+        return;
+      }
+      setFreeRun({ yes: isFreeRun(args), day1At: sessions.find((s) => s.passageId === 'baseline')?.at });
+    });
+    return () => {
+      live = false;
+    };
+  }, [ready, passage, profile.pro]);
+
+  if (passage === undefined || (passage && !freeRun)) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   if (passage === null) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.bg }]}>
@@ -63,10 +90,47 @@ export default function GlideSession() {
       </View>
     );
   }
-  return <GlideSessionView passage={passage} cold={cold === '1'} step={step} pace={pace ?? defaultPace(passage.id)} />;
+  return (
+    <GlideSessionView
+      passage={passage}
+      cold={cold === '1'}
+      step={step}
+      pace={pace ?? defaultPace(passage.id)}
+      freeRun={freeRun!.yes}
+      day1At={freeRun!.day1At}
+    />
+  );
 }
 
-function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; cold: boolean; step?: string; pace: PaceContext }) {
+/** The free run's counts for analytics: never the script's words, only how many. */
+async function trackFreeRun(passageId: string, moment: string | null, words: number, wpm: number, stumbled: number, day1At?: number) {
+  const scriptId = /^s\.(\d+)\./.exec(passageId)?.[1];
+  const parts = (await loadScripts()).find((s) => s.id === scriptId)?.chunks.length ?? null;
+  track('free_run_complete', {
+    moment,
+    words,
+    parts,
+    wpm,
+    stumbled,
+    minutes_since_day1: day1At ? Math.round((Date.now() - day1At) / 60_000) : null,
+  });
+}
+
+function GlideSessionView({
+  passage,
+  cold,
+  step,
+  pace,
+  freeRun,
+  day1At,
+}: {
+  passage: Passage;
+  cold: boolean;
+  step?: string;
+  pace: PaceContext;
+  freeRun: boolean;
+  day1At?: number;
+}) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -299,6 +363,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     await recordWords(resultsFromSession(words, a));
     for (const i of corrected) await recordCorrection(words[i].display);
     await markStep(profile, update, step);
+    if (freeRun) trackFreeRun(passage.id, profile.moment?.id ?? null, words.length, stats.wpm, stumbled.length, day1At).catch(() => {});
     track('session_complete', {
       kind: passage.id.split('.')[0],
       pace,
@@ -313,7 +378,7 @@ function GlideSessionView({ passage, cold, step, pace }: { passage: Passage; col
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (isBaseline && !profile.onboarded) router.replace({ pathname: '/onboarding/day1', params: { id: sessionId } });
     else router.replace({ pathname: '/tape', params: { id: sessionId } });
-  }, [a, raw, listener, passage, words, pace, corrected, profile, update, step, isBaseline, tester]);
+  }, [a, raw, listener, passage, words, pace, corrected, profile, update, step, isBaseline, tester, freeRun, day1At]);
 
   /** A real restart: clean transcript, timer, corrections, marks and pauses, then listen again. */
   const retry = useCallback(() => {
