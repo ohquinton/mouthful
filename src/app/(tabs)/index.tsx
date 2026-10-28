@@ -7,7 +7,8 @@ import { estimateSeconds, formatDuration as duration, PASSAGES, passageOfTheDay 
 import { MOMENTS } from '../../content/moments';
 import { loadSessions, SavedSession, streak, thisWeek } from '../../store/sessions';
 import { useProfile } from '../../store/profile';
-import { COLD_READ_STREAK, requirePro } from '../../pro';
+import { requirePro } from '../../pro';
+import { loadScripts } from '../../content/scripts';
 import { PlanCard } from '../../components/PlanCard';
 import { ProBadge } from '../../components/ui';
 import { fonts, space, useColors } from '../../theme';
@@ -22,11 +23,14 @@ export default function Today() {
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
   const [sessions, setSessions] = useState<SavedSession[]>([]);
+  const [scriptCount, setScriptCount] = useState(0);
   const today = passageOfTheDay();
 
   useFocusEffect(
     useCallback(() => {
       loadSessions().then(setSessions);
+      // PlanCard needs it: a free reader's first script is free, a second is Pro.
+      loadScripts().then((all) => setScriptCount(all.length));
     }, []),
   );
 
@@ -34,7 +38,6 @@ export default function Today() {
   const week = thisWeek(sessions);
   const doneToday = sessions.some((s) => s.passageId === today.id && new Date(s.at).toDateString() === new Date().toDateString());
   const last = sessions[sessions.length - 1];
-  const coldUnlocked = days >= COLD_READ_STREAK;
   // Cold read uses a passage the reader hasn't opened yet.
   const readIds = new Set(sessions.map((s) => s.passageId));
   const unseen = PASSAGES.find((p) => !readIds.has(p.id) && p.id !== today.id) ?? PASSAGES[(PASSAGES.indexOf(today) + 1) % PASSAGES.length];
@@ -46,8 +49,8 @@ export default function Today() {
       sub: 'Paste it, rehearse it',
       icon: 'document-text-outline' as const,
       badge: !profile.pro,
-      dim: false,
-      onPress: () => requirePro(profile, 'scripts') && router.push('/scripts'),
+      // Free readers can open the list: their first script is free. "Paste a script" walls the second.
+      onPress: () => router.push('/scripts'),
     },
     {
       key: 'talk',
@@ -55,18 +58,16 @@ export default function Today() {
       sub: '60 seconds, no script',
       icon: 'chatbubble-ellipses-outline' as const,
       badge: false,
-      dim: false,
       onPress: () => router.push('/talk'),
     },
     {
       key: 'cold',
       title: 'Cold read',
-      sub: coldUnlocked ? 'Unseen passage' : `Unlocks at a ${COLD_READ_STREAK}-day streak`,
-      icon: (coldUnlocked ? 'eye-off-outline' : 'lock-closed-outline') as 'eye-off-outline',
-      badge: false,
-      dim: !coldUnlocked,
-      onPress: () =>
-        coldUnlocked && requirePro(profile, 'cold') && router.push({ pathname: '/session/[id]', params: { id: unseen.id, cold: '1' } }),
+      sub: 'Unseen passage',
+      icon: 'eye-off-outline' as const,
+      // Pro only, like Scripts. No streak lock: being locked twice read as bait.
+      badge: !profile.pro,
+      onPress: () => requirePro(profile, 'cold') && router.push({ pathname: '/session/[id]', params: { id: unseen.id, cold: '1' } }),
     },
   ];
 
@@ -90,7 +91,7 @@ export default function Today() {
 
       {/* What you're preparing for comes first */}
       {profile.moment ? (
-        <PlanCard />
+        <PlanCard sessions={sessions} scriptCount={scriptCount} />
       ) : (
         <View style={[styles.prep, { backgroundColor: colors.card }]}>
           <Text style={[styles.prepTitle, { color: colors.cardInk }]}>What are you preparing for?</Text>
@@ -136,19 +137,14 @@ export default function Today() {
             key={t.key}
             onPress={t.onPress}
             accessibilityRole="button"
-            style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.line, opacity: t.dim ? 0.6 : pressed ? 0.75 : 1 }]}
+            style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.75 : 1 }]}
           >
             <View style={styles.tileTop}>
-              <Ionicons name={t.icon} size={22} color={t.dim ? colors.muted : colors.signal} />
+              <Ionicons name={t.icon} size={22} color={colors.signal} />
               {t.badge && <ProBadge />}
             </View>
             <Text style={[styles.tileTitle, { color: colors.ink }]}>{t.title}</Text>
             <Text style={[styles.tileSub, { color: colors.muted }]}>{t.sub}</Text>
-            {t.key === 'cold' && !coldUnlocked && (
-              <View style={[styles.meter, { backgroundColor: colors.line }]}>
-                <View style={[styles.meterFill, { backgroundColor: colors.ember, width: `${(days / COLD_READ_STREAK) * 100}%` }]} />
-              </View>
-            )}
           </Pressable>
         ))}
       </View>
@@ -216,8 +212,6 @@ const styles = StyleSheet.create({
   tileTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   tileTitle: { fontSize: 15, fontWeight: '700' },
   tileSub: { fontSize: 13, lineHeight: 17 },
-  meter: { height: 4, borderRadius: 2, marginTop: 'auto' },
-  meterFill: { height: 4, borderRadius: 2 },
   section: { fontSize: 17, fontWeight: '700', marginTop: space(1) },
   week: { flexDirection: 'row', justifyContent: 'space-between', borderWidth: 1, borderRadius: 18, padding: space(2) },
   day: { alignItems: 'center', gap: 8 },

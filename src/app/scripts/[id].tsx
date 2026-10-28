@@ -7,12 +7,17 @@ import { deleteScript, loadScripts, Script, wordCount } from '../../content/scri
 import { scriptChunkId } from '../../content/resolve';
 import { estimateSeconds, formatDuration } from '../../content/passages';
 import { loadSessions, SavedSession } from '../../store/sessions';
+import { useProfile } from '../../store/profile';
+import { canRehearse } from '../../pro';
+import { FREE_RUN_LINE } from '../../content/moments';
+import { ProBadge } from '../../components/ui';
 import { fonts, space, useColors } from '../../theme';
 
 export default function ScriptDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { profile } = useProfile();
   const [script, setScript] = useState<Script | null>();
   const [sessions, setSessions] = useState<SavedSession[]>([]);
   const [confirm, setConfirm] = useState(false);
@@ -53,6 +58,8 @@ export default function ScriptDetail() {
 
         {script.chunks.map((c, i) => {
           const b = best(i);
+          // Labels only: session/[id].tsx makes the call (canRehearse) for every way in.
+          const open = canRehearse({ pro: profile.pro, sessions, passageId: scriptChunkId(script.id, i) });
           return (
             <Pressable
               key={i}
@@ -63,7 +70,12 @@ export default function ScriptDetail() {
                 <Text style={[styles.partLabel, { color: colors.muted }]}>
                   PART {i + 1} · {wordCount(c)} WORDS · {formatDuration(estimateSeconds(c))}
                 </Text>
-                {b !== undefined && <Text style={[styles.partBest, { color: colors.good }]}>Best {b}</Text>}
+                {b !== undefined ? (
+                  <Text style={[styles.partBest, { color: colors.good }]}>Best {b}</Text>
+                ) : !profile.pro && open ? (
+                  <Text style={[styles.partBest, { color: colors.good }]}>{FREE_RUN_LINE}</Text>
+                ) : null}
+                {!open && <ProBadge />}
               </View>
               <Text style={[styles.partText, { color: colors.ink }]} numberOfLines={3}>
                 {c}

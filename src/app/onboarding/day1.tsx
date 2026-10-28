@@ -26,8 +26,9 @@ export default function Day1() {
     const ok = await scheduleDailyReminder(time.hour, time.minute).catch(() => false);
     await update({ onboarded: true, baselineSessionId: id, reminder: ok ? time : null });
     track('onboarding_complete', { wpm: s?.wpm ?? null, reminder: ok, recorded: !!s?.recordings?.length });
+    // No paywall here (criterion 1): the full paywall waits until after their first own-script run, so they've
+    // seen their own words ink in before we ask (docs/briefs/aha-before-paywall.md).
     router.replace('/');
-    router.push({ pathname: '/paywall', params: { wpm: String(s?.wpm ?? '') } });
   };
 
   if (!s) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;

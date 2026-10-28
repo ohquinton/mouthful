@@ -129,9 +129,9 @@ export default function You() {
         <Text style={[styles.planSub, { color: profile.pro ? colors.muted : colors.cardMuted }]}>
           {profile.pro
             ? 'Everything is unlocked. Thanks for backing a small app.'
-            : 'Plans for your big moments, Glide, the free Word Pack and streaks. Pro adds your own scripts, word drills, every pack and your full history.'}
+            : 'Plans for your big moments, Glide, the free Word Pack, streaks, and one script with a free first run. Pro adds every script, unlimited rehearsal, word drills, cold reads, every pack and your full history.'}
         </Text>
-        {!profile.pro && <PrimaryButton label="See Pro" onPress={() => router.push('/paywall')} style={{ marginTop: space(1) }} />}
+        {!profile.pro && <PrimaryButton label="See Pro" onPress={() => router.push({ pathname: '/paywall', params: { from: 'you' } })} style={{ marginTop: space(1) }} />}
       </View>
 
       <SectionTitle>What you’re preparing for</SectionTitle>
