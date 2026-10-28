@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,7 +14,7 @@ import { resolvePassage, sourceOf } from '../content/resolve';
 import { preparePassage, PassageWord } from '../engine/align';
 import { paceSteadiness, PaceSegment } from '../engine/steadiness';
 import { PaceStrip } from '../components/PaceStrip';
-import { requirePro } from '../pro';
+import { ahaNumbers, ahaPaywallDue, requirePro } from '../pro';
 import { track } from '../analytics';
 import { fonts, space, useColors } from '../theme';
 
@@ -24,8 +24,9 @@ export default function Tape() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile } = useProfile();
+  const { profile, update } = useProfile();
   const [s, setS] = useState<SavedSession>();
+  const [all, setAll] = useState<SavedSession[]>([]);
   const [prev, setPrev] = useState<SavedSession>();
   const [days, setDays] = useState(0);
   const [shown, setShown] = useState(0);
@@ -36,6 +37,7 @@ export default function Tape() {
     loadSessions().then((all) => {
       const i = all.findIndex((x) => x.id === id);
       if (i < 0) return;
+      setAll(all);
       setS(all[i]);
       if (all[i].segments) resolvePassage(all[i].passageId).then((p) => p && setPassageWords(preparePassage(p.text)));
       setPrev(all.slice(0, i).reverse().find((x) => x.passageId === all[i].passageId) ?? all[i - 1]);
@@ -46,6 +48,57 @@ export default function Tape() {
     });
     return () => count.removeAllListeners();
   }, [id, count]);
+
+  // ---- The full paywall after the free run (docs/briefs/aha-before-paywall.md) ----
+  // Never on top of the Tape: they see their result and can tap "I said it" first. It opens as
+  // they leave (Done, the plan row, Read it again, or a back gesture), once. The numbers come from
+  // `s` as it is now, so corrections count.
+  // Set the moment it's taken (not state), so the unmount check below can't open it twice.
+  const ahaTaken = useRef(false);
+  const ahaDue = !!s && ahaPaywallDue({ profile, sessions: all, sessionId: s.id });
+
+  /** Marks the paywall shown (so it opens once) and returns its route, with numbers only. */
+  const takeAha = (session: SavedSession) => {
+    ahaTaken.current = true;
+    update({ ahaPaywallShown: true });
+    const n = ahaNumbers(session);
+    // The moment's name goes in the headline only when this is the moment's own script.
+    const m = profile.moment;
+    const own = !!m?.scriptId && session.passageId.startsWith(`s.${m.scriptId}.`);
+    return {
+      pathname: '/paywall' as const,
+      params: { from: 'aha', wpm: String(n.wpm), words: String(n.words), heard: String(n.heard), ...(own && m ? { moment: m.id } : {}) },
+    };
+  };
+
+  // A back gesture (or Android back) leaves without our buttons. Let it go, then open the
+  // paywall over wherever they land. The latest "open it" is kept in a ref for the unmount.
+  const openOnLeave = useRef<(() => void) | undefined>(undefined);
+  useEffect(() => {
+    openOnLeave.current =
+      ahaDue && s
+        ? () => {
+            if (ahaTaken.current) return;
+            const route = takeAha(s);
+            setTimeout(() => router.push(route), 0);
+          }
+        : undefined;
+  });
+  useEffect(() => () => openOnLeave.current?.(), []);
+
+  const done = () => {
+    if (!ahaDue || !s || ahaTaken.current) return router.dismissTo('/');
+    const route = takeAha(s);
+    router.dismissTo('/');
+    router.push(route);
+  };
+
+  const again = () => {
+    if (!s) return;
+    if (ahaDue && !ahaTaken.current) return router.replace(takeAha(s));
+    if (s.passageId === 'talk') router.replace('/talk');
+    else router.replace({ pathname: '/session/[id]', params: { id: s.passageId, pace: s.context ?? 'reading' } });
+  };
 
   if (!s) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
@@ -175,7 +228,7 @@ export default function Tape() {
 
       {moment && (
         <Pressable
-          onPress={() => router.dismissTo('/')}
+          onPress={done}
           style={({ pressed }) => [styles.planRow, { backgroundColor: colors.signalSoft, opacity: pressed ? 0.8 : 1 }]}
         >
           <Ionicons name="list" size={20} color={colors.signal} />
@@ -184,18 +237,12 @@ export default function Tape() {
         </Pressable>
       )}
 
-      <Pressable style={[styles.secondary, { borderColor: colors.line }]} onPress={() => router.dismissTo('/')}>
+      <Pressable style={[styles.secondary, { borderColor: colors.line }]} onPress={done}>
         <Text style={[styles.secondaryText, { color: colors.ink }]}>Done</Text>
       </Pressable>
-      {s.passageId === 'talk' ? (
-        <Pressable onPress={() => router.replace('/talk')}>
-          <Text style={[styles.again, { color: colors.muted }]}>Try another prompt</Text>
-        </Pressable>
-      ) : (
-        <Pressable onPress={() => router.replace({ pathname: '/session/[id]', params: { id: s.passageId, pace: ctx } })}>
-          <Text style={[styles.again, { color: colors.muted }]}>Read it again</Text>
-        </Pressable>
-      )}
+      <Pressable onPress={again}>
+        <Text style={[styles.again, { color: colors.muted }]}>{s.passageId === 'talk' ? 'Try another prompt' : 'Read it again'}</Text>
+      </Pressable>
     </ScrollView>
   );
 }
