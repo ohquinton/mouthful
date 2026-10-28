@@ -24,7 +24,15 @@ Mouthful can send anonymous usage counts to PostHog (USA) to see which parts of 
 - We **never** send your words, scripts, transcripts or voice. The app removes any text before sending.
 - We **never** send the English variety you picked, since it could hint at where you're from.
 - PostHog can see the internet address a request comes from. We don't use it to identify you.
-- You can switch usage counts off in **You → Privacy**, and they stay off if you reset the app.
+- You can switch usage counts off in **You → Privacy** (the same switch turns off crash reports), and they stay off if you reset the app.
+
+## Crash reports
+
+If Mouthful crashes, it can send a crash report to Sentry (USA) so we can fix the bug. A crash report contains the type of error, a short error message, where in the app's code it happened, the app version, and your phone's model and operating system version.
+
+- We **never** send your words, scripts, transcripts or voice. Any report whose error message looks like ordinary text (more than a few words) is thrown away on your phone before sending, and error messages are cut short.
+- Crash reports don't include screenshots, what was on screen, what you did before the crash, your language or region settings, your name, or any account. Sentry is set not to store the internet address a report comes from.
+- Crash reports use the same switch as usage counts: **You → Privacy → Share anonymous usage counts and crash reports**. Turn it off and nothing more is sent (it takes full effect the next time you open the app). It stays off if you reset the app.
 
 ## Purchases
 
