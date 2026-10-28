@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { chunkScript, MAX_SCRIPT_WORDS, saveScript, titleFrom, wordCount } from '../../content/scripts';
+import { chunkScript, loadScripts, MAX_SCRIPT_WORDS, saveScript, titleFrom, wordCount } from '../../content/scripts';
 import { PrimaryButton } from '../../components/ui';
 import { getMoment } from '../../content/moments';
 import { useProfile } from '../../store/profile';
 import { markStep } from '../../plan';
+import { canAddScript } from '../../pro';
 import { track } from '../../analytics';
 import { space, useColors } from '../../theme';
 
@@ -15,10 +16,23 @@ export default function NewScript() {
   const moment = getMoment(momentId);
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile, update } = useProfile();
+  const { profile, update, ready } = useProfile();
   const [title, setTitle] = useState(moment ? `My ${moment.short}` : '');
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Second line of defence for deep links: the buttons that open this screen already check.
+  // A free reader's first script is free; with one saved, swap this screen for the soft wall.
+  useEffect(() => {
+    if (!ready || profile.pro) return;
+    let live = true;
+    loadScripts().then((all) => {
+      if (live && !canAddScript({ pro: false, scriptCount: all.length })) router.replace({ pathname: '/paywall', params: { feature: 'scripts' } });
+    });
+    return () => {
+      live = false;
+    };
+  }, [ready, profile.pro]);
 
   const words = wordCount(text);
   const parts = words ? chunkScript(text).length : 0;
@@ -28,7 +42,7 @@ export default function NewScript() {
   const save = async () => {
     setSaving(true);
     const s = await saveScript(title, text);
-    track('script_saved', { words: wordCount(text), parts: s.chunks.length, moment: moment?.id ?? null });
+    track('script_saved', { words: wordCount(text), parts: s.chunks.length, moment: moment?.id ?? null, free: !profile.pro });
     if (moment) {
       await markStep(profile, update, step, { scriptId: s.id });
       router.back(); // straight back to the plan; the next step is rehearsing it

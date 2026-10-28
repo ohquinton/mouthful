@@ -2,10 +2,7 @@
 // completed Glide of its part 1. These are the rules session/[id].tsx, the Tape, PlanCard and
 // the scripts screens all call, so there's one answer and no way round it.
 
-const push = jest.fn();
-// pro.ts imports the router for requirePro(); the real one needs React Native.
-jest.mock('expo-router', () => ({ router: { push: (...a: unknown[]) => push(...a) } }));
-
+import * as pro from '../src/pro';
 import {
   ahaCopy,
   ahaNumbers,
@@ -20,6 +17,11 @@ import {
   UPSELL,
 } from '../src/pro';
 import type { Profile } from '../src/store/profile';
+
+// pro.ts imports the router for requirePro(); the real one needs React Native. (jest.mock is
+// hoisted above the imports; the `mock` prefix lets the factory use mockPush.)
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ router: { push: (...a: unknown[]) => mockPush(...a) } }));
 
 const run = (passageId: string, id = passageId) => ({ id, passageId });
 const free = { pro: false };
@@ -161,19 +163,19 @@ describe('the post-run paywall copy', () => {
 
 describe('requirePro', () => {
   const profile = (pro: boolean): Profile => ({ onboarded: true, pro, paywallSeen: true });
-  beforeEach(() => push.mockClear());
+  beforeEach(() => mockPush.mockClear());
 
   it('lets Pro straight through (cold read goes straight in)', () => {
     expect(requirePro(profile(true), 'cold')).toBe(true);
-    expect(push).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('opens the soft wall for a free reader, whatever their streak (no streak lock any more)', () => {
     expect(requirePro(profile(false), 'cold')).toBe(false);
-    expect(push).toHaveBeenCalledWith({ pathname: '/paywall', params: { feature: 'cold' } });
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/paywall', params: { feature: 'cold' } });
   });
 
   it('no longer exports the cold-read streak', () => {
-    expect((require('../src/pro') as Record<string, unknown>).COLD_READ_STREAK).toBeUndefined();
+    expect('COLD_READ_STREAK' in pro).toBe(false);
   });
 });
