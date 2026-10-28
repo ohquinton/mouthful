@@ -9,6 +9,7 @@ module.exports = {
   moduleNameMapper: {
     '^@react-native-async-storage/async-storage$': '<rootDir>/test/asyncStorageMock.js',
     '^react-native$': '<rootDir>/test/reactNativeMock.js',
+    '^@sentry/react-native$': '<rootDir>/test/sentryMock.js',
   },
   transform: { '^.+\\.tsx?$': ['ts-jest', { tsconfig: { strict: true, esModuleInterop: true, target: 'es2020', module: 'commonjs', types: ['jest'] } }] },
 };
