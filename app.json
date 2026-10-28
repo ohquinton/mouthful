@@ -44,6 +44,14 @@
           "microphonePermission": "Mouthful listens while you practise so it can follow along. Recordings are kept only if you choose, on this phone (and in its backup, if you use one).",
           "enableBackgroundPlayback": false
         }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "organization": "mouthful",
+          "project": "mouthful-app"
+        }
       ]
     ],
     "scheme": "mouthful",
