@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -6,12 +6,14 @@ import { useFonts } from 'expo-font';
 import { Literata_500Medium, Literata_700Bold } from '@expo-google-fonts/literata';
 import { BricolageGrotesque_700Bold, BricolageGrotesque_800ExtraBold } from '@expo-google-fonts/bricolage-grotesque';
 import { ProfileProvider, useProfile } from '../store/profile';
-import { hasPro, initPurchases } from '../purchases';
+import { customerState, initPurchases, onCustomerChange, type CustomerState } from '../purchases';
+import { syncTrialReminder } from '../reminders';
 import { useColors } from '../theme';
+import { wrapRoot } from '../sentry';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-export default function RootLayout() {
+function RootLayout() {
   const colors = useColors();
   const [loaded, failed] = useFonts({
     Literata_500Medium,
@@ -49,17 +51,37 @@ export default function RootLayout() {
   );
 }
 
-/** On launch, the store is the source of truth for Pro (when purchases are configured). */
+// Reports render errors as crash reports, once the profile provider has started Sentry
+// (it waits for the reader's choice). Before that, or with sharing off, it does nothing.
+export default wrapRoot(RootLayout);
+
+/**
+ * On launch, the store is the source of truth for Pro (when purchases are configured). It also
+ * keeps the trial reminder honest: scheduled while a trial will turn into a charge, cancelled
+ * once they cancel it in Settings, whether we find out at launch or while the app is open.
+ */
 function EntitlementSync() {
   const { ready, profile, update } = useProfile();
+  // The latest value, for the store listener below, which outlives this render.
+  const pro = useRef(profile.pro);
+  useEffect(() => {
+    pro.current = profile.pro;
+  }, [profile.pro]);
+
   useEffect(() => {
     if (!ready) return;
+    const apply = async (state: NonNullable<CustomerState>) => {
+      if (state.pro !== pro.current) await update({ pro: state.pro });
+      await syncTrialReminder(state.trial, { ask: false });
+    };
     (async () => {
       await initPurchases();
-      const pro = await hasPro();
-      if (pro !== null && pro !== profile.pro) await update({ pro });
+      const state = await customerState();
+      if (state) await apply(state);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
+    return onCustomerChange((state) => {
+      apply(state);
+    });
+  }, [ready, update]);
   return null;
 }

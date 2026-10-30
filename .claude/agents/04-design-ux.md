@@ -83,6 +83,30 @@ Elsewhere:
 - Haptics: light impact at sentence ends during Glide, selection on corrections, success on
   finishing. Don't add more. Haptics are a reward, not a metronome.
 
+## Taste: it must never look vibe-coded (Quinton, 2026-10-30)
+
+Restraint is the brand. Think Things, Headspace, Linear, iA Writer: calm, typographic, confident. Not a
+template with effects bolted on.
+
+**Never:**
+- glows, neon edges, outer shadows that "light up", glassmorphism, blur behind cards
+- gradients on buttons, text or backgrounds (one flat colour per surface)
+- confetti, fireworks, sparkles, bouncing badges, emoji as decoration
+- more than one accent colour on a screen; cobalt is the accent, amber only means "watch out"
+- stock illustration packs, 3D blobs, AI-looking art, drop shadows on everything
+- animation for its own sake: every motion must explain something (a word inking in, a timer counting)
+
+**Always:**
+- good moments use the existing `good` colour, quietly: a line drawing in, a number settling, a soft haptic
+- type does the work: size, weight and space before colour or effects
+- one idea per screen; generous space; real content in mockups (no lorem ipsum)
+- motion short (150–400 ms), eased, and off under Reduce Motion
+- the mascot (Drop) is flat, two colours, no shine or highlight, and appears only where docs/design/ANIMATION.md
+  allows
+
+Before handing off any design, ask: "Would this look at home in Things or Headspace?" If it looks like a
+template, a crypto app or a hackathon demo, cut until it doesn't.
+
 ## Voice and copy
 
 Mouthful talks like a calm, sharp friend who's good at this. It doesn't talk like a coach yelling

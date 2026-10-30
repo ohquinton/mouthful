@@ -25,13 +25,18 @@ export type EventName =
   | 'plan_step_done'
   | 'pack_open'
   | 'script_saved'
-  | 'paywall_view'
+  | 'paywall_view' // `from`: aha (after the free script run) | soft (a soft wall) | you (See Pro)
+  | 'paywall_close' // seconds on the paywall before leaving it without buying
+  | 'free_run_complete' // the free reader's one script run was saved: counts and the moment code only
+  | 'free_run_stopped' // "Stop here" on an early Finish of the free run: words reached and the part's length
+  | 'script_linked' // plan step 3 used a script already saved: its parts, the moment code, free or Pro
   | 'purchase_attempt'
   | 'purchase_result'
   | 'recording_played'
   | 'recordings_deleted'
   | 'session_retry'
-  | 'session_resume'; // Carry on after the recogniser stopped; `error` is the listener's code
+  | 'session_resume' // Carry on after the recogniser stopped; `error` is the listener's code
+  | 'rating_prompt'; // the App Store rating prompt was shown; `reason`: second_run | after_moment
 
 type Props = Record<string, string | number | boolean | null | undefined>;
 
@@ -40,7 +45,11 @@ type Props = Record<string, string | number | boolean | null | undefined>;
  * Any other string property is dropped before sending, so a user's words, scripts or
  * transcripts can't leak into analytics even if someone adds a careless track() call.
  */
-const TEXT_KEYS = new Set(['kind', 'pace', 'plan', 'feature', 'moment', 'step', 'where', 'which', 'error', 'from', 'source']);
+// `reason`: why the rating prompt was shown (rating.ts RatingReason: second_run, after_moment).
+// `flow_version`: One Minute's Flow formula code from engine/minute.ts FLOW_VERSION (e.g. 1-k40p35w25).
+// One Minute also uses `which` for the prompt id (p01–p36) or the habit-word code (like, you_know),
+// and `kind` for minute | habit. Never the prompt text or a word the reader said.
+const TEXT_KEYS = new Set(['kind', 'pace', 'plan', 'feature', 'moment', 'step', 'where', 'which', 'error', 'from', 'source', 'reason', 'flow_version']);
 const CODE = /^[a-z0-9_:-]{1,24}$/i;
 
 export function sanitise(props: Props): Props {

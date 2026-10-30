@@ -49,9 +49,10 @@ Pay $20: fair for 30 minutes, gets strangers instead of friends, and cuts polite
   No names on the sheet. Accent goes in the observer columns only, never in analytics.
 - **3–9 Onboarding and Day 1 read.** Say only "Try it and think out loud." Log `hl_eye`
   (keeps / lags / jumps) and count hesitations (`confusions`). Their quotes go in a separate notes doc.
-- **9–10 Paywall.** Log `paywall` (tap trial / close / look at price). If they close it, unlock Pro yourself.
-- **10–20 Interview moment.** Steps 1–2 quickly. Step 3: they paste their own answer. Step 4: rehearse
-  it twice. Log `rehearsals`.
+- **9–17 Interview moment.** Steps 1–2 quickly. Step 3: they paste their own answer. Step 4: their first
+  rehearsal (free). Log `aha` (Y/N, reached the free run).
+- **About 17: the paywall** opens as they leave that Tape. Log `paywall` (tap trial / close / look at price) and
+  `paywall_min`. If they close it, unlock Pro yourself, then the second rehearsal. Log `rehearsals`.
 - **20–22 Phone face down.** "Say your answer to me, no script." Tick each key point you hear. Log
   `kp_recalled` (N of M) and `recall_s`.
 - **22–26 Free talk, 2 min.** "Tell me about a project you're proud of." Tally each like / so / you know /
@@ -84,7 +85,7 @@ You tab → Tester mode → **Review sessions**. For each reading session:
 corrections · uncaught errors · false red /100 · false green /100 · reader caught % · wpm · first-word lag ms · reviewed
 
 **Observer columns** (one row per tester): tester_id · esl (Y/N) · accent (self-described) ·
-days_to_moment · consent · hl_eye · confusions · paywall · rehearsals · kp_M · kp_recalled · recall_s ·
+days_to_moment · consent · hl_eye · confusions · aha · paywall · paywall_min · rehearsals · kp_M · kp_recalled · recall_s ·
 habit_n · real_n · felt_unfair · named_word · pay10 · commit · returned_d2
 
 ## Gates

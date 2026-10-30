@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -14,18 +14,38 @@ import { resolvePassage, sourceOf } from '../content/resolve';
 import { preparePassage, PassageWord } from '../engine/align';
 import { paceSteadiness, PaceSegment } from '../engine/steadiness';
 import { PaceStrip } from '../components/PaceStrip';
-import { requirePro } from '../pro';
+import { ahaPaywallDue, ahaPaywallRoute, claimAhaPaywall, requirePro } from '../pro';
 import { track } from '../analytics';
+import { clock, lengthZone, spokenClock } from '../content/targets';
+import { maybeAskForRating } from '../rating';
+import { minuteTrend } from '../engine/minute';
+import type { HabitWord } from '../engine/habits';
+import { habitCode, overruleFiller, pastMinutes, trendText } from '../store/minute';
+import { MinuteResult } from '../components/MinuteResult';
 import { fonts, space, useColors } from '../theme';
 
 const CONTEXT_LABEL = { reading: 'reading aloud', presenting: 'presenting', talking: 'talking' } as const;
+
+/** A finished One Minute with its Flow. Anything else (Free talk, reading, older sessions) shows the usual Tape. */
+const isMinuteSession = (x: SavedSession) => x.kind === 'minute' && typeof x.flow === 'number' && !!x.minute;
+
+/** The big number: Flow for a minute, the score for everything else. */
+const headline = (x: SavedSession) => (isMinuteSession(x) ? x.flow! : x.score);
+
+/** This minute against your own earlier minutes of the same Flow version. */
+function minuteTrendText(s: SavedSession, all: SavedSession[]): string {
+  const version = s.flowVersion ?? '';
+  const past = pastMinutes(all, all.findIndex((x) => x.id === s.id), version);
+  return trendText(minuteTrend(past, version, s.flow), past.length);
+}
 
 export default function Tape() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile } = useProfile();
+  const { profile, update } = useProfile();
   const [s, setS] = useState<SavedSession>();
+  const [all, setAll] = useState<SavedSession[]>([]);
   const [prev, setPrev] = useState<SavedSession>();
   const [days, setDays] = useState(0);
   const [shown, setShown] = useState(0);
@@ -36,18 +56,94 @@ export default function Tape() {
     loadSessions().then((all) => {
       const i = all.findIndex((x) => x.id === id);
       if (i < 0) return;
+      setAll(all);
       setS(all[i]);
       if (all[i].segments) resolvePassage(all[i].passageId).then((p) => p && setPassageWords(preparePassage(p.text)));
       setPrev(all.slice(0, i).reverse().find((x) => x.passageId === all[i].passageId) ?? all[i - 1]);
       setDays(streak(all).days);
-      // The one celebratory moment: the score counts up over 600ms.
+      // The one celebratory moment: the score (or a minute's Flow) counts up over 600ms.
       count.addListener(({ value }) => setShown(Math.round(value)));
-      Animated.timing(count, { toValue: all[i].score, duration: 600, useNativeDriver: false }).start();
+      Animated.timing(count, { toValue: headline(all[i]), duration: 600, useNativeDriver: false }).start();
     });
     return () => count.removeAllListeners();
   }, [id, count]);
 
+  // ---- The full paywall after the free run (docs/briefs/aha-before-paywall.md) ----
+  // Never on top of the Tape: they see their result and can tap "I said it" first. It opens as
+  // they leave (Done, the plan row, Read it again, or a back gesture), once. The numbers come from
+  // `s` as it is now, so corrections count. claimAhaPaywall() makes it once per launch whoever
+  // asks (Today asks too, on focus, for a reader whose app was killed here); the profile flag
+  // makes it once for good.
+  const ahaDue = !!s && ahaPaywallDue({ profile, sessions: all, sessionId: s.id });
+
+  /** If the aha paywall is due and nobody has opened it yet, claims it and returns its route. */
+  const takeAha = () => {
+    if (!ahaDue || !s || !claimAhaPaywall()) return undefined;
+    update({ ahaPaywallShown: true });
+    return ahaPaywallRoute(s, profile.moment);
+  };
+
+  // A back gesture (iOS swipe, Android back, the browser's back) leaves without our buttons.
+  // Expo Router 58 emits `removed` once this screen is out of the stack, however it left; our
+  // buttons claim the paywall before they navigate, so for them this finds nothing to do. It
+  // fires after unmount, so it reads the last render's takeAha from a ref, and (as the router
+  // docs say) the unsubscribe waits a microtask so the event still reaches us. The paywall then
+  // opens over wherever they landed.
+  const navigation = useNavigation();
+  const takeAhaRef = useRef(takeAha);
+  useEffect(() => {
+    takeAhaRef.current = takeAha;
+  });
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('removed', () => {
+      const route = takeAhaRef.current();
+      if (route) setTimeout(() => router.push(route), 0);
+    });
+    return () => queueMicrotask(unsubscribe);
+  }, [navigation]);
+
+  const done = () => {
+    const route = takeAha();
+    router.dismissTo('/');
+    if (route) router.push(route);
+    // Only when nothing else is opening, and only by the rule in rating.ts (second good run, or
+    // the day after the moment). The system sheet sits over Today, never over the result.
+    else if (s) maybeAskForRating({ sessions: all, profile, update, sessionId: s.id }).catch(() => {});
+  };
+
+  const again = () => {
+    if (!s) return;
+    const route = takeAha();
+    if (route) return router.replace(route);
+    if (s.passageId === 'talk') router.replace('/talk');
+    else router.replace({ pathname: '/session/[id]', params: { id: s.passageId, pace: s.context ?? 'reading' } });
+  };
+
+  // "I meant that" on a likely filler. One tap at a time, so a double tap can't log twice.
+  const saving = useRef(false);
+  const meant = async (index: number, word: HabitWord) => {
+    if (!s || saving.current) return;
+    const next = overruleFiller(s, index);
+    if (next === s) return;
+    saving.current = true;
+    setS(next);
+    if (next.flow !== s.flow) {
+      count.setValue(headline(next));
+      setShown(headline(next));
+    }
+    try {
+      await updateSession(s.id, { overruled: next.overruled, flow: next.flow, minute: next.minute });
+    } finally {
+      saving.current = false;
+    }
+    Haptics.selectionAsync().catch(() => {});
+    // The habit word's code only (like, you_know), never the words around it.
+    track('recognition_correction', { where: 'tape', kind: 'habit', which: habitCode(word) });
+  };
+
   if (!s) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+
+  const isMinute = isMinuteSession(s);
 
   const ctx = s.context ?? (s.passageId === 'talk' ? 'talking' : 'reading');
   const [lo, hi] = PACE_BANDS[ctx];
@@ -67,6 +163,13 @@ export default function Tape() {
       .join(' ')
       .replace(/[,;:.!?]+$/, '');
   const habitList = Object.entries(s.habits ?? {}).sort((x, y) => y[1] - x[1]).slice(0, 4);
+  // Your own scripts only: how the read compares with its target length. On time is good; a
+  // short read is just a fact. Words with every colour, never colour alone.
+  const target = s.targetSeconds;
+  const timeZone = target ? lengthZone(s.seconds, target) : undefined;
+  const onTime = timeZone === 'near';
+  const timeNote = timeZone === 'over' ? 'over time' : onTime ? 'on time' : undefined;
+  const timeTone = timeZone === 'over' ? colors.stumble : onTime ? colors.good : colors.muted;
 
   const sayIt = async (word: string) => {
     const next = correctSessionWord(s, word);
@@ -106,6 +209,10 @@ export default function Tape() {
         <Text style={[styles.streak, { color: colors.ember, borderColor: colors.line }]}>🔥 {days}</Text>
       </View>
 
+      {isMinute ? (
+        <MinuteResult s={s} shown={shown} trend={minuteTrendText(s, all)} onMeant={meant} colors={colors} />
+      ) : (
+      <>
       <View style={styles.scoreRow}>
         <Text style={[styles.score, { color: colors.ink }]}>{shown}</Text>
         <Text style={[styles.outOf, { color: colors.muted }]}>/100</Text>
@@ -128,6 +235,15 @@ export default function Tape() {
           </View>
         ))}
       </View>
+      {target !== undefined && timeZone && (
+        <Text
+          style={[styles.target, { color: colors.ink }]}
+          accessibilityLabel={`${spokenClock(s.seconds)} of a ${spokenClock(target)} target${timeNote ? `, ${timeNote}` : ''}`}
+        >
+          {clock(s.seconds)} of {clock(target)} target
+          {timeNote && <Text style={{ color: timeTone }}> · {timeNote}</Text>}
+        </Text>
+      )}
       <Text style={[styles.fine, { color: colors.muted }]}>
         Suggested pace for {CONTEXT_LABEL[ctx]}: {lo}–{hi} wpm. It’s a guide, not a rule.
       </Text>
@@ -142,6 +258,8 @@ export default function Tape() {
       )}
 
       <Text style={[styles.coach, { color: colors.ink }]}>{line}</Text>
+      </>
+      )}
 
       {s.stumbled.length > 0 && (
         <View style={[styles.fixCard, { backgroundColor: colors.card }]}>
@@ -175,7 +293,7 @@ export default function Tape() {
 
       {moment && (
         <Pressable
-          onPress={() => router.dismissTo('/')}
+          onPress={done}
           style={({ pressed }) => [styles.planRow, { backgroundColor: colors.signalSoft, opacity: pressed ? 0.8 : 1 }]}
         >
           <Ionicons name="list" size={20} color={colors.signal} />
@@ -184,18 +302,12 @@ export default function Tape() {
         </Pressable>
       )}
 
-      <Pressable style={[styles.secondary, { borderColor: colors.line }]} onPress={() => router.dismissTo('/')}>
+      <Pressable style={[styles.secondary, { borderColor: colors.line }]} onPress={done}>
         <Text style={[styles.secondaryText, { color: colors.ink }]}>Done</Text>
       </Pressable>
-      {s.passageId === 'talk' ? (
-        <Pressable onPress={() => router.replace('/talk')}>
-          <Text style={[styles.again, { color: colors.muted }]}>Try another prompt</Text>
-        </Pressable>
-      ) : (
-        <Pressable onPress={() => router.replace({ pathname: '/session/[id]', params: { id: s.passageId, pace: ctx } })}>
-          <Text style={[styles.again, { color: colors.muted }]}>Read it again</Text>
-        </Pressable>
-      )}
+      <Pressable onPress={again}>
+        <Text style={[styles.again, { color: colors.muted }]}>{isMinute ? 'Another minute' : s.passageId === 'talk' ? 'Try another prompt' : 'Read it again'}</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -216,6 +328,7 @@ const styles = StyleSheet.create({
   tileUnit: { fontSize: 13, fontWeight: '400' },
   tileNote: { fontSize: 13 },
   fine: { fontSize: 13, marginTop: -space(1) },
+  target: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
   coach: { fontSize: 17, lineHeight: 24 },
   fixCard: { borderRadius: 18, padding: space(2), gap: space(1) },
   fixEyebrow: { fontSize: 12, fontWeight: '600', letterSpacing: 1 },

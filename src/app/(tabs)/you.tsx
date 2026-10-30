@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
@@ -7,12 +7,14 @@ import { useProfile } from '../../store/profile';
 import { clearSessionRecordings, clearSessionReviews, loadSessions, recordingUris, reviewCount } from '../../store/sessions';
 import { deleteAllRecordings, listRecordings } from '../../store/recordings';
 import { analyticsEnabled, track } from '../../analytics';
+import { crashReportsConfigured, sendTestCrashReport } from '../../sentry';
 import { countdownLabel, getMoment } from '../../content/moments';
 import { listenLocale, onDeviceSupported, serverServiceName } from '../../speech/useListener';
 import { SPEECH_LOCALES } from '../../engine/locale';
 import { BRAND } from '../../brand';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { cancelDailyReminder, formatTime, REMINDER_OPTIONS, scheduleDailyReminder } from '../../reminders';
+import { cancelDailyReminder, formatTime, REMINDER_OPTIONS, scheduleDailyReminder, syncTrialReminder } from '../../reminders';
+import { cancelPath, subscriptionsUrl } from '../../billing';
 import { restore, PurchasesNotConfigured } from '../../purchases';
 import { PrimaryButton, SectionTitle } from '../../components/ui';
 import { fonts, space, useColors } from '../../theme';
@@ -98,11 +100,18 @@ export default function You() {
   const onRestore = async () => {
     try {
       const r = await restore();
+      if (r.trial !== undefined) await syncTrialReminder(r.trial, { ask: false });
       if (r.pro) await update({ pro: true });
       setNote(r.pro ? 'Pro restored.' : 'No earlier purchase found for this account.');
     } catch (e) {
       setNote(e instanceof PurchasesNotConfigured ? e.message : 'Couldn’t reach the store. Check your connection and try again.');
     }
+  };
+
+  /** The store's own subscriptions page: change plan or cancel, with no hoops on our side. */
+  const manageSubscription = () => {
+    const url = subscriptionsUrl(Platform.OS);
+    Linking.openURL(url).catch(() => setNote(`Couldn’t open it. Go to ${cancelPath(Platform.OS)}.`));
   };
 
   const moment = getMoment(profile.moment?.id);
@@ -128,10 +137,23 @@ export default function You() {
         <Text style={[styles.planSub, { color: profile.pro ? colors.muted : colors.cardMuted }]}>
           {profile.pro
             ? 'Everything is unlocked. Thanks for backing a small app.'
-            : 'Plans for your big moments, Glide, the free Word Pack and streaks. Pro adds your own scripts, word drills, every pack and your full history.'}
+            : 'Plans for your big moments, Glide, the free Word Pack, streaks, and one script with a free first run. Pro adds every script, unlimited rehearsal, word drills, cold reads, every pack and your full history.'}
         </Text>
-        {!profile.pro && <PrimaryButton label="See Pro" onPress={() => router.push('/paywall')} style={{ marginTop: space(1) }} />}
+        {!profile.pro && <PrimaryButton label="See Pro" onPress={() => router.push({ pathname: '/paywall', params: { from: 'you' } })} style={{ marginTop: space(1) }} />}
       </View>
+      {profile.pro && (
+        <Pressable
+          onPress={manageSubscription}
+          accessibilityRole="link"
+          style={({ pressed }) => [styles.momentRow, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.75 : 1 }]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.momentTitle, { color: colors.ink }]}>Manage subscription</Text>
+            <Text style={[styles.momentSub, { color: colors.muted }]}>Change your plan or cancel. It opens your store account.</Text>
+          </View>
+          <Ionicons name="open-outline" size={20} color={colors.muted} />
+        </Pressable>
+      )}
 
       <SectionTitle>What you’re preparing for</SectionTitle>
       <Pressable
@@ -213,20 +235,37 @@ export default function You() {
             }} accessibilityLabel={`Use ${serverServiceName()}`} />
         </View>
       )}
-      {analyticsEnabled && (
+      {/* One switch for both: usage counts (analytics.ts) and crash reports (sentry.ts). Shown when either is set up. */}
+      {(analyticsEnabled || crashReportsConfigured) && (
         <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.line }]}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.momentTitle, { color: colors.ink }]}>Share anonymous usage counts</Text>
+            <Text style={[styles.momentTitle, { color: colors.ink }]}>Share anonymous usage counts and crash reports</Text>
             <Text style={[styles.momentSub, { color: colors.muted }]}>
-              Counts like “session finished” help us improve the app. Never your words or voice.
+              Counts like “session finished” and crash reports help us fix the app. Never your words or voice.
             </Text>
           </View>
           <Switch
             value={profile.analyticsOptOut !== true}
             onValueChange={(v) => update({ analyticsOptOut: !v })}
-            accessibilityLabel="Share anonymous usage counts"
+            accessibilityLabel="Share anonymous usage counts and crash reports"
           />
         </View>
+      )}
+      {/* Tester mode only: proves on a phone that crash reports arrive, and arrive scrubbed. */}
+      {showTester && crashReportsConfigured && profile.analyticsOptOut !== true && (
+        <Pressable
+          onPress={() =>
+            setPrivacyNote(
+              sendTestCrashReport()
+                ? 'Test crash report sent.'
+                : 'Crash reports aren’t running. They’re off on web, and after sharing is switched off they stay off until the app is reopened.',
+            )
+          }
+          hitSlop={8}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.link, { color: colors.signal }]}>Send a test crash report</Text>
+        </Pressable>
       )}
       {privacyNote && <Text style={[styles.note, { color: colors.muted }]}>{privacyNote}</Text>}
       <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.line }]}>

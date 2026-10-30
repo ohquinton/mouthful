@@ -2,16 +2,20 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { countdownLabel, getMoment, nextStep, planSteps, PlanStep, StepId } from '../content/moments';
+import { countdownLabel, FREE_RUN_LINE, getMoment, nextStep, planSteps, PlanStep, StepId } from '../content/moments';
 import { getPack, packPassageId } from '../content/wordpacks';
 import { scriptChunkId } from '../content/resolve';
 import { useProfile } from '../store/profile';
-import { requirePro } from '../pro';
+import type { SavedSession } from '../store/sessions';
+import { freeRunUsed } from '../pro';
 import { fonts, space, useColors } from '../theme';
 import { ProBadge } from './ui';
 
-/** The active moment's five-step plan: what's done, and one button for what's next. */
-export function PlanCard() {
+/**
+ * The active moment's five-step plan: what's done, and one button for what's next.
+ * `sessions` come from Today (it reloads them on focus), for the free run.
+ */
+export function PlanCard({ sessions }: { sessions: SavedSession[] }) {
   const colors = useColors();
   const { profile } = useProfile();
   const m = getMoment(profile.moment?.id);
@@ -21,18 +25,26 @@ export function PlanCard() {
   const done = (profile.moment.done ?? []) as StepId[];
   const next = nextStep(steps, done);
   const scriptId = profile.moment.scriptId;
+  // Free readers get one run of their script's part 1. Until it's used, step 4 says so up front.
+  const runUsed = freeRunUsed(sessions);
+  const freeRunLeft = !profile.pro && !runUsed;
+  const locked = (s: PlanStep) => s.pro && !profile.pro && runUsed;
+
+  // Step 3 always opens scripts/new: it offers a script they've already saved (free, even when
+  // their one free script was added from the Scripts tile) and walls only a second new one.
+  const addScript = () => router.push({ pathname: '/scripts/new', params: { moment: m.id, step: 'script' } });
 
   const go = (s: PlanStep) => {
-    if (s.pro && !requirePro(profile, 'scripts')) return;
     switch (s.id) {
       case 'learn':
         return router.push({ pathname: '/fixit', params: { words: pack.words.map((w) => w.word).join(','), title: pack.title, step: 'learn' } });
       case 'context':
         return router.push({ pathname: '/session/[id]', params: { id: packPassageId(pack.id, 0), step: 'context', pace: m.pace } });
       case 'script':
-        return router.push({ pathname: '/scripts/new', params: { moment: m.id, step: 'script' } });
+        return addScript();
       case 'rehearse':
-        if (!scriptId) return router.push({ pathname: '/scripts/new', params: { moment: m.id, step: 'script' } });
+        if (!scriptId) return addScript();
+        // No gate here on purpose: session/[id].tsx checks canRehearse() for every way in.
         return router.push({ pathname: '/session/[id]', params: { id: scriptChunkId(scriptId, 0), step: 'rehearse', pace: m.pace } });
       case 'retest':
         return router.push({ pathname: '/session/[id]', params: { id: packPassageId(pack.id, 1), cold: '1', step: 'retest', pace: m.pace } });
@@ -69,9 +81,13 @@ export function PlanCard() {
                 <Text style={[styles.stepTitle, { color: isDone ? colors.cardMuted : colors.cardInk, textDecorationLine: isDone ? 'line-through' : 'none' }]}>
                   {s.title}
                 </Text>
-                {isNext && <Text style={[styles.stepSub, { color: colors.cardMuted }]} numberOfLines={2}>{s.sub}</Text>}
+                {s.id === 'rehearse' && freeRunLeft ? (
+                  <Text style={[styles.stepSub, styles.freeLine, { color: colors.good }]}>{FREE_RUN_LINE}</Text>
+                ) : (
+                  isNext && <Text style={[styles.stepSub, { color: colors.cardMuted }]} numberOfLines={2}>{s.sub}</Text>
+                )}
               </View>
-              {s.pro && !profile.pro && !isDone && <ProBadge />}
+              {locked(s) && !isDone && <ProBadge />}
             </Pressable>
           );
         })}
@@ -101,6 +117,7 @@ const styles = StyleSheet.create({
   num: { fontSize: 13, fontWeight: '700' },
   stepTitle: { fontSize: 16, fontWeight: '600' },
   stepSub: { fontSize: 13, lineHeight: 18, marginTop: 2 },
+  freeLine: { fontWeight: '600' },
   btn: { flexDirection: 'row', gap: 8, borderRadius: 16, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', marginTop: space(0.5) },
   btnText: { color: '#fff', fontSize: 17, fontWeight: '600' },
   ready: { fontSize: 16, lineHeight: 22 },

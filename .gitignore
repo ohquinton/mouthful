@@ -45,3 +45,6 @@ yarn-error.*
 
 # agent worktrees
 .claude/worktrees/
+
+# OpenAI Codex config (its own setup, not part of this repo)
+.codex/

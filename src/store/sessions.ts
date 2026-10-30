@@ -3,6 +3,8 @@ import { correctedAccuracy, sessionScore } from '../engine/score';
 import type { ReviewMarks } from '../engine/review';
 import type { PaceSegment } from '../engine/steadiness';
 import { calendarDay } from '../engine/days';
+import type { HabitWord } from '../engine/habits';
+import type { FlowInput } from '../engine/minute';
 
 export type SavedSession = {
   id: string;
@@ -28,6 +30,43 @@ export type SavedSession = {
   habits?: Record<string, number>; // like, so, you know: reported on the Tape, never scored
   segments?: PaceSegment[]; // pace of each stretch of the passage (engine/steadiness.ts)
   steadiness?: number; // 0–100; shown on the Tape, not part of the score
+  /**
+   * Script parts only: Glide reached 80% of the part or its last sentence (pro.ts partReached).
+   * false means an early Finish, which doesn't count as a run. Unset on older sessions (counts).
+   */
+  partReached?: boolean;
+  /** Your own scripts only: the target length in seconds (content/targets.ts). Shown on the Tape. */
+  targetSeconds?: number;
+  /**
+   * One Minute (docs/briefs/one-minute.md). Set only on a finished minute that had a Flow; Free
+   * talk and older sessions leave all of these unset. passageId stays 'talk'.
+   */
+  kind?: 'minute';
+  /** 0–100. Whether you kept talking (engine/minute.ts). Not the same scale as `score`. */
+  flow?: number;
+  /** Which Flow formula made `flow`. Trends compare only the same version. */
+  flowVersion?: string;
+  /** The prompt's id (content/prompts.ts), never its text. */
+  promptId?: string;
+  level?: 1 | 2 | 3;
+  /** Token indices of likely fillers the reader marked "I meant that". Never the words. */
+  overruled?: number[];
+  /** The minute's numbers, so the Tape can redraw (and recompute) without the transcript. */
+  minute?: {
+    longPauses: number;
+    longestPauseSeconds: number;
+    talkSeconds: number;
+    wpm: number;
+    words: number;
+    umCount: number;
+    umPerMin: number;
+    /** Likely fillers at Finish: token index + which habit word (a fixed list of codes). */
+    habitFillers: { index: number; word: HabitWord }[];
+    /** "unsure" uses: shown as a quiet count, never as fillers. */
+    habitUnsure: number;
+    /** What Flow was computed from (engine FlowInput). */
+    input: FlowInput;
+  };
   /** Tester mode only (supervised beta). Stays on the phone; never sent anywhere. */
   review?: {
     statuses: string; // see engine/review.ts
@@ -95,6 +134,19 @@ export function correctSessionWord(s: SavedSession, word: string): SavedSession 
     s.context ?? 'reading',
   );
   return { ...base, readCount, accuracy, score };
+}
+
+/**
+ * Which Glide taps ("I said it" on a red word) are still corrections when the read ends.
+ * `rawStatus` is the recogniser's own status for each word at Finish, before corrections.
+ * A tapped word the recogniser later inked anyway (a late result, or the resync backfill) is
+ * 'read' there: the recogniser got it, so logging it as a correction would make the
+ * recognition_correction metric overcount its misses. One that went back to 'pending' (a
+ * revision pulled the pointer back) isn't a miss either. Only words still 'skipped' count.
+ * Returned in passage order.
+ */
+export function keptCorrections(rawStatus: readonly string[], corrected: ReadonlySet<number>): number[] {
+  return [...corrected].filter((i) => rawStatus[i] === 'skipped').sort((x, y) => x - y);
 }
 
 export async function getSession(id: string): Promise<SavedSession | undefined> {

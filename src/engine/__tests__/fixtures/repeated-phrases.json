@@ -1,0 +1,29 @@
+{
+  "_source": "Adversarial scripts for Glide resync, written for this test suite (no tester data). Each repeats bigrams or whole phrases so a resync could anchor on the wrong copy. resync.test.ts skips, re-reads and stutters through every position of each one and asserts no false greens.",
+  "scripts": [
+    {
+      "id": "the-project",
+      "text": "The project started in March with a small team. The project team met every Monday, and the project budget stayed flat until summer. By June the project was late, so we split the project into two phases and hired one more engineer."
+    },
+    {
+      "id": "we-need-to",
+      "text": "We need to hire two engineers before the launch. We need to finish the audit by the end of May. We need to cut the cloud bill before the board meeting in June. And we need to tell the clients what changes for them."
+    },
+    {
+      "id": "list",
+      "text": "First, we cut costs across the whole team. Second, we cut delays in the review process. Third, we cut the number of handoffs between groups. Finally, we cut the time it takes to ship a fix to customers."
+    },
+    {
+      "id": "i-think",
+      "text": "I think the plan is sound and the numbers support it. I think the timing is wrong for this quarter. I think we should wait a month, and I think the team will agree once they see the data."
+    },
+    {
+      "id": "the-report",
+      "text": "The report is due on Friday, and the report needs a short summary. If the summary is late, the report is late, and the client will notice that the report is late again."
+    },
+    {
+      "id": "same-sentence-twice",
+      "text": "Thanks for coming in today. We shipped the new dashboard last week. Thanks for coming in today, again, because the second meeting matters more. We shipped the new dashboard to every region by Friday."
+    }
+  ]
+}

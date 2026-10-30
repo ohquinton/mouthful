@@ -17,6 +17,12 @@ export type Moment = {
   pace: PaceContext;
   scriptPrompt: string;
   scriptPlaceholder: string;
+  /**
+   * How long the whole script should take, in seconds, when the moment has a usual slot (an
+   * interview answer: about 2 minutes). Unset: the target comes from the script's length at the
+   * middle of the pace band (content/targets.ts).
+   */
+  targetSeconds?: number;
 };
 
 export const MOMENTS: Moment[] = [
@@ -30,6 +36,7 @@ export const MOMENTS: Moment[] = [
     pace: 'talking',
     scriptPrompt: 'Paste your answer to the question you’re dreading.',
     scriptPlaceholder: 'Tell me about yourself… I’m a data analyst with three years of experience in…',
+    targetSeconds: 120,
   },
   {
     id: 'presentation',
@@ -70,13 +77,17 @@ export function getMoment(id: string | undefined): Moment | undefined {
   return MOMENTS.find((m) => m.id === id);
 }
 
+/** `pro`: needs Pro after the free allowance (one script, one run of its part 1; see pro.ts). */
 export type PlanStep = { id: StepId; title: string; sub: string; pro: boolean };
+
+/** Shown on step 4 until the free run is used, so the reader knows before they start (App Review 3.1.1). */
+export const FREE_RUN_LINE = 'Your first run is free';
 
 export function planSteps(m: Moment): PlanStep[] {
   return [
     { id: 'learn', title: 'Learn the words', sub: '8 words, how to say them', pro: false },
     { id: 'context', title: 'Say them in context', sub: 'A short passage with Glide', pro: false },
-    { id: 'script', title: 'Add your real words', sub: m.scriptPrompt, pro: true },
+    { id: 'script', title: 'Add your real words', sub: m.scriptPrompt, pro: false },
     { id: 'rehearse', title: 'Rehearse it', sub: 'Read your version with Glide', pro: true },
     { id: 'retest', title: 'Final run-through', sub: 'Cold read, like the real thing', pro: false },
   ];

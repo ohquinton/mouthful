@@ -1,0 +1,50 @@
+# Engine fixtures
+
+Data only (JSON): Jest runs every `.ts` file under `__tests__` as a test suite, so fixture logic lives
+in the test that uses it. No tester data here. Every transcript is generated or typed from the
+built-in passages, the scripts below or text written for the test. Tester recordings and scripts
+never leave the phone (see TESTING.md).
+
+| Fixture | What it is | Failure type | Fixed? | By |
+|---|---|---|---|---|
+| `memory-scripts.json` | The Fade experiment's 8 work scripts (interview, meeting, raise, presentation) with from-memory variants: fillers dropped, a clause dropped, synonyms, two sentences swapped plus one paraphrased. Ported from branch `worktree-agent-a8f8e4f1d0fc2114a`, commit de4351f. | Lost pointer after a dropped clause or reordered sentence (today: 42–51% inked) | y | Glide resync (`align.ts`), `resync.test.ts` |
+| `repeated-phrases.json` | 6 adversarial scripts built from repeated phrases ("the project … the project", "we need to …" ×4, a First/Second/Third list, "I think" ×4, "the report is late" ×3, a sentence said twice). The test skips, re-reads and stutters through every position. | False green from anchoring on the wrong copy of a phrase | y (0 false greens in 2,050 cases) | Glide resync |
+
+Generated in `resync.test.ts` from all 25 built-in texts (passages, Day 1 baseline, Word Pack
+passages, moment placeholders) plus the 8 scripts:
+
+| Case set | Count | Failure type | Fixed? |
+|---|---|---|---|
+| Verbatim, every prefix | 37 texts | Regression guard: must equal the pre-resync aligner word for word | n/a (unchanged) |
+| Skips of 6, 10, 20, 40 words at every position | 5,188 | Lost pointer (today ~50% of said words red) | y |
+| Whole-sentence skips | 89 | Lost pointer | y |
+| Re-read of the previous sentence (3 shapes, one with an aside) | 342 | False jump forward, pointer regress | y |
+| Digits, contractions, homophones, one-letter-off on the above | sampled | Resync on noisy recogniser output | y (no new reds or greens) |
+| Interim revisions (each word first arrives as a wrong guess; every 7th, two words rewritten) | sampled | Red↔green flicker | y, except backfill (see resync.test.ts §6) |
+
+qa-critic's findings on the first resync (`resync.test.ts` §10, seeded ports of its repro scripts):
+
+| Case set | Count | Failure type | Fixed? |
+|---|---|---|---|
+| Refrain: passage opens and closes with the same line, reader says "sorry let me start again" + it | 2 + every text quoting its last sentence early | Jump to the end, `done`, 19 red, auto-finish | y: a tie with a copy behind waits; a jump into the last sentence holds unless the reader was in it or picked up at its start from the sentence before |
+| Light-noise fuzz (drops, mishearings, stutters, habit words, 3-word restarts), seed 9 | 3,900 | False red from a stutter after a dropped word | y: 483 → 0 runs worse than the old aligner |
+| Garbled last 1–3 words after a 12-word skip | 621 | Cursor retreat over 4 words (interim revision) | y: 87 → 23 (legacy 31); the 3-word rewrite of an anchor's only content word still retreats (known limit) |
+| Asides quoting 3 later words, then back | 720 | Far leap / ink an aside | far ones: 141 → 0; near ones (current or next sentence) still jump, by design |
+| 300/500-word scripts with 100/150-word rambles | 8 shapes | Slow calls (3.6–5.3 ms) | y: under 1 ms in Jest, ~0.3 ms in plain Node |
+
+qa-critic's second review (resync v2 and the habit classifier, 2026-10-30):
+
+| Case set | Count | Failure type | Fixed? |
+|---|---|---|---|
+| Skip into the last sentence, then Finish (settled alignment) | 186 | Gap and last sentence left pending: accuracy 100% for a reader who skipped | y: the final alignment lands a hold still active at the end (a tie: gap counted skipped). 186 → 0 |
+| One sentence ×50, read twice / shuffled (§10e) | 2 shapes | Slow calls: 3.0 / 2.3 ms in Jest, 24.6 / 2.9 ms under `node --jitless` | y: 0.75 / 1.6 ms jitless; read twice ≈ 1.9× read once (was 13×) |
+| Speed tests on a loaded machine | §8, §10e | Wall-clock "under 1 ms" failed under parallel Jest | y: same-process ratio vs legacyAlign (≤ 4×) plus a 5 ms backstop |
+| `habits-qa.json`: 167 lines by qa-critic (`real.txt`, `fill.txt`) | 210 habit words | False accusations: "you know" + object in a burst, verb/degree stutters ("i like like", "so so much"), "like basically done" | y: 6 → 0 (precision 86% → 100%). Fixes made against this set, so it's a regression bar now, not a holdout |
+
+Numbers in Glide (`numbers.test.ts`, 2026-10-30):
+
+| Fixture | What it is | Failure type | Fixed? | By |
+|---|---|---|---|---|
+| `numbers.json` | 94 lines written for the test (finance, interview, meeting): percents, decimals, integers to 9999, years, money ($ £, m/k/bn, "and a half"), ordinals, clock times, several numbers per line, both directions (digits in the script and spoken, or spelled in the script and digits heard). 28 adversarial: "to"/"too" for "2", "two" for "to", "one" the pronoun, a number one higher, one digit off, percent or million not said, ordinal said as cardinal, "twenty" cut out of "twenty seven", a skipped number before a said one. Typed by hand, no tester data | False red on every spoken number (only 0–10, & and % were mapped); false green from one-digit-off matches ("12,000" inking "120,000") and "$4" keyed as "four" | y: false red 67 → 0, false green 4 → 0 (94 cases) | Number respelling before matching (`align.ts`, Numbers) |
+| (generated) every clean line with its numbers left out / said one higher | 66 / 30+ | False green from the rewrite | y: 0 inked | same |
+
