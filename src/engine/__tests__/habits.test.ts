@@ -450,6 +450,18 @@ describe('labelled corpus', () => {
     expect(all.accused / all.reals).toBeLessThanOrEqual(0.03);
   });
 
+  // qa-critic's independent set (habits-qa.json). Written by someone else to break the rules, so
+  // it's the nearest thing to an outside estimate until beta data exists. Before the fixes for its
+  // findings: you know 57% (3 accusations), so 67% (1), like 97% (1). The fixes were made against
+  // it, so it's no longer untouched: read it as a regression bar, not a fresh estimate.
+  it('qa-critic set: every habit word marked, no false accusations', () => {
+    const qa = load('./fixtures/habits-qa.json');
+    const { rows, accusations, problems } = score(qa);
+    table('QA-CRITIC (independent author; fixes made against it)', rows);
+    expect(problems).toEqual([]);
+    expect(accusations).toEqual([]);
+  });
+
   it('holdout set (never tuned on): same bar', () => {
     const { rows, accusations } = score(holdout);
     table('HOLDOUT (not tuned on)', rows);
@@ -550,8 +562,37 @@ describe('nervous speakers (an um next to a real use)', () => {
   });
 });
 
+// qa-critic's adversarial cases (2026-10-30): each was a false accusation.
+describe('qa-critic: no accusation from a burst, a repeat or a stack on a real use', () => {
+  it('a burst never fires on "you know" + an object', () => {
+    const langs = classifyHabits(tokenise('you know python you know java you know sql'));
+    expect(langs.map((r) => r.label).filter((l) => l === 'filler')).toEqual([]);
+    expect(langs).toHaveLength(3);
+    // the opposite direction: a burst of "you know" before clauses still counts
+    const t = 'it was hard you know we had no budget you know we lost staff you know we kept going';
+    for (let n = 0; n < 3; n++) is(t, 'you know', 'filler', n);
+  });
+
+  it('a repeat never fires on a verb or degree use', () => {
+    is('i like like three things about the role', 'like', 'real', 0);
+    is('i like like three things about the role', 'like', 'real', 1);
+    is('um so so much happened this year', 'so', 'real', 0);
+    is('um so so much happened this year', 'so', 'real', 1);
+    // a stutter of a filler is still a filler
+    is('and like like the client never called', 'like', 'filler', 1);
+    is('so so like we started', 'so', 'filler', 0);
+  });
+
+  it('"like basically done": basically is a degree word, not stacked', () => {
+    expect(label('we were like basically done', 'basically').label).not.toBe('filler');
+    is('we were like basically done', 'like', 'filler');
+    // stacked before a clause or a verb is still a filler
+    is('and like basically we rebuilt it', 'basically', 'filler');
+  });
+});
+
 describe('speed', () => {
-  it('classifies a 200-token minute in under 0.2 ms', () => {
+  it('classifies a 200-token minute in under 1 ms, and scales linearly', () => {
     const minute = tokenise(
       'so today i want to walk you through the numbers and like it was a hard quarter you know ' +
         'we basically had to rebuild the pipeline right and i mean the team was like so tired but we got it right in the end ' +
@@ -562,13 +603,25 @@ describe('speed', () => {
     while (words.length < 200) words.push(...minute.map((w, i) => ({ word: w, start: (words.length + i) * 300, end: (words.length + i) * 300 + 250 })));
     words.length = 200;
     for (let k = 0; k < 200; k++) classifyHabits(words); // warm up
-    const runs = 2000;
-    const t0 = performance.now();
-    let sink = 0;
-    for (let k = 0; k < runs; k++) sink += classifyHabits(words).length;
-    const ms = (performance.now() - t0) / runs;
-    console.log(`classifyHabits: ${ms.toFixed(4)} ms per 200 tokens (${sink / runs} habit words)`);
-    expect(ms).toBeLessThan(0.2);
+    // Wall-clock budgets flake on a loaded machine (parallel Jest, CI), so: the best of 20 batches
+    // (load only ever adds time), against a generous ceiling, and a scaling check that catches an
+    // accidental quadratic whatever the machine: 10× the tokens must cost well under 30×.
+    const perCall = (toks: HeardToken[], runs: number) => {
+      let best = Infinity;
+      for (let b = 0; b < 20; b++) {
+        const t0 = performance.now();
+        for (let k = 0; k < runs; k++) classifyHabits(toks);
+        best = Math.min(best, (performance.now() - t0) / runs);
+      }
+      return best;
+    };
+    const ms = perCall(words, 100);
+    const long: HeardToken[] = [];
+    for (let r = 0; r < 10; r++) long.push(...words.map((w) => (typeof w === 'string' ? w : { word: w.word, start: w.start! + r * 60000, end: w.end! + r * 60000 })));
+    const ms10 = perCall(long, 10);
+    console.log(`classifyHabits: ${ms.toFixed(4)} ms per 200 tokens (budget 0.2 on a quiet machine), 2000 tokens ${ms10.toFixed(4)} ms (${(ms10 / ms).toFixed(1)}×)`);
+    expect(ms).toBeLessThan(1);
+    expect(ms10 / ms).toBeLessThan(30);
   });
 });
 

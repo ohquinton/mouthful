@@ -491,7 +491,14 @@ function skipFailures(cases: Case[]) {
     // "the" skipped, or "schedule | the project", the first): a hold is right if one of them holds.
     const options = [c0, ...(c0.alts ?? [])];
     const jumps = options.filter((o) => !holdsAtEnd(o));
-    if (options.some((o) => holdsAtEnd(o) && held(o))) continue;
+    if (options.some((o) => holdsAtEnd(o) && held(o))) {
+      // Live it holds; Finish saves the settled alignment, which must be the honest one: the gap
+      // red, the last sentence inked (qa-critic: a held skip saved 100% accuracy).
+      const saved = align(c0.passage, c0.heard, c0.heard.length).status;
+      const t = truthFor(c0, saved);
+      if (code(saved) !== code(expected(t))) fails.push(`${c0.label}: Finish saves\n  want ${code(expected(t))}\n  got  ${code(saved)}`);
+      continue;
+    }
     if (!jumps.length) {
       fails.push(`${c0.label}: should hold at the end, got ${code(got)}`);
       continue;
@@ -526,6 +533,47 @@ describe('2. skips', () => {
     expect(a.status.slice(8, 14)).toEqual(Array(6).fill('skipped'));
     expect(a.skipped).toBe(6);
     expect(a.done).toBe(true);
+  });
+
+  // qa-critic: a skip into the last sentence held forever, so Finish saved 100% accuracy for a
+  // reader who skipped 48 of 75 words. Live it still holds; the settled alignment lands the jump.
+  it('a skip into the last sentence holds live, and Finish saves it with the gap red', () => {
+    const p = preparePassage(PASSAGES.find((x) => x.id === 'night-shift')!.text);
+    const k = keysOf(p);
+    const fs = sentenceRanges(p).at(-1)![0];
+    const heard = [...k.slice(0, 6), ...k.slice(fs)];
+    const live = align(p, heard);
+    expect(live.done).toBe(false); // no auto-finish on what may be a refrain
+    expect(live.status.slice(fs).includes('read')).toBe(false);
+    const saved = align(p, heard, heard.length);
+    expect(saved.skipped).toBe(fs - 6);
+    expect(saved.read).toBe(6 + p.length - fs);
+    expect(saved.done).toBe(true);
+    expect(saved.read / (saved.read + saved.skipped)).toBeLessThan(0.5);
+  });
+
+  it('a mid-passage refrain then the last sentence: Finish saves the skipped middle as red', () => {
+    const text =
+      'We ship every Friday. Our rule is simple: test it, ship it, fix it. Last month we missed one Friday because a vendor slipped. ' +
+      'Our rule is simple: test it, ship it, fix it. Next quarter we add a second region and more support staff for the launch.';
+    const p = preparePassage(text);
+    const said = tokenise(
+      'we ship every friday our rule is simple test it ship it fix it next quarter we add a second region and more support staff for the launch',
+    );
+    expect(align(p, said).done).toBe(false);
+    const saved = align(p, said, said.length);
+    const rs = sentenceRanges(p);
+    expect(code(saved.status)).toBe(
+      'r'.repeat(rs[1][1]) + 's'.repeat(rs[3][1] - rs[1][1]) + 'r'.repeat(p.length - rs[3][1]),
+    );
+    // the opposite error: read straight through, nothing turns red at Finish
+    const straight = keysOf(p);
+    expect(align(p, straight, straight.length).skipped).toBe(0);
+    // the closing line quoted early as an aside, then the passage read on: nothing red, nothing extra
+    const thanks = preparePassage('I led the migration of our billing system to the new platform. We cut support tickets by a third in two months. Thank you.');
+    const aside = tokenise('i led the migration oh thank you of our billing system to the new platform we cut support tickets by a third in two months thank you');
+    const a = align(thanks, aside, aside.length);
+    expect([a.read, a.skipped]).toEqual([thanks.length, 0]);
   });
 
   it('a dropped clause no longer turns the rest of the answer red', () => {
@@ -799,10 +847,12 @@ describe('6. recogniser realism', () => {
       const before = score(c, legacyAlign(c.passage, heard).status);
       const after = score(c, align(c.passage, heard).status);
       if (after.falseGreen > before.falseGreen) fails.push(`${c.label}: false green ${before.falseGreen} → ${after.falseGreen}`);
-      // A skip into the last sentence holds (section 2): the old aligner inked a few of those words
-      // by chance in its lookahead; a hold inks none, by design. Its false greens still count above.
+      // A skip into the last sentence holds live (section 2) and inks nothing, by design. What Finish
+      // saves (the settled alignment) must ink at least what the old aligner did, holds included.
       const holds = [c, ...(c.alts ?? [])].some(holdsAtEnd);
-      if (!holds && after.inkedSaid < before.inkedSaid) fails.push(`${c.label}: inked ${before.inkedSaid} → ${after.inkedSaid}`);
+      const saved = holds ? score(c, align(c.passage, heard, heard.length).status) : after;
+      if (saved.falseGreen > before.falseGreen) fails.push(`${c.label}: saved false green ${before.falseGreen} → ${saved.falseGreen}`);
+      if (saved.inkedSaid < before.inkedSaid) fails.push(`${c.label}: inked ${before.inkedSaid} → ${saved.inkedSaid}`);
     }
     expect(summary(fails)).toEqual(NONE);
   });
@@ -858,14 +908,75 @@ describe('7. hesitations and habit words never trigger or anchor a resync', () =
 
 // ------------------------------------------------------------------------------------------------
 // 8. Performance.
+//
+// These tests must not depend on how busy the machine is (parallel Jest workers, a 2-core CI runner
+// running two jobs). So they don't assert an absolute "under 1 ms": they race align() against the
+// frozen legacyAlign in the same process at the same moment, interleaved call by call, so load
+// slows both alike, and bound the ratio of their totals. Today align runs at 1.0–2.3× legacy on
+// every shape here (resync search costs something while the reader is lost), so 4× leaves room for
+// noise and still fails the regressions this guards against: 5.3 ms per call on a 500-word ramble
+// before 3bd089a (~12× legacy), 3.0 ms on a repeated passage read twice (~12×, fixed with the
+// "nothing left to backfill" shortcut). A generous absolute ceiling stays as a backstop for
+// something catastrophic.
+
+/** align() may take at most this many times legacyAlign's total time over a shape's prefixes. */
+const PERF_RATIO_MAX = 4;
+/**
+ * Backstop: no single call (best of its runs) may take longer than this. Only for something
+ * catastrophic (a quadratic blow-up): with three Jest runs at once on a laptop every time here
+ * rises ~4× (worst call 6.8 ms, ratios unchanged), so a tight absolute bound would be a false alarm.
+ */
+const PERF_CEILING_MS = 20;
+
+type Race = { ratio: number; worst: { before: number; after: number }; median: { before: number; after: number } };
+
+/**
+ * Times legacyAlign ("before") and align ("after") on every transcript in `calls`, interleaved: each
+ * rep runs both back to back, alternating which goes first. A call's time is its best of `reps` runs
+ * (the rest is timer, garbage-collector and scheduler noise). `ratio` is after ÷ before, summed
+ * over all calls, so one unlucky call can't decide it.
+ */
+function race(q: PassageWord[], calls: string[][], reps = 15): Race {
+  const before: number[] = [];
+  const after: number[] = [];
+  const once = (f: typeof align, h: string[]) => {
+    const t0 = performance.now();
+    f(q, h);
+    return performance.now() - t0;
+  };
+  for (const h of calls) {
+    align(q, h); // warm this call's path
+    let b = Infinity;
+    let a = Infinity;
+    for (let rep = 0; rep < reps; rep++) {
+      if (rep % 2) {
+        a = Math.min(a, once(align, h));
+        b = Math.min(b, once(legacyAlign, h));
+      } else {
+        b = Math.min(b, once(legacyAlign, h));
+        a = Math.min(a, once(align, h));
+      }
+    }
+    before.push(b);
+    after.push(a);
+  }
+  const sum = (xs: number[]) => xs.reduce((s, x) => s + x, 0);
+  const at = (xs: number[], f: number) => [...xs].sort((x, y) => x - y)[Math.floor((xs.length - 1) * f)];
+  return {
+    ratio: sum(after) / Math.max(sum(before), 1e-6),
+    worst: { before: at(before, 1), after: at(after, 1) },
+    median: { before: at(before, 0.5), after: at(after, 0.5) },
+  };
+}
 
 describe('8. performance', () => {
-  it('worst case stays under 1 ms per call on the longest passage with a 40-word stuck run', () => {
+  it('stays within 4× the old aligner on the longest passage with a 40-word stuck run', () => {
     const texts = [...BUILT_IN, ...SCRIPTS];
     const longest = texts.reduce((a, b) => (preparePassage(b.text).length > preparePassage(a.text).length ? b : a));
     // a 190-word script chunk (chunkScript's ceiling is ~187) built from real sentences, the worst a reader can paste
     const chunk = SCRIPTS.map((s) => s.text).join(' ').split(/\s+/).slice(0, 190).join(' ');
-    const rows = ['passage | words | heard | stuck run (40 words) | worst call, ms (before → after) | median call, ms (before → after)'];
+    const rows = ['passage | words | heard | stuck run (40 words) | worst call, ms (before → after) | median call, ms (before → after) | total ratio'];
+    const bad: string[] = [];
     for (const [name, text] of [[longest.id, longest.text], ['190-word script chunk', chunk]]) {
       const p = preparePassage(text);
       const keys = keysOf(p);
@@ -881,31 +992,16 @@ describe('8. performance', () => {
       ];
       for (const [label, stuck] of runs) {
         const heard = [...keys.slice(0, 15), ...stuck, ...keys.slice(15)];
-        // Each call's time is its best of 15 runs (the rest is timer and garbage-collector noise);
-        // the worst call is the slowest prefix of the transcript.
-        const time = (f: typeof align) => {
-          const best = prefixes(heard).map((h) => {
-            let m = Infinity;
-            for (let rep = 0; rep < 15; rep++) {
-              const t0 = performance.now();
-              f(p, h);
-              m = Math.min(m, performance.now() - t0);
-            }
-            return m;
-          });
-          const sorted = [...best].sort((x, y) => x - y);
-          return { worst: sorted[sorted.length - 1], median: sorted[Math.floor(sorted.length / 2)] };
-        };
-        time(align); // warm up the JIT and the per-passage index
-        const b = time(legacyAlign);
-        const a = time(align);
+        const r = race(p, prefixes(heard));
         rows.push(
-          `${name} | ${p.length} | ${heard.length} | ${label} | ${b.worst.toFixed(3)} → ${a.worst.toFixed(3)} | ${b.median.toFixed(3)} → ${a.median.toFixed(3)}`,
+          `${name} | ${p.length} | ${heard.length} | ${label} | ${r.worst.before.toFixed(3)} → ${r.worst.after.toFixed(3)} | ${r.median.before.toFixed(3)} → ${r.median.after.toFixed(3)} | ${r.ratio.toFixed(2)}×`,
         );
-        expect(a.worst).toBeLessThan(1);
+        if (r.ratio > PERF_RATIO_MAX) bad.push(`${name} ${label}: ${r.ratio.toFixed(2)}× legacy`);
+        if (r.worst.after > PERF_CEILING_MS) bad.push(`${name} ${label}: ${r.worst.after.toFixed(3)} ms`);
       }
     }
     console.log(rows.join('\n'));
+    expect(bad).toEqual([]);
   });
 });
 
@@ -1185,10 +1281,10 @@ describe('10d. asides that quote later words', () => {
 });
 
 describe('10e. performance on long scripts', () => {
-  it('a 500-word script with a 150-word ramble stays under 1 ms per call, worst case', () => {
+  it('a 500-word script with a 150-word ramble stays within 4× the old aligner', () => {
     const rnd = seeded(5);
     const all = keysOf(preparePassage([...PASSAGES.map((x) => x.text), ...SCRIPTS.map((s) => s.text)].join(' ')));
-    const rows = ['words | transcript | heard | worst call ms (before → after)'];
+    const rows = ['words | transcript | heard | worst call ms (before → after) | total ratio'];
     const slow: string[] = [];
     for (const [N, R] of [
       [300, 100],
@@ -1205,29 +1301,60 @@ describe('10e. performance on long scripts', () => {
         ['wrong passage from word 10', [...k.slice(0, 10), ...ramble(), ...ramble()]],
       ];
       for (const [label, heard] of shapes) {
-        // every 7th prefix, longest first; each call's time is its best of 15 runs (the rest is noise)
-        const worst = (f: typeof align) => {
-          let w = 0;
-          for (let len = heard.length; len > 0; len -= 7) {
-            const h = heard.slice(0, len);
-            let m = Infinity;
-            for (let rep = 0; rep < 15; rep++) {
-              const t0 = performance.now();
-              f(q, h);
-              m = Math.min(m, performance.now() - t0);
-            }
-            w = Math.max(w, m);
-          }
-          return w;
-        };
-        worst(align); // warm up
-        const b = worst(legacyAlign);
-        const a = worst(align);
-        rows.push(`${N} | ${label} | ${heard.length} | ${b.toFixed(3)} → ${a.toFixed(3)}`);
-        if (a >= 1) slow.push(`${N} ${label}: ${a.toFixed(3)} ms`);
+        // every 7th prefix, longest first
+        const calls: string[][] = [];
+        for (let len = heard.length; len > 0; len -= 7) calls.push(heard.slice(0, len));
+        const r = race(q, calls);
+        rows.push(`${N} | ${label} | ${heard.length} | ${r.worst.before.toFixed(3)} → ${r.worst.after.toFixed(3)} | ${r.ratio.toFixed(2)}×`);
+        if (r.ratio > PERF_RATIO_MAX) slow.push(`${N} ${label}: ${r.ratio.toFixed(2)}× legacy`);
+        if (r.worst.after > PERF_CEILING_MS) slow.push(`${N} ${label}: ${r.worst.after.toFixed(3)} ms`);
       }
     }
     console.log(rows.join('\n'));
+    expect(slow).toEqual([]);
+  });
+
+  // The worst cases qa-critic found: one 10-word sentence 50 times, so every word matches 50 places.
+  // Before: read twice 3.0 ms (legacy 0.25), shuffled 2.3 ms (legacy 0.47); 10–20× slower under
+  // Hermes-like interpretation (node --jitless), where align runs on the phone's JS thread.
+  it('a passage that repeats one sentence 50 times stays within 4× the old aligner, read twice or shuffled', () => {
+    const rnd = seeded(3);
+    const ten = 'we need to ship the plan this week for sure'.split(' ');
+    const q = preparePassage(Array.from({ length: 50 }, (_, i) => ten.join(' ') + (i % 2 ? '.' : ',')).join(' '));
+    const k = keysOf(q);
+    const rows = ['transcript | heard | worst call ms (before → after) | total ratio'];
+    const slow: string[] = [];
+    for (const [label, heard, from] of [
+      // timed over the second read only: the first is a straight read, cheap for both
+      ['read twice', [...k, ...k], k.length],
+      ['shuffled', Array.from({ length: 500 }, () => ten[Math.floor(rnd() * ten.length)]), 0],
+    ] as [string, string[], number][]) {
+      const calls: string[][] = [];
+      for (let len = heard.length; len > from; len -= 7) calls.push(heard.slice(0, len));
+      const r = race(q, calls);
+      rows.push(`${label} | ${heard.length} | ${r.worst.before.toFixed(3)} → ${r.worst.after.toFixed(3)} | ${r.ratio.toFixed(2)}×`);
+      if (r.ratio > PERF_RATIO_MAX) slow.push(`${label}: ${r.ratio.toFixed(2)}× legacy`);
+      if (r.worst.after > PERF_CEILING_MS) slow.push(`${label}: ${r.worst.after.toFixed(3)} ms`);
+    }
+    // Reading it twice should cost about twice reading it once (linear). Both timed here, now,
+    // interleaved, best of 31. Now ~1.9×; before the fix ~13× (every word of the second read searched
+    // 50 copies for a re-read that could ink nothing).
+    let once = Infinity;
+    let twice = Infinity;
+    const both = [...k, ...k];
+    for (let rep = 0; rep < 31; rep++) {
+      let t0 = performance.now();
+      align(q, k);
+      once = Math.min(once, performance.now() - t0);
+      t0 = performance.now();
+      align(q, both);
+      twice = Math.min(twice, performance.now() - t0);
+    }
+    rows.push(`read once ${once.toFixed(3)} ms, read twice ${twice.toFixed(3)} ms: ${(twice / once).toFixed(2)}×`);
+    if (twice > 4 * once) slow.push(`read twice is ${(twice / once).toFixed(2)}× read once`);
+    console.log(rows.join('\n'));
+    // read twice still ends with every word read
+    expect(align(q, [...k, ...k], 2 * k.length).read).toBe(k.length);
     expect(slow).toEqual([]);
   });
 });

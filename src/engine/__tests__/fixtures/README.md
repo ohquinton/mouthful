@@ -31,3 +31,12 @@ qa-critic's findings on the first resync (`resync.test.ts` §10, seeded ports of
 | Garbled last 1–3 words after a 12-word skip | 621 | Cursor retreat over 4 words (interim revision) | y: 87 → 23 (legacy 31); the 3-word rewrite of an anchor's only content word still retreats (known limit) |
 | Asides quoting 3 later words, then back | 720 | Far leap / ink an aside | far ones: 141 → 0; near ones (current or next sentence) still jump, by design |
 | 300/500-word scripts with 100/150-word rambles | 8 shapes | Slow calls (3.6–5.3 ms) | y: under 1 ms in Jest, ~0.3 ms in plain Node |
+
+qa-critic's second review (resync v2 and the habit classifier, 2026-10-30):
+
+| Case set | Count | Failure type | Fixed? |
+|---|---|---|---|
+| Skip into the last sentence, then Finish (settled alignment) | 186 | Gap and last sentence left pending: accuracy 100% for a reader who skipped | y: the final alignment lands a hold still active at the end (a tie: gap counted skipped). 186 → 0 |
+| One sentence ×50, read twice / shuffled (§10e) | 2 shapes | Slow calls: 3.0 / 2.3 ms in Jest, 24.6 / 2.9 ms under `node --jitless` | y: 0.75 / 1.6 ms jitless; read twice ≈ 1.9× read once (was 13×) |
+| Speed tests on a loaded machine | §8, §10e | Wall-clock "under 1 ms" failed under parallel Jest | y: same-process ratio vs legacyAlign (≤ 4×) plus a 5 ms backstop |
+| `habits-qa.json`: 167 lines by qa-critic (`real.txt`, `fill.txt`) | 210 habit words | False accusations: "you know" + object in a burst, verb/degree stutters ("i like like", "so so much"), "like basically done" | y: 6 → 0 (precision 86% → 100%). Fixes made against this set, so it's a regression bar now, not a holdout |
