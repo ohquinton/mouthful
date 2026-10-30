@@ -32,6 +32,7 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
   - `review.ts` — beta review metrics (false red/green per 100 words, uncaught errors)
   - `steadiness.ts` — pace by stretch of the passage (breaths left out) and a 0–100 steadiness; shown on the Tape as `PaceStrip`, not part of the score
   - `locale.ts` — which English the recogniser listens for (reader's choice in You, else the phone's region)
+  - `habits.ts` — habit-word classifier: each like/so/you know/actually/basically/literally/i mean/kind of/sort of/right labelled filler, real or unsure (context rules, bursts, pauses); corpus + holdout in `__tests__/fixtures/habits-*.json`. Not wired into scoring yet
   - `days.ts` — calendar-day maths (`daysBetween`, `calendarDay`), safe across clock changes
 - `src/speech/gate.ts` — when speech counts as on-device (Android only from API 33) and whether a variety is supported
 - `src/speech/useListener.ts` — recogniser wrapper: on-device/consent, restarts, voice level, optional recording, `reset()` for retries
@@ -70,7 +71,7 @@ Today shows the active moment's plan (`PlanCard`): learn the words → say them 
 ## Commands
 
 ```bash
-npm test                  # engine + store tests (353); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
+npm test                  # engine + store tests (411); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)
@@ -89,6 +90,7 @@ npx eas-cli@latest build --profile development --platform ios
 
 ## Known limits
 
+- The habit classifier's precision (100% dev, 100% holdout, 0 false accusations) is measured only on an author-written corpus, cleaner than real recogniser output: a ceiling, not an estimate. um/uh never decide a habit label (they're stripped before the rules run). Recommended to score first: like, you know; the rest stay shown-only.
 - Habit words aren't scored until the classifier is validated (principle 7), so for now someone who says "like" every third word is told so only by the Tape's habit-word line.
 - On-device recognisers often drop "um" and "uh", so filler counts run low. Item 5 above fixes that.
 - First-word lag is a proxy for highlight delay (voice level crossing a threshold → first inked word). It isn't measured on web, which has no voice levels.
@@ -98,6 +100,6 @@ npx eas-cli@latest build --profile development --platform ios
 - Steadiness leaves out steps over 2.5 s (the Pauses tile covers those) and steps touching a skipped word. A tail under 8 words after the last full stop isn't timed.
 - Recoverable recogniser errors (AirPods, network blips, busy) are hidden and restarted; 3 in 10 s with nothing heard ends the session with `repeated-failure`. iOS `interrupted` (call, Siri, backgrounding), `network` and `repeated-failure` stop listening; `resume()` (Carry on) keeps the read, while `language-not-supported` only offers Try again. The cap is unverified on Android phones.
 - Steadiness leaves out resync jumps and re-reads (same `reachedAt` stamp on 3+ words, or next to a skipped word). A one-word gap later backfilled can still read ~12% fast in that sentence, and a real drag right after a red word may be dropped. Exact fix if needed: stamp heard-token counts per word in the session screen.
-- Glide resyncs after skips and re-reads: 3 unconfirmed words, then a unique 2-word match nearby or 3+ words further away. Resuming on stopwords or habit words takes 4–8 words. A re-read doesn't move the pointer; it inks the red words it covers. Parameters: `RESYNC_AFTER` 3, `NEAR_SENTENCES` 2, `CARRY_ON` 2, `MAX_ANCHOR` 6.
+- Glide resyncs after skips and re-reads: 3 unconfirmed words (stutters and habit words don't count), then a unique 2-word match nearby or 3+ further away. A jump waits until its words are 2 from the end of the transcript, and past the next sentence it needs 2 more words read on. A skip into the last sentence holds, unless the reader was already in it or picked up at its first word, so a refrain can't finish the session. A 3-word interim rewrite of an anchor's only content word can still pull the cursor back. `align()` returns `rereadingAt` while the reader re-reads behind the pointer; call `align(words, heard, heard.length)` for the final alignment at session end. Parameters: `RESYNC_AFTER` 3, `NEAR_SENTENCES` 2, `CARRY_ON` 2, `MAX_ANCHOR` 6, `SETTLE` 2.
 - Plan steps 1, 2, 3 and 5 are free. Step 4 is free once: the first saved script session that reached 80% of part 1 or its last sentence (`countsAsRun`, `freeRunUsed` in `pro.ts`); an earlier Finish asks first and saves nothing. Every way into a script part goes through `canRehearse()` in `session/[id].tsx`. Deleting the script doesn't give the run back; Reset all data does. The full paywall shows once, as the reader leaves that run's Tape (`ahaPaywallShown`); everything after is a soft wall. Step 3 can link a script you already saved ("Use a script you've saved"). Corrections are logged at Finish, only for words the recogniser never inked (`keptCorrections`).
 - `patches/expo-speech-recognition+58.0.0.patch` makes iOS check on-device support for the locale we listen in (the library only checked the device default, and iOS silently falls back to the server). Android's on-device check still ignores locale. Re-check the patch when upgrading the library.

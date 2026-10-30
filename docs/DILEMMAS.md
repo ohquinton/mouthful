@@ -50,7 +50,9 @@ move it to DECISIONS.md (one line) and mark it **Decided** here with the date.
   can't reach it stay shown-only. Apply it to One Minute first (no script to rephrase). In reading, a
   "like" that isn't in the passage is already off-script, so the classifier could judge it there too, but
   only after One Minute proves it.
-- **Status:** wait for the classifier's per-word report.
+- **Classifier report (2026-10-30):** score first: **like**, **you know**. Shown only: so, actually, basically, right (fillers are mostly bursts; single uses are legitimate discourse, e.g. Indian English "actually"), literally, i mean (too few), kind of / sort of (hedges locked to unsure).
+- **Fairness question:** "the traffic is like heavy" is labelled filler (be + like + adjective). In Filipino English "like" there can be a hedge (from *parang*). Decide before scoring that rule.
+- **Status:** apply to One Minute first; score like + you know once the beta tally agrees.
 
 ### 6. The free run: one, or unlimited runs of part 1?
 - **Now:** one completed run of part 1 (docs/briefs/aha-before-paywall.md).

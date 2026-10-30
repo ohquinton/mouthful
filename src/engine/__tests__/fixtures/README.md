@@ -21,3 +21,13 @@ passages, moment placeholders) plus the 8 scripts:
 | Re-read of the previous sentence (3 shapes, one with an aside) | 342 | False jump forward, pointer regress | y |
 | Digits, contractions, homophones, one-letter-off on the above | sampled | Resync on noisy recogniser output | y (no new reds or greens) |
 | Interim revisions (each word first arrives as a wrong guess; every 7th, two words rewritten) | sampled | Red↔green flicker | y, except backfill (see resync.test.ts §6) |
+
+qa-critic's findings on the first resync (`resync.test.ts` §10, seeded ports of its repro scripts):
+
+| Case set | Count | Failure type | Fixed? |
+|---|---|---|---|
+| Refrain: passage opens and closes with the same line, reader says "sorry let me start again" + it | 2 + every text quoting its last sentence early | Jump to the end, `done`, 19 red, auto-finish | y: a tie with a copy behind waits; a jump into the last sentence holds unless the reader was in it or picked up at its start from the sentence before |
+| Light-noise fuzz (drops, mishearings, stutters, habit words, 3-word restarts), seed 9 | 3,900 | False red from a stutter after a dropped word | y: 483 → 0 runs worse than the old aligner |
+| Garbled last 1–3 words after a 12-word skip | 621 | Cursor retreat over 4 words (interim revision) | y: 87 → 23 (legacy 31); the 3-word rewrite of an anchor's only content word still retreats (known limit) |
+| Asides quoting 3 later words, then back | 720 | Far leap / ink an aside | far ones: 141 → 0; near ones (current or next sentence) still jump, by design |
+| 300/500-word scripts with 100/150-word rambles | 8 shapes | Slow calls (3.6–5.3 ms) | y: under 1 ms in Jest, ~0.3 ms in plain Node |

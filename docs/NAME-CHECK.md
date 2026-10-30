@@ -79,3 +79,41 @@ Top 3: **Saysteady** ("Saysteady: Rehearse Out Loud" / "Say it steady when it ma
 **Mouthwise** (keeps "That word's a mouthful. Get mouthwise."; risk: reads as mouthwash/dental),
 **Downpat** ("Get it down pat by Thursday."; risk: ESL readers may not know the idiom).
 Scratch evidence: Quinton's scratchpad naming/ folder (temporary).
+
+## Naming round 2 (brand-namer, 2026-10-30)
+
+From marketing's direction (calm, ready, on your side; avoid Say-, Glide, Prompt, Speak, Coach, AI…). 66
+generated, 27 killed on the App Store alone, 15 fully kill-tested.
+
+**CIPO now reachable** (https://ised-isde.canada.ca/cipo/trademark-search/srch, JSON POST with a session cookie).
+**Correction to round 1:** CIPO shows 7 MOUTHFUL marks, not 0; one live: HEAVEN IN A MOUTHFUL (#1623193, classes
+29/30/32, food). WIPO not tried. Domains via registry RDAP (Google .app, Verisign .com, CIRA .ca), whose 404s
+were checked against known registered domains.
+
+| Name | Score /25 | .app / .com / .ca | Main risk |
+|---|---|---|---|
+| **Warmword** | 19 | free / taken (2024) / free | "Warm Words: Daily Quotes" app (Lifestyle, US); WARMWORD class 28 (games, US 90007329) |
+| **Daysure** | 18 | free / for sale (Sedo) / free | sounds like UK insurers Dayinsure, Staysure |
+| **Steadfoot** | 16 | free / taken / free | spelling ("stedfoot"?) |
+| Sureday, Wordsure | 15–16 | mostly taken | pill-reminder app; .app registered 2026-10-23 |
+
+Killed on the App Store: Readyby, Foothold (Interview Prep), Keel, Byheart, Throughline (Voice First To-Do),
+Readyroom (Sales Trainer), Primed, Daymark, Greenroom, Rehearsed (AI Scene Partner), Verba (Speaking Coach),
+Inkstone, Saidit, Allset, Dayready, Aloud, Outloud, Mywords, Keepword, Inkword, Readyset, Bythen, Waymark,
+Standfirm, Inkwell, Landed, Clearday. Killed on trademarks: Footing, Surefoot, Sureground, Setready, Readysteady.
+
+**#1 Warmword:** "That word's a mouthful. Warm it up." App Store "Warmword: Rehearse Out Loud" / "Be ready by the
+day it counts". warmword.app free (Google RDAP 404), warmword.ca free; warmword.com taken, getwarmword.com free.
+Not yet checked: meanings in Hindi, Tagalog, Spanish, Mandarin, Arabic, Portuguese, French, Punjabi; Google Play;
+WIPO; social handles. Lawyer questions: does the "Warm Words" Lifestyle app matter in classes 9/41/42; is WARMWORD
+(class 28) likely to be cited; is "warm" weak (warm-up); Canada first with Paris priority; full clearance cost.
+
+**Glide replacement:** **Ink-in** (says what happens; no app uses it), **Warm read** (pairs with Warmword; CIPO 0),
+Trace, Inkway. Avoid Inkline (Wacom, class 9).
+
+**One Minute name:** keep **One Minute** (ONE MINUTE MANAGER in class 41 is low risk for a feature name), or
+**Talk a Minute** (no app, CIPO 0). Avoid Minute Talk (an English-speaking app exists) and Daily Minute (close to
+Wellspoken's "Daily 60").
+
+More speaking-practice apps found: Aplomb: Rehearsal Room (6804829889), Foothold: Interview Prep (6756803555),
+Verba: Speaking Coach (6767426317), Ready Room: Sales Trainer (6789900882), 1 Minute Talks.
