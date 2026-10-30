@@ -1,10 +1,10 @@
-# Mouthful
+# SaidClearly (formerly Mouthful)
 
-**That word’s a mouthful. Make it yours.**
+**Rehearse it out loud. Say it clearly when it counts.**
 
 Mouthful helps adults rehearse what they'll actually say at work (an interview answer, a presentation, a raise conversation, a meeting update) out loud. You read with Glide, the words ink in as you say them, and you see your pace, fillers and the words you tripped on. Then you practise those words alone and in a sentence.
 
-Formerly "Cadence" (renamed: at least two speaking apps already use that name). The product name lives in `src/brand.ts` only.
+Renamed Mouthful → SaidClearly on 2026-10-30 (US risk; docs/NAME-CHECK.md), and earlier Cadence → Mouthful. The product name lives in `src/brand.ts` (and app.json's display name and permission strings). The repo, bundle id (`ca.quintonjackson.mouthful`), slug and URL scheme stay "mouthful": RevenueCat, Sentry and EAS are tied to them. Copy must say "heard clearly", never imply a clarity grade (the name sounds like a verdict).
 
 Strategy, bets and open decisions: `STRATEGY.md` (read it before planning work). Open product dilemmas: `docs/DILEMMAS.md`. Competitors: `docs/COMPETITORS.md`. What users love, ask for and hate (2,863 reviews): `docs/MARKET-RESEARCH.md`. Feature briefs: `docs/briefs/`.
 Product spec (written under the old name): https://claude.ai/artifact/7y5W1WCUVuHKrXsHjLFAmC
