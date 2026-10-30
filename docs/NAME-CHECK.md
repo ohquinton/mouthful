@@ -117,3 +117,28 @@ Wellspoken's "Daily 60").
 
 More speaking-practice apps found: Aplomb: Rehearsal Room (6804829889), Foothold: Interview Prep (6756803555),
 Verba: Speaking Coach (6767426317), Ready Room: Sales Trainer (6789900882), 1 Minute Talks.
+
+## Naming round 3 (brand-namer, 2026-10-30): one-word, instantly understood
+
+Direction (Quinton): "one-word names, or names where it's pretty easy to understand… Wellspoken is perfect."
+Gaps: the iTunes API rate-limited partway (Vox, Parlé not App Store checked; some CA lookups failed); WIPO not tried;
+social handles unknown; language checks thin (one search each).
+
+**Killed:** Clearspoken (clearspoken.app is a live speech-coaching product), Plainspoken (voice-notes app + mark),
+Wellsaid (WELL SAID registered CA class 41, CIPO 2211738; WellSaid Labs mark; Education apps), Articulate (CIPO
+2317231 classes 9/41/42; 8+ Education apps), Spoken, Diction, Lucid (39 CA marks), Eloquent (CIPO 1123659; stuttering
+app), Composed, Wordwise, Orator (AI speaking-coach apps), Speakwell, Speakly, Outspoken, Softspoken, Lectern, Podium,
+Encore, Crisp, Clarity, Tempo, Steady, Assured, Clearvoice, Unhurried, Unrushed, Wellput, Truespoken, Clearword,
+Speakready, Vox, Parlé.
+
+| Name | Score /25 | Availability | Main risk |
+|---|---|---|---|
+| **Wellphrased** | 20 | .app, .ca, getwellphrased.com, wellphrasedapp.com free; .com held since 2014; App Store 0 US/CA; trademarkia 0; CIPO 0; Play none | Closest in feel to **Wellspoken** (direct competitor; WELLSPOKEN filed, trademarkia 99713166). "Phrased" = word choice more than delivery |
+| Wellrehearsed | 19 | .app, .ca, getwellrehearsed.com free; marks 0 | 4 syllables, hard r-h-r for ESL, misspelling |
+| **Clearsaid** | 18 | .app, .ca, getclearsaid.com, clearsaidapp.com free; marks 0 | clearsaid.com is a live insurance-education site (2026-07-06); ClearSpeak apps |
+| Clearlysaid | 18 | .app, .ca, getclearlysaid.com free; marks 0 | clumsy written as one word; keeps the hook ("Now it's clearly said") |
+| Wellpaced | 17 | .app free, .ca taken | only about pace |
+
+Mechanic: **Ink-in**. Feature: keep **One Minute**.
+Lawyer questions (Wellphrased): confusion with WELLSPOKEN in classes 9/41/42; is "well phrased" descriptive/laudatory;
+the 2014 .com holder; Canada-first with Paris priority vs Madrid; full clearance cost.

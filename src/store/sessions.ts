@@ -33,6 +33,8 @@ export type SavedSession = {
    * false means an early Finish, which doesn't count as a run. Unset on older sessions (counts).
    */
   partReached?: boolean;
+  /** Your own scripts only: the target length in seconds (content/targets.ts). Shown on the Tape. */
+  targetSeconds?: number;
   /** Tester mode only (supervised beta). Stays on the phone; never sent anywhere. */
   review?: {
     statuses: string; // see engine/review.ts

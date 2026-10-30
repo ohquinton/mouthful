@@ -16,6 +16,8 @@ import { paceSteadiness, PaceSegment } from '../engine/steadiness';
 import { PaceStrip } from '../components/PaceStrip';
 import { ahaPaywallDue, ahaPaywallRoute, claimAhaPaywall, requirePro } from '../pro';
 import { track } from '../analytics';
+import { clock, lengthZone, spokenClock } from '../content/targets';
+import { maybeAskForRating } from '../rating';
 import { fonts, space, useColors } from '../theme';
 
 const CONTEXT_LABEL = { reading: 'reading aloud', presenting: 'presenting', talking: 'talking' } as const;
@@ -87,6 +89,9 @@ export default function Tape() {
     const route = takeAha();
     router.dismissTo('/');
     if (route) router.push(route);
+    // Only when nothing else is opening, and only by the rule in rating.ts (second good run, or
+    // the day after the moment). The system sheet sits over Today, never over the result.
+    else if (s) maybeAskForRating({ sessions: all, profile, update, sessionId: s.id }).catch(() => {});
   };
 
   const again = () => {
@@ -117,6 +122,13 @@ export default function Tape() {
       .join(' ')
       .replace(/[,;:.!?]+$/, '');
   const habitList = Object.entries(s.habits ?? {}).sort((x, y) => y[1] - x[1]).slice(0, 4);
+  // Your own scripts only: how the read compares with its target length. On time is good; a
+  // short read is just a fact. Words with every colour, never colour alone.
+  const target = s.targetSeconds;
+  const timeZone = target ? lengthZone(s.seconds, target) : undefined;
+  const onTime = timeZone === 'near';
+  const timeNote = timeZone === 'over' ? 'over time' : onTime ? 'on time' : undefined;
+  const timeTone = timeZone === 'over' ? colors.stumble : onTime ? colors.good : colors.muted;
 
   const sayIt = async (word: string) => {
     const next = correctSessionWord(s, word);
@@ -178,6 +190,15 @@ export default function Tape() {
           </View>
         ))}
       </View>
+      {target !== undefined && timeZone && (
+        <Text
+          style={[styles.target, { color: colors.ink }]}
+          accessibilityLabel={`${spokenClock(s.seconds)} of a ${spokenClock(target)} target${timeNote ? `, ${timeNote}` : ''}`}
+        >
+          {clock(s.seconds)} of {clock(target)} target
+          {timeNote && <Text style={{ color: timeTone }}> · {timeNote}</Text>}
+        </Text>
+      )}
       <Text style={[styles.fine, { color: colors.muted }]}>
         Suggested pace for {CONTEXT_LABEL[ctx]}: {lo}–{hi} wpm. It’s a guide, not a rule.
       </Text>
@@ -260,6 +281,7 @@ const styles = StyleSheet.create({
   tileUnit: { fontSize: 13, fontWeight: '400' },
   tileNote: { fontSize: 13 },
   fine: { fontSize: 13, marginTop: -space(1) },
+  target: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
   coach: { fontSize: 17, lineHeight: 24 },
   fixCard: { borderRadius: 18, padding: space(2), gap: space(1) },
   fixEyebrow: { fontSize: 12, fontWeight: '600', letterSpacing: 1 },
