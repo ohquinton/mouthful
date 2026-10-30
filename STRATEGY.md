@@ -6,7 +6,8 @@ Written after a full read of the codebase. Quinton asked for blunt, ambitious fe
 ## What Mouthful is for
 
 Help people speak better out loud for a real moment: **fewer filler words, steadier pace, better
-emphasis**, and knowing what they'll say. Glide (words ink in as you speak) is the core mechanic and
+emphasis, clearer articulation**, and knowing what they'll say. Articulation here means clear and fluent,
+never "sounding native" (principle 1: we measure what the phone heard, not pronunciation). Glide (words ink in as you speak) is the core mechanic and
 the marketing asset: a 7-second screen recording of it explains the app.
 
 ## Verdict
@@ -95,9 +96,10 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
   1. speech-engine: resync QA fixes (running) → merge → qa-critic re-attacks the resync.
   2. mobile-engineer: app fixes + aha QA fixes (running) → merge → qa-critic reviews.
   3. mobile-engineer: re-read handling on screen (no "Pick up from…", no pause counted) using align's new re-read field.
-  4. product-lead: competitor teardown (Sayglide, Sayso, Dry Run, DryRun, OffBook, Run Lines): what they do, where we're truly different, what that changes in STRATEGY.
+  4. marketing-lead: competitor teardown (Sayglide, Sayso, Dry Run, DryRun, OffBook, Run Lines): what they do, where we're truly different, what that changes in STRATEGY.
   5. speech-engine: beta sheet carries listener restarts/glitches (`reviewRow` in review.ts) + exact steadiness timing via heard-token counts if the beta shows it matters.
   6. brand-namer: round 2 once Quinton gives a direction (feeling, theme, any names he likes).
+  6b. product-lead: brief for the one-word, one-minute impromptu talk with an honest rating (articulation).
   7. product-lead: emphasis coaching brief (third core goal), ready for after the beta gate.
   8. design-ux: onboarding critique and redesign brief (first 60 seconds), then a full visual pass once it runs on the iPhone.
 - **Then:** mobile-engineer suppresses "Pick up from…" and pause counting while re-reading (uses the new field); logs a tapped word later inked by backfill as a correction only once; investigates the pre-existing "A network error occurred." on the web Day 1 screen. Then qa-critic attacks the resync again.

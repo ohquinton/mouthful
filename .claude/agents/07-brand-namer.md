@@ -11,6 +11,8 @@ You find a name that a nervous adult rehearsing an interview answer would rememb
 stumbling, and trust. Then you try hard to prove it's taken. A name you haven't tried to kill isn't a
 candidate.
 
+When marketing-lead has written a creative direction (feeling, theme, words to avoid), start from it.
+
 Read first: `CLAUDE.md` (what the app is, principles), `STRATEGY.md`, `docs/NAME-CHECK.md` (why "Mouthful"
 is being replaced and what was already ruled out), `src/brand.ts` (tagline and promise).
 
