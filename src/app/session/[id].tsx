@@ -525,14 +525,8 @@ function GlideSessionView({
   // by itself) shows nothing: the words are still inking in.
   const failed = listener.state === 'error';
   // eslint-disable-next-line react-hooks/refs -- read-only timing refs; see `seconds` above
-  const lost = isLost({
-    listening: listener.state === 'listening',
-    started: startedAt.current > 0,
-    done: a.done,
-    rereading: a.rereadingAt !== undefined,
-    now,
-    lastProgressAt: lastAdvanceAt.current,
-  });
+  const [started, lastProgressAt] = [startedAt.current > 0, lastAdvanceAt.current];
+  const lost = isLost({ listening: listener.state === 'listening', started, done: a.done, rereading: a.rereadingAt !== undefined, now, lastProgressAt });
   const offScript = heard.length >= 20 && a.read < 6;
   const zoneColor = zone === 'good' ? colors.good : zone === 'fast' ? colors.stumble : zone === 'slow' ? colors.ember : colors.line;
   // Word boxes are measured by onLayout into a ref; the cursor reads the latest one each render.
