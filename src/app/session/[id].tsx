@@ -17,9 +17,10 @@ import {
 import { PaceContext, pacerIndex, pacerWpm, paceZone, sessionScore, wordsPerMinute } from '../../engine/score';
 import type { Passage } from '../../content/passages';
 import { resolvePassage, sourceOf } from '../../content/resolve';
-import { loadSessions, saveSession } from '../../store/sessions';
+import { keptCorrections, loadSessions, saveSession } from '../../store/sessions';
 import { loadScripts } from '../../content/scripts';
-import { canRehearse, isFreeRun } from '../../pro';
+import { getMoment } from '../../content/moments';
+import { canColdRead, canRehearse, isFreeRun, isScriptPassage, partReached, rehearseWall, trackFreeRunComplete } from '../../pro';
 import { deleteRecordingFiles } from '../../store/recordings';
 import { encodeStatuses } from '../../engine/review';
 import { paceSegments, paceSteadiness } from '../../engine/steadiness';
@@ -34,7 +35,7 @@ import { useVoiceLevel, VoiceRibbon } from '../../components/VoiceRibbon';
 import { MicGate, gateStates } from '../../components/MicGate';
 import { ListenError } from '../../components/ListenError';
 import { space, useColors } from '../../theme';
-import { DICTIONARY } from '../../content/wordpacks';
+import { DICTIONARY, packPassageId } from '../../content/wordpacks';
 
 const MID_SENTENCE_PAUSE_MS = 2000;
 const BREATH_PAUSE_MS = 450;
@@ -57,19 +58,28 @@ export default function GlideSession() {
     resolvePassage(id ?? '').then((p) => setPassage(p ?? null));
   }, [id]);
 
-  // The one rehearse gate. PlanCard, scripts/[id], the Tape's "Read it again" and deep links all
-  // land here, so a script part never starts without canRehearse() saying yes. Waits for the
-  // profile, so a Pro reader opening a deep link at launch isn't walled by the default profile.
+  // The one rehearse and cold-read gate. PlanCard, scripts/[id], Today, the Tape's "Read it
+  // again" and deep links all land here, so a script part never starts without canRehearse()
+  // saying yes, and a cold read never starts without canColdRead(). Waits for the profile, so a
+  // Pro reader opening a deep link at launch isn't walled by the default profile.
+  const momentPackId = getMoment(profile.moment?.id)?.packId;
   useEffect(() => {
     if (!ready || !passage) return;
     let live = true;
+    // Replace, not push: closing the wall goes back to where they came from, never into a
+    // session that would start the mic.
+    const wall = (feature: string) => router.replace({ pathname: '/paywall', params: { feature } });
+    // The moment's final run-through (plan step 5) is the one free cold read.
+    const retestPassageId = momentPackId ? packPassageId(momentPackId, 1) : undefined;
+    if (cold === '1' && !canColdRead({ pro: profile.pro, passageId: passage.id, retestPassageId })) {
+      wall('cold');
+      return;
+    }
     loadSessions().then((sessions) => {
       if (!live) return;
       const args = { pro: profile.pro, sessions, passageId: passage.id };
       if (!canRehearse(args)) {
-        // Replace, not push: closing the wall goes back to where they came from, never into a
-        // session that would start the mic.
-        router.replace({ pathname: '/paywall', params: { feature: 'rehearse' } });
+        wall(rehearseWall(args));
         return;
       }
       setFreeRun({ yes: isFreeRun(args), day1At: sessions.find((s) => s.passageId === 'baseline')?.at });
@@ -77,7 +87,7 @@ export default function GlideSession() {
     return () => {
       live = false;
     };
-  }, [ready, passage, profile.pro]);
+  }, [ready, passage, profile.pro, cold, momentPackId]);
 
   if (passage === undefined || (passage && !freeRun)) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   if (passage === null) {
@@ -106,14 +116,7 @@ export default function GlideSession() {
 async function trackFreeRun(passageId: string, moment: string | null, words: number, wpm: number, stumbled: number, day1At?: number) {
   const scriptId = /^s\.(\d+)\./.exec(passageId)?.[1];
   const parts = (await loadScripts()).find((s) => s.id === scriptId)?.chunks.length ?? null;
-  track('free_run_complete', {
-    moment,
-    words,
-    parts,
-    wpm,
-    stumbled,
-    minutes_since_day1: day1At ? Math.round((Date.now() - day1At) / 60_000) : null,
-  });
+  trackFreeRunComplete({ moment, words, parts, wpm, stumbled, day1At });
 }
 
 function GlideSessionView({
@@ -164,6 +167,9 @@ function GlideSessionView({
   const [breathFilled, setBreathFilled] = useState<Set<number>>(new Set());
   const [corrected, setCorrected] = useState<Set<number>>(new Set());
   const [tooShort, setTooShort] = useState(false);
+  // Finish tapped early on the free run: ask first (see requestFinish).
+  const [confirmEarly, setConfirmEarly] = useState(false);
+  const sentenceEnds = useMemo(() => words.map((w) => w.sentenceEnd), [words]);
 
   const startedAt = useRef(0); // first recognised word, so a slow start doesn't hurt pace
   const lastAdvanceAt = useRef(0);
@@ -218,21 +224,12 @@ function GlideSessionView({
     [toast],
   );
 
-  const onCorrect = useCallback(
-    (idx: number) => {
-      setCorrected((s) => new Set(s).add(idx));
-      Haptics.selectionAsync().catch(() => {});
-      // Never the word itself: a script's words are private. Length and source are enough to spot patterns.
-      track('recognition_correction', {
-        where: 'glide',
-        source: sourceOf(passage.id),
-        length: words[idx]?.key.length ?? 0,
-        pack_word: DICTIONARY.has(words[idx]?.key ?? ''),
-        position: Math.round((idx / Math.max(1, words.length)) * 10) / 10,
-      });
-    },
-    [words, passage.id],
-  );
+  // A tap only marks the word. Whether it's logged as a correction is decided at Finish
+  // (keptCorrections): the recogniser may still ink it, and then it wasn't a miss.
+  const onCorrect = useCallback((idx: number) => {
+    setCorrected((s) => new Set(s).add(idx));
+    Haptics.selectionAsync().catch(() => {});
+  }, []);
 
   // React to the pointer moving: pauses, breath marks, haptics, auto-scroll.
   useEffect(() => {
@@ -303,6 +300,7 @@ function GlideSessionView({
   const finish = useCallback(async () => {
     if (finished.current) return;
     finished.current = true;
+    setConfirmEarly(false);
     // Finish from the error card: the recogniser has already stopped, so don't wait on it.
     const recordings = listener.state === 'error' ? listener.recordings : await listener.stop();
     if (a.spoken < MIN_WORDS_TO_SCORE) {
@@ -326,6 +324,10 @@ function GlideSessionView({
     const stats = { wpm: wordsPerMinute(a.spoken, secs), fillersPerMin, accuracy, midSentencePauses: pauses.current, seconds: secs, steadiness: steady?.score };
     const topFiller = Object.entries(a.fillers).sort((x, y) => y[1] - x[1])[0]?.[0];
     const stumbled = stumbledWords(words, a);
+    // Taps the recogniser didn't overrule by inking the word itself (see keptCorrections).
+    const kept = keptCorrections(raw.status, corrected);
+    const isScript = isScriptPassage(passage.id);
+    const reachedPart = isScript ? partReached(a.next, sentenceEnds) : undefined;
     const sessionId = `${Date.now()}`;
     await saveSession({
       id: sessionId,
@@ -345,14 +347,18 @@ function GlideSessionView({
       readCount: a.read,
       skippedWords: skippedWords(words, a),
       stumbledContext: stumbledContexts(words, a, stumbled),
-      corrected: [...corrected].map((i) => words[i].display.replace(/[^A-Za-z'’-]/g, '')),
+      corrected: kept.map((i) => words[i].display.replace(/[^A-Za-z'’-]/g, '')),
       recordings: recordings.length ? recordings : undefined,
       habits: a.habitCount ? a.habits : undefined,
       segments: segments.length ? segments : undefined,
       steadiness: steady?.score,
+      partReached: reachedPart,
       review: tester
         ? {
-            statuses: encodeStatuses(a.status, corrected),
+            // The recogniser's statuses, so a tapped word it still missed is 'c' (it was 'r' from
+            // the corrected statuses, which hid every correction from /review). One it inked
+            // later is 'r': it was heard.
+            statuses: encodeStatuses(raw.status, corrected),
             transcript: listener.transcript,
             marks: { said: [], notSaid: [] },
             firstWordLagMs: firstWordLag.current,
@@ -361,16 +367,29 @@ function GlideSessionView({
         : undefined,
     });
     await recordWords(resultsFromSession(words, a));
-    for (const i of corrected) await recordCorrection(words[i].display);
+    for (const i of kept) {
+      await recordCorrection(words[i].display);
+      // Never the word itself: a script's words are private. Length and source are enough to spot patterns.
+      track('recognition_correction', {
+        where: 'glide',
+        source: sourceOf(passage.id),
+        length: words[i].key.length,
+        pack_word: DICTIONARY.has(words[i].key),
+        position: Math.round((i / Math.max(1, words.length)) * 10) / 10,
+      });
+    }
     await markStep(profile, update, step);
-    if (freeRun) trackFreeRun(passage.id, profile.moment?.id ?? null, words.length, stats.wpm, stumbled.length, day1At).catch(() => {});
+    // A Pro reader's script run: if Pro lapses later, there's no "you just rehearsed" paywall
+    // about it (pro.ts ahaPending). update() merges into the latest profile, after markStep.
+    if (profile.pro && isScript && reachedPart && !profile.ahaPaywallShown) await update({ ahaPaywallShown: true });
+    if (freeRun && reachedPart) trackFreeRun(passage.id, profile.moment?.id ?? null, words.length, stats.wpm, stumbled.length, day1At).catch(() => {});
     track('session_complete', {
       kind: passage.id.split('.')[0],
       pace,
       wpm: stats.wpm,
       accuracy,
       fillers_per_min: fillersPerMin,
-      corrections: corrected.size,
+      corrections: kept.length,
       steadiness: steady?.score ?? null,
       seconds: Math.round(secs),
       recorded: recordings.length > 0,
@@ -378,7 +397,28 @@ function GlideSessionView({
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (isBaseline && !profile.onboarded) router.replace({ pathname: '/onboarding/day1', params: { id: sessionId } });
     else router.replace({ pathname: '/tape', params: { id: sessionId } });
-  }, [a, raw, listener, passage, words, pace, corrected, profile, update, step, isBaseline, tester, freeRun, day1At]);
+  }, [a, raw, listener, passage, words, sentenceEnds, pace, corrected, profile, update, step, isBaseline, tester, freeRun, day1At]);
+
+  /**
+   * The Finish button. On the free run, before Glide has reached most of part 1, it asks first:
+   * a run only counts once it reaches the end (pro.ts partReached), and an early Finish there
+   * saves nothing, so the free run is still theirs. Too few words go straight to finish(), which
+   * shows the too-short card as usual.
+   */
+  const requestFinish = useCallback(() => {
+    if (freeRun && a.spoken >= MIN_WORDS_TO_SCORE && !partReached(a.next, sentenceEnds)) setConfirmEarly(true);
+    else finish();
+  }, [freeRun, a.spoken, a.next, sentenceEnds, finish]);
+
+  /** "Stop here" on the early-Finish question: mic off, audio gone, nothing saved, back out. */
+  const stopWithoutSaving = useCallback(async () => {
+    if (finished.current) return;
+    finished.current = true;
+    const uris = listener.state === 'listening' ? await listener.stop() : listener.recordings;
+    deleteRecordingFiles(uris);
+    track('free_run_stopped', { reached: a.next, words: words.length });
+    router.back();
+  }, [listener, a.next, words.length]);
 
   /** A real restart: clean transcript, timer, corrections, marks and pauses, then listen again. */
   const retry = useCallback(() => {
@@ -396,6 +436,7 @@ function GlideSessionView({
     setBreathFilled(new Set());
     setNotice(null);
     setTooShort(false);
+    setConfirmEarly(false);
     scroller.current?.scrollTo({ y: 0, animated: true });
     finished.current = false;
     track('session_retry', { where: 'glide' });
@@ -569,6 +610,27 @@ function GlideSessionView({
         </View>
       )}
 
+      {/* Early Finish on the free run. Listening carries on underneath, so "Keep reading" (the
+          default, filled) just closes this and they read on. */}
+      {confirmEarly && !tooShort && !failed && (
+        <View style={styles.errorDock}>
+          <View style={[styles.retry, { backgroundColor: colors.surface, borderColor: colors.line }]} accessibilityLiveRegion="polite">
+            <Text style={[styles.retryTitle, { color: colors.ink }]}>Finish now?</Text>
+            <Text style={[styles.retryBody, { color: colors.muted }]}>
+              Your free run counts when you reach the end of part 1. If you stop here, this read isn’t saved and your free run is still yours.
+            </Text>
+            <View style={styles.retryRow}>
+              <Pressable onPress={() => setConfirmEarly(false)} style={[styles.retryBtn, { backgroundColor: colors.button }]} accessibilityRole="button">
+                <Text style={styles.primaryText}>Keep reading</Text>
+              </Pressable>
+              <Pressable onPress={stopWithoutSaving} hitSlop={8} accessibilityRole="button">
+                <Text style={[styles.link, { color: colors.muted }]}>Stop here</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Footer: voice ribbon, live pace, pacer, finish */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + space(1.5) }]}>
         <View style={styles.footerRow}>
@@ -578,8 +640,8 @@ function GlideSessionView({
             <Text style={[styles.wpmUnit, { color: colors.muted }]}>wpm</Text>
             <Text style={[styles.pacerLabel, { color: colors.signal }]}>Pacer {pacerAt}</Text>
           </View>
-          {!tooShort && (
-            <Pressable hitSlop={12} onPress={finish} accessibilityRole="button">
+          {!tooShort && !confirmEarly && (
+            <Pressable hitSlop={12} onPress={requestFinish} accessibilityRole="button">
               <Text style={[styles.finish, { color: colors.muted }]}>Finish</Text>
             </Pressable>
           )}

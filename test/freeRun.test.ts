@@ -9,6 +9,7 @@ import {
   ahaPaywallDue,
   canAddScript,
   canRehearse,
+  countsAsRun,
   freeRunUsed,
   isFreeRun,
   isScriptPassage,
@@ -58,6 +59,22 @@ describe('freeRunUsed', () => {
     const saved = [run('baseline')]; // the too-short script attempt isn't in here
     expect(freeRunUsed(saved)).toBe(false);
     expect(canRehearse({ ...free, sessions: saved, passageId: 's.1.0' })).toBe(true);
+  });
+
+  // The 15-word Finish (qa-critic S2): a script session that stopped before most of the part
+  // must not use the run, even though it was saved. Under the old rule (any script session)
+  // this fails.
+  it('ignores a saved script session that finished early', () => {
+    const early = { id: 'e', passageId: 's.1.0', partReached: false };
+    expect(freeRunUsed([run('baseline'), early])).toBe(false);
+    expect(canRehearse({ ...free, sessions: [early], passageId: 's.1.0' })).toBe(true);
+    expect(isFreeRun({ ...free, sessions: [early], passageId: 's.1.0' })).toBe(true);
+  });
+
+  it('counts a run that reached the part, and older sessions saved before the rule', () => {
+    expect(freeRunUsed([{ passageId: 's.1.0', partReached: true }])).toBe(true);
+    expect(countsAsRun({ passageId: 's.1.0' })).toBe(true); // no field: saved before the rule
+    expect(countsAsRun({ passageId: 'w.interview.0', partReached: true })).toBe(false);
   });
 
   it('stays used after the script is deleted (its sessions stay)', () => {

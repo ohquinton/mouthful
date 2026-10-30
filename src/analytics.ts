@@ -28,6 +28,8 @@ export type EventName =
   | 'paywall_view' // `from`: aha (after the free script run) | soft (a soft wall) | you (See Pro)
   | 'paywall_close' // seconds on the paywall before leaving it without buying
   | 'free_run_complete' // the free reader's one script run was saved: counts and the moment code only
+  | 'free_run_stopped' // "Stop here" on an early Finish of the free run: words reached and the part's length
+  | 'script_linked' // plan step 3 used a script already saved: its parts, the moment code, free or Pro
   | 'purchase_attempt'
   | 'purchase_result'
   | 'recording_played'

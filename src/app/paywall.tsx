@@ -19,7 +19,7 @@ import { track } from '../analytics';
 import { BRAND } from '../brand';
 import { useProfile } from '../store/profile';
 import { getSession } from '../store/sessions';
-import { ahaCopy, ProFeature, UPSELL } from '../pro';
+import { ahaCopy, paywallFrom, trackPaywallClose, trackPaywallView, upsellFeature, UPSELL } from '../pro';
 import { daysUntil, getMoment } from '../content/moments';
 import { PrimaryButton } from '../components/ui';
 import { fonts, space, useColors } from '../theme';
@@ -39,9 +39,6 @@ const AHA_BENEFITS: Benefit[] = [
   { icon: 'pulse-outline', text: 'Drill the words you trip on' },
 ];
 
-/** Where the paywall was opened from, for analytics: a code, never text. */
-type From = 'aha' | 'soft' | 'you';
-
 /** Route params are strings from anywhere (deep links too): only whole, non-negative numbers count. */
 function count(v: string | undefined): number | undefined {
   if (!v || !/^\d{1,5}$/.test(v)) return undefined;
@@ -51,8 +48,8 @@ function count(v: string | undefined): number | undefined {
 export default function Paywall() {
   const params = useLocalSearchParams<{ feature?: string; from?: string; wpm?: string; words?: string; heard?: string; moment?: string }>();
   // Only features we know: anything else shows the main paywall.
-  const feature = params.feature && params.feature in UPSELL ? (params.feature as ProFeature) : undefined;
-  const from: From = params.from === 'aha' ? 'aha' : feature ? 'soft' : 'you';
+  const feature = upsellFeature(params.feature);
+  const from = paywallFrom(params.from, feature);
   // The Tape passes the free run's numbers as it leaves, so "I said it" corrections count.
   const aha =
     from === 'aha' && count(params.wpm) !== undefined && count(params.words) !== undefined && count(params.heard) !== undefined
@@ -75,14 +72,14 @@ export default function Paywall() {
   useEffect(() => {
     // The full paywall after the free run opens once; after that, soft walls only.
     update(from === 'aha' ? { paywallSeen: true, ahaPaywallShown: true } : { paywallSeen: true });
-    track('paywall_view', { from, feature: feature ?? 'main', has_day1: !!day1 });
+    trackPaywallView(from, feature, !!day1);
     storePrices().then((p) => p && setPrices(p));
     trialOffer('annual').then(setTrial);
     if (from !== 'aha' && !day1 && profile.baselineSessionId) getSession(profile.baselineSessionId).then((s) => s && setDay1(s.wpm));
     const opened = Date.now();
     // On unmount, so a swipe-down counts as well as Not now and the close button.
     return () => {
-      if (!bought.current) track('paywall_close', { from, feature: feature ?? 'main', seconds: Math.round((Date.now() - opened) / 1000) });
+      if (!bought.current) trackPaywallClose(from, feature, opened);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
