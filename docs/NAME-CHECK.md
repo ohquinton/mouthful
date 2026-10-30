@@ -53,3 +53,29 @@ Mouthwise keeps the hook: "That word's a mouthful. Get mouthwise."
 
 Sources: trademarkia.com searches (mouthful, pages 1–5), trademarkia.com/be-mouthful-88955723,
 trademarkelite.com Canada search, apps.apple.com id6758976174, foundryone.tech/mouthful, CIPO fees page.
+
+## Naming round 1 (brand-namer, 2026-10-29)
+
+~45 generated, 15 kill-tested, 24 more domain/App Store checked. Sources: iTunes Search API (US, CA), registry
+RDAP (Google .app, Verisign .com, CIRA .ca), trademarkia. CIPO and WIPO **not** checked (unreachable).
+
+| Name | App Store | .app / .com / .ca | Verdict |
+|---|---|---|---|
+| **Saysteady** | none (US, CA) | free / taken (reg. 2026-08-23) / free | **Survives** (score 20/25) |
+| **Mouthwise** | only dental apps | free / for sale (since 2005) / free | **Survives** (20) |
+| **Downpat** | none | suspended reg. / Afternic sale / free | **Survives** (18) |
+| Saypace | none | free / taken / free | Survives, weak (15) |
+| Sayready, Rehearsly, Wordready | none or near | mostly taken | Weak (11–12) |
+| Offbook, Sayso, Runlines, Saywise, Sayline, Paceline, Sayahead, Sayglide, Dryrun, SayCue, Saytrue, Offscript, Wordkeep | same/similar app exists | | Killed |
+
+Trademarks: Mouthwise and Saypace 0 hits. STEADY live in class 42 (98236512) and 41 (97750414). DOWNPAT MUSIC
+live in class 41 (99211087).
+
+**Competitors found while checking:** "Sayglide: Voice Teleprompter" (id6818066820), "Sayso – Communication Coach"
+(id6758900396), "Dry Run: Rehearse" (id6781274908), "DryRun: Say the Hard Thing", "OffBook – Learn Your Lines",
+"Run Lines: Script Rehearsal". Worth a product-lead look.
+
+Top 3: **Saysteady** ("Saysteady: Rehearse Out Loud" / "Say it steady when it matters", saysteady.app),
+**Mouthwise** (keeps "That word's a mouthful. Get mouthwise."; risk: reads as mouthwash/dental),
+**Downpat** ("Get it down pat by Thursday."; risk: ESL readers may not know the idiom).
+Scratch evidence: Quinton's scratchpad naming/ folder (temporary).
