@@ -131,8 +131,17 @@ function jumpedSteps(
   const skipped = (k: number) => status[k] === 'skipped';
   let total = 0;
   let count = 0;
+  // The 0 ms steps inside a long shared-stamp run are a jump, not speech: they'd drag the reader's
+  // pace down and hide the jump itself. Bursts (up to RUN_WORDS words) still count.
+  const runLen = new Array<number>(passage.length).fill(1);
+  for (let r0 = 0; r0 < passage.length; ) {
+    let r1 = r0;
+    while (reachedAt[r0] !== undefined && r1 + 1 < passage.length && reachedAt[r1 + 1] === reachedAt[r0]) r1++;
+    for (let k = r0; k <= r1; k++) runLen[k] = r1 - r0 + 1;
+    r0 = r1 + 1;
+  }
   for (let k = 0; k + 1 < passage.length; k++) {
-    if (timeable(k)) {
+    if (timeable(k) && !(runLen[k] > RUN_WORDS && reachedAt[k + 1] === reachedAt[k])) {
       total += reachedAt[k + 1]! - reachedAt[k]!;
       count++;
     }
