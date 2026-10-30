@@ -1,0 +1,139 @@
+{
+  "_source": "HOLDOUT set for habits.test.ts, written at the same time as habits-corpus.json, before the classifier was run on either, and never tuned on. Same markup and labelling rules as habits-corpus.json. Hand-written, no tester data.",
+  "groups": [
+    {
+      "ctx": "interview", "l1": "en",
+      "items": [
+        "i would like/R to talk about a project i led",
+        "the role looks like/R a great fit",
+        "my team was like/F really small",
+        "we grew revenue by like/r thirty percent",
+        "so/r the challenge was the timeline",
+        "i actually/r enjoy conflict resolution",
+        "you_know/r i've always been curious",
+        "i like/R working under pressure",
+        "it was like/F um a tough year",
+        "i'm basically/r the go to person for data",
+        "i was so/R proud of the team",
+        "what kind_of/R team would i join",
+        "i think so/R yes",
+        "the right/R thing was to tell the client",
+        "i_mean/r we did our best",
+        "and like/F the manager left halfway through",
+        "they like/R people who take initiative",
+        "so/R that i could learn the codebase faster",
+        "my boss was like/r you're ready",
+        "i'd like/R to know more about the team"
+      ]
+    },
+    {
+      "ctx": "presentation", "l1": "en",
+      "items": [
+        "so/r let's look at the numbers",
+        "revenue is right/R where we expected",
+        "costs are kind_of/r high this month",
+        "it's literally/R the same chart",
+        "the trend looks like/R this",
+        "we hit like/r ninety percent of target",
+        "you_know/R what we need to do",
+        "and so/r on to the next slide",
+        "basically/F you_know/F like/F it's flat",
+        "the forecast is so/R uncertain",
+        "the team did it right/R",
+        "the plan is right/r",
+        "it's due friday right/r",
+        "we need the right/R tools",
+        "the you_know/F launch date moved"
+      ]
+    },
+    {
+      "ctx": "casual", "l1": "en",
+      "items": [
+        "it was like/F so/R weird",
+        "we like/F waited forever",
+        "i like/R your shoes",
+        "it's like/R that sometimes",
+        "the movie was like/F amazing",
+        "like/F like/F i don't even know",
+        "he was like/r stop",
+        "i was so/R tired",
+        "it's not like/R i care",
+        "she literally/r screamed",
+        "it was literally/F the best literally/F the best literally/F",
+        "you_know/F like/F whatever",
+        "so/F so/F anyway",
+        "um like/F where was i",
+        "it was you_know/F fine",
+        "they were like/F totally fine with it",
+        "it like/F never ends",
+        "i sort_of/r get it",
+        "a sort_of/R tradition",
+        "it's kinda/r cold",
+        "like/F it was like/F so/R bad like/F seriously",
+        "we hung out right/R after work",
+        "you're right/R about that",
+        "i don't like/R horror movies",
+        "it smells like/R smoke"
+      ]
+    },
+    {
+      "ctx": "work", "l1": "hi",
+      "items": [
+        "actually/r we already sent the mail",
+        "the report is ready actually/r",
+        "actually/r madam the file is pending",
+        "did they actually/R approve it",
+        "i will do it today itself only",
+        "actually/F actually/F the issue is different",
+        "basically/r the vendor delayed",
+        "it is basically/r the same process"
+      ]
+    },
+    {
+      "ctx": "casual", "l1": "fil",
+      "items": [
+        "it's like/F so/R hot today",
+        "we're like/r ten people in the team",
+        "parang it's like/F super nice",
+        "the client is like/F strict"
+      ]
+    },
+    {
+      "ctx": "casual", "l1": "es",
+      "items": [
+        "i like/R much the coffee here",
+        "is like/F very difficult",
+        "you_know/R the address",
+        "my english is so/R so/R"
+      ]
+    },
+    {
+      "ctx": "casual", "l1": "zh",
+      "items": [
+        "i very like/R the project",
+        "he like/R eat noodles",
+        "actually/r my english is not good",
+        "the right/R answer is b"
+      ]
+    },
+    {
+      "ctx": "work", "l1": "en",
+      "items": [
+        "i_mean/R it when i say thanks",
+        "i_mean/F like/F come on",
+        "i_mean/r the deadline not the budget",
+        "kind_of/F um you_know/F",
+        "we kind_of/r rushed it",
+        "a different sort_of/R plan",
+        "you_know/F you_know/F what happened",
+        "let me know if you_know/R anyone",
+        "the you_know/F thing",
+        "right/r okay let's go",
+        "it's due monday right/r",
+        "so/R many people came",
+        "i was like/r really",
+        "and it like/F was over"
+      ]
+    }
+  ]
+}
