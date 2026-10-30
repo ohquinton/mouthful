@@ -114,6 +114,7 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
   6d. speech-engine: minute.ts free thinking ~8 s + `timeToFirstWord` in the summary and trend (DILEMMAS #15); then mobile-engineer: show "You started after N s" on the One Minute Tape with its coaching line.
   6e. mobile-engineer: target length per DILEMMAS #16 (no per-part lights; whole-answer target in the final run-through; paste-time "runs about 3:10" warning; custom target field on scripts).
   6f. main session: rename to SaidClearly in src/brand.ts once brand-namer clears it.
+  6g. mobile-engineer: onboarding redesign (docs/briefs/onboarding-redesign.md). The S0 mic-denied trap first, then the date, then the copy.
   7. product-lead: emphasis coaching brief (third core goal), ready for after the beta gate.
   8. design-ux: onboarding critique and redesign brief (first 60 seconds), then a full visual pass once it runs on the iPhone.
 - **Then:** mobile-engineer suppresses "Pick up from…" and pause counting while re-reading (uses the new field); logs a tapped word later inked by backfill as a correction only once; investigates the pre-existing "A network error occurred." on the web Day 1 screen. Then qa-critic attacks the resync again.
