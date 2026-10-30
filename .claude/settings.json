@@ -1,5 +1,40 @@
 {
   "enabledPlugins": {
     "expo@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:itunes.apple.com)",
+      "WebFetch(domain:apps.apple.com)",
+      "WebFetch(domain:rdap.org)",
+      "WebFetch(domain:pubapi.registry.google)",
+      "WebFetch(domain:rdap.verisign.com)",
+      "WebFetch(domain:rdap.ca.fury.ca)",
+      "WebFetch(domain:ised-isde.canada.ca)",
+      "WebFetch(domain:trademarkia.com)",
+      "WebFetch(domain:www.trademarkia.com)",
+      "WebFetch(domain:play.google.com)",
+      "Bash(curl -s https://itunes.apple.com/*)",
+      "Bash(curl -sS https://itunes.apple.com/*)",
+      "Bash(curl -sL https://itunes.apple.com/*)",
+      "Bash(curl -s https://apps.apple.com/*)",
+      "Bash(curl -sL https://apps.apple.com/*)",
+      "Bash(curl -s https://rdap.org/*)",
+      "Bash(curl -sS https://rdap.org/*)",
+      "Bash(curl -sL https://rdap.org/*)",
+      "Bash(curl -s https://pubapi.registry.google/*)",
+      "Bash(curl -sS https://pubapi.registry.google/*)",
+      "Bash(curl -s https://rdap.verisign.com/*)",
+      "Bash(curl -sS https://rdap.verisign.com/*)",
+      "Bash(curl -s https://rdap.ca.fury.ca/*)",
+      "Bash(curl -sS https://rdap.ca.fury.ca/*)",
+      "Bash(curl -s https://ised-isde.canada.ca/*)",
+      "Bash(curl -sS https://ised-isde.canada.ca/*)",
+      "Bash(curl -sL https://ised-isde.canada.ca/*)",
+      "Bash(curl -s https://www.trademarkia.com/*)",
+      "Bash(curl -sL https://www.trademarkia.com/*)",
+      "Bash(curl -s https://play.google.com/*)",
+      "Bash(curl -sL https://play.google.com/*)"
+    ]
   }
 }
