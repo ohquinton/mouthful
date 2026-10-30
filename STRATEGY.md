@@ -91,6 +91,15 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
 ## Resume here (paused 2026-10-28)
 
 - **In progress:** speech-engine fixing qa-critic's 6 resync findings (S1 refrain "start again" jumps to the closing line and auto-finishes; S1 stutter after a dropped word turns said words red; S2 one interim revision makes the cursor retreat up to 19 words; S2 asides quoting later words pull the cursor ahead; S2 3.6–5.3 ms per call on 300–500-word scripts, target ≤1 ms; plus an additive `align` field so the screen can tell a re-read). Stopped mid-way. WIP (failing tests + partial align.ts) is on branch `wip/resync-qa-fixes` (GitHub), with qa-critic's repro scripts in `wip/qa-resync/`. Restart speech-engine from that branch with the same brief; don't merge the WIP as is.
+- **Build queue** (start the next one the moment a builder finishes; quality over speed):
+  1. speech-engine: resync QA fixes (running) → merge → qa-critic re-attacks the resync.
+  2. mobile-engineer: app fixes + aha QA fixes (running) → merge → qa-critic reviews.
+  3. mobile-engineer: re-read handling on screen (no "Pick up from…", no pause counted) using align's new re-read field.
+  4. product-lead: competitor teardown (Sayglide, Sayso, Dry Run, DryRun, OffBook, Run Lines): what they do, where we're truly different, what that changes in STRATEGY.
+  5. speech-engine: beta sheet carries listener restarts/glitches (`reviewRow` in review.ts) + exact steadiness timing via heard-token counts if the beta shows it matters.
+  6. brand-namer: round 2 once Quinton gives a direction (feeling, theme, any names he likes).
+  7. product-lead: emphasis coaching brief (third core goal), ready for after the beta gate.
+  8. design-ux: onboarding critique and redesign brief (first 60 seconds), then a full visual pass once it runs on the iPhone.
 - **Then:** mobile-engineer suppresses "Pick up from…" and pause counting while re-reading (uses the new field); logs a tapped word later inked by backfill as a correction only once; investigates the pre-existing "A network error occurred." on the web Day 1 screen. Then qa-critic attacks the resync again.
 - **Open decision (name):** docs/NAME-CHECK.md. US risk medium (Foundry One's "Mouthful: Voice to To-Do List", Education, since March 2026). Keep Mouthful for the beta; decide before any branding spend or public launch. Name lives only in src/brand.ts.
 - **Then:** the Mac. Xcode is installed on Quinton's MacBook Air (M2). Check the Xcode/macOS that Expo SDK 58 needs, clone the private repo, `npx expo run:ios --device` with a free Apple ID (7-day signing), rebuild for Sentry's native code. Apple Developer signup still pending.
