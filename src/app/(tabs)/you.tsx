@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
@@ -13,7 +13,8 @@ import { listenLocale, onDeviceSupported, serverServiceName } from '../../speech
 import { SPEECH_LOCALES } from '../../engine/locale';
 import { BRAND } from '../../brand';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { cancelDailyReminder, formatTime, REMINDER_OPTIONS, scheduleDailyReminder } from '../../reminders';
+import { cancelDailyReminder, formatTime, REMINDER_OPTIONS, scheduleDailyReminder, syncTrialReminder } from '../../reminders';
+import { cancelPath, subscriptionsUrl } from '../../billing';
 import { restore, PurchasesNotConfigured } from '../../purchases';
 import { PrimaryButton, SectionTitle } from '../../components/ui';
 import { fonts, space, useColors } from '../../theme';
@@ -99,11 +100,18 @@ export default function You() {
   const onRestore = async () => {
     try {
       const r = await restore();
+      if (r.trial !== undefined) await syncTrialReminder(r.trial, { ask: false });
       if (r.pro) await update({ pro: true });
       setNote(r.pro ? 'Pro restored.' : 'No earlier purchase found for this account.');
     } catch (e) {
       setNote(e instanceof PurchasesNotConfigured ? e.message : 'Couldn’t reach the store. Check your connection and try again.');
     }
+  };
+
+  /** The store's own subscriptions page: change plan or cancel, with no hoops on our side. */
+  const manageSubscription = () => {
+    const url = subscriptionsUrl(Platform.OS);
+    Linking.openURL(url).catch(() => setNote(`Couldn’t open it. Go to ${cancelPath(Platform.OS)}.`));
   };
 
   const moment = getMoment(profile.moment?.id);
@@ -133,6 +141,19 @@ export default function You() {
         </Text>
         {!profile.pro && <PrimaryButton label="See Pro" onPress={() => router.push({ pathname: '/paywall', params: { from: 'you' } })} style={{ marginTop: space(1) }} />}
       </View>
+      {profile.pro && (
+        <Pressable
+          onPress={manageSubscription}
+          accessibilityRole="link"
+          style={({ pressed }) => [styles.momentRow, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.75 : 1 }]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.momentTitle, { color: colors.ink }]}>Manage subscription</Text>
+            <Text style={[styles.momentSub, { color: colors.muted }]}>Change your plan or cancel. It opens your store account.</Text>
+          </View>
+          <Ionicons name="open-outline" size={20} color={colors.muted} />
+        </Pressable>
+      )}
 
       <SectionTitle>What you’re preparing for</SectionTitle>
       <Pressable

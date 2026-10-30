@@ -9,7 +9,16 @@
 // With no key: development builds unlock Pro locally for testing; production builds refuse.
 import { Platform } from 'react-native';
 import Purchases, { INTRO_ELIGIBILITY_STATUS, type CustomerInfo, type PurchasesPackage } from 'react-native-purchases';
-import { ENTITLEMENT, PlanId, PurchaseCancelled, PurchasesNotConfigured, TrialOffer } from './purchases.shared';
+import {
+  CustomerState,
+  ENTITLEMENT,
+  PlanId,
+  PurchaseCancelled,
+  PurchaseResult,
+  PurchasesNotConfigured,
+  TrialOffer,
+  TrialStatus,
+} from './purchases.shared';
 
 export * from './purchases.shared';
 
@@ -17,6 +26,18 @@ const KEY = Platform.OS === 'ios' ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY :
 let configured = false;
 
 const isPro = (info: CustomerInfo) => !!info.entitlements.active[ENTITLEMENT];
+
+/**
+ * The free trial the reader is in now, if any. RevenueCat reports a trial as periodType TRIAL,
+ * with the trial's end as the expiration date. willRenew turns false once they cancel in Settings.
+ */
+function trialOf(info: CustomerInfo): TrialStatus {
+  const e = info.entitlements.active[ENTITLEMENT];
+  if (!e || e.periodType?.toUpperCase() !== 'TRIAL' || !e.expirationDateMillis) return null;
+  return { endsAt: e.expirationDateMillis, willRenew: e.willRenew };
+}
+
+const stateOf = (info: CustomerInfo): NonNullable<CustomerState> => ({ pro: isPro(info), trial: trialOf(info) });
 
 export async function initPurchases(): Promise<boolean> {
   if (!KEY) return false;
@@ -88,7 +109,33 @@ export async function hasPro(): Promise<boolean | null> {
   }
 }
 
-export async function purchase(plan: PlanId): Promise<{ pro: boolean }> {
+/** Pro and the trial in one store call, for launch. null = couldn't check. */
+export async function customerState(): Promise<CustomerState> {
+  if (!(await initPurchases())) return null;
+  try {
+    return stateOf(await Purchases.getCustomerInfo());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Calls back whenever RevenueCat learns something new about this reader while the app is open,
+ * e.g. they cancelled the trial in Settings and came back. Returns the unsubscribe.
+ */
+export function onCustomerChange(cb: (state: NonNullable<CustomerState>) => void): () => void {
+  if (!KEY) return () => {};
+  const listener = (info: CustomerInfo) => cb(stateOf(info));
+  // configure() must run first; initPurchases is synchronous once it has the key.
+  initPurchases().then(() => Purchases.addCustomerInfoUpdateListener(listener)).catch(() => {});
+  return () => {
+    try {
+      Purchases.removeCustomerInfoUpdateListener(listener);
+    } catch {}
+  };
+}
+
+export async function purchase(plan: PlanId): Promise<PurchaseResult> {
   if (!(await initPurchases())) {
     if (__DEV__) return { pro: true };
     throw new PurchasesNotConfigured();
@@ -97,17 +144,17 @@ export async function purchase(plan: PlanId): Promise<{ pro: boolean }> {
   if (!pkg) throw new PurchasesNotConfigured();
   try {
     const { customerInfo } = await Purchases.purchasePackage(pkg);
-    return { pro: isPro(customerInfo) };
+    return stateOf(customerInfo);
   } catch (e) {
     if ((e as { userCancelled?: boolean }).userCancelled) throw new PurchaseCancelled();
     throw e;
   }
 }
 
-export async function restore(): Promise<{ pro: boolean }> {
+export async function restore(): Promise<PurchaseResult> {
   if (!(await initPurchases())) {
     if (__DEV__) return { pro: false };
     throw new PurchasesNotConfigured();
   }
-  return { pro: isPro(await Purchases.restorePurchases()) };
+  return stateOf(await Purchases.restorePurchases());
 }

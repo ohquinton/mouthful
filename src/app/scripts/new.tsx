@@ -154,6 +154,10 @@ export default function NewScript() {
         textAlignVertical="top"
         style={[styles.body, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.surface }]}
       />
+      {/* iOS's Live Text reads printed notes through the camera, straight into the box. Android has no equivalent here. */}
+      {Platform.OS === 'ios' && (
+        <Text style={[styles.meta, { color: colors.muted }]}>Tip: on iPhone, tap the box, then Scan Text to copy from paper.</Text>
+      )}
 
       <Text style={[styles.meta, { color: tooLong ? colors.stumble : colors.muted }]}>
         {tooLong

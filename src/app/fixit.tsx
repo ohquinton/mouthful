@@ -13,6 +13,7 @@ import { recordWords } from '../store/words';
 import { useProfile } from '../store/profile';
 import { markStep } from '../plan';
 import { track } from '../analytics';
+import { noteRoughPatch } from '../rating';
 import { listenLocale, useListener } from '../speech/useListener';
 import { useVoiceLevel, VoiceRibbon } from '../components/VoiceRibbon';
 import { MicGate, gateStates } from '../components/MicGate';
@@ -146,6 +147,10 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
   // The recogniser stopped for good (e.g. it can't listen for this English). A routine error
   // while it's still listening restarts by itself, so it shows nothing.
   const failed = listener.state === 'error';
+  // No rating ask in a launch where the recogniser let them down (rating.ts).
+  useEffect(() => {
+    if (failed) noteRoughPatch();
+  }, [failed]);
 
   /** Start listening again from a clean page. The step stays where it was. */
   const retryListening = async () => {

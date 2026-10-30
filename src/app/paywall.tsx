@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -16,6 +16,8 @@ import {
   type TrialOffer,
 } from '../purchases';
 import { track } from '../analytics';
+import { billingLine, subscriptionsUrl } from '../billing';
+import { syncTrialReminder } from '../reminders';
 import { BRAND } from '../brand';
 import { useProfile } from '../store/profile';
 import { getSession } from '../store/sessions';
@@ -112,10 +114,13 @@ export default function Paywall() {
     track('purchase_attempt', { plan, from, feature: feature ?? 'main' });
     try {
       const r = await purchase(plan);
-      track('purchase_result', { plan, from, pro: r.pro });
+      track('purchase_result', { plan, from, pro: r.pro, trial: !!r.trial });
       if (r.pro) {
         bought.current = true;
         await update({ pro: true });
+        // A trial gets its "ends in 2 days" reminder (asking for notifications now, since they
+        // just started it); a paid plan cancels any old one. Unknown (no store): leave it.
+        if (r.trial !== undefined) await syncTrialReminder(r.trial, { ask: !!r.trial });
         close();
       }
     } catch (e) {
@@ -134,6 +139,7 @@ export default function Paywall() {
   const onRestore = async () => {
     try {
       const r = await restore();
+      if (r.trial !== undefined) await syncTrialReminder(r.trial, { ask: false });
       if (r.pro) {
         bought.current = true;
         await update({ pro: true });
@@ -190,16 +196,17 @@ export default function Paywall() {
         })}
       </ScrollView>
 
+      {/* Exactly what happens to their money, with the price, before the button that spends it.
+          Outside the scroll so it's always next to the button. */}
+      <Text style={[styles.billing, { color: colors.ink }]} accessibilityLiveRegion="polite">
+        {billingLine({ plan, price: prices[plan] ?? PLANS[plan].price, trialDays: plan === 'annual' ? trial?.days : undefined, os: Platform.OS })}
+      </Text>
+      <Pressable onPress={() => openLink(subscriptionsUrl(Platform.OS))} hitSlop={8} accessibilityRole="link" style={styles.howTo}>
+        <Text style={[styles.legalLink, { color: colors.signal }]}>How to cancel</Text>
+      </Pressable>
       {/* Ink, not red: a store hiccup isn't the reader's mistake. */}
       {error && <Text style={[styles.error, { color: colors.ink }]}>{error}</Text>}
       <PrimaryButton label={plan === 'annual' && trial ? 'Start free trial' : 'Subscribe'} busy={busy} onPress={buy} />
-      <Text style={[styles.fine, { color: colors.muted }]}>
-        {plan === 'annual'
-          ? trial
-            ? `Free for ${trial.days} days, then ${prices.annual ?? PLANS.annual.price} a year. Renews automatically. Cancel anytime in Settings before the trial ends.`
-            : `${prices.annual ?? PLANS.annual.price} a year. Renews automatically. Cancel anytime in Settings.`
-          : `${prices.monthly ?? PLANS.monthly.price} a month. Renews automatically. Cancel anytime in Settings.`}
-      </Text>
       <View style={styles.legal}>
         <Pressable onPress={() => openLink(BRAND.privacyUrl)} hitSlop={8} accessibilityRole="link">
           <Text style={[styles.legalLink, { color: colors.muted }]}>Privacy policy</Text>
@@ -237,7 +244,8 @@ const styles = StyleSheet.create({
   planPrice: { fontSize: 24, fontWeight: '700', fontVariant: ['tabular-nums'] },
   planPer: { fontSize: 14, fontWeight: '500' },
   error: { fontSize: 14, textAlign: 'center' },
-  fine: { fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  billing: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  howTo: { alignSelf: 'center', marginTop: -space(1) },
   legal: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: space(1) },
   // paddingVertical + hitSlop make a tap target of at least 44 pt.
   legalLink: { fontSize: 13, textDecorationLine: 'underline', paddingVertical: 10 },

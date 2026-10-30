@@ -35,7 +35,8 @@ export type EventName =
   | 'recording_played'
   | 'recordings_deleted'
   | 'session_retry'
-  | 'session_resume'; // Carry on after the recogniser stopped; `error` is the listener's code
+  | 'session_resume' // Carry on after the recogniser stopped; `error` is the listener's code
+  | 'rating_prompt'; // the App Store rating prompt was shown; `reason`: second_run | after_moment
 
 type Props = Record<string, string | number | boolean | null | undefined>;
 
@@ -44,7 +45,8 @@ type Props = Record<string, string | number | boolean | null | undefined>;
  * Any other string property is dropped before sending, so a user's words, scripts or
  * transcripts can't leak into analytics even if someone adds a careless track() call.
  */
-const TEXT_KEYS = new Set(['kind', 'pace', 'plan', 'feature', 'moment', 'step', 'where', 'which', 'error', 'from', 'source']);
+// `reason`: why the rating prompt was shown (rating.ts RatingReason: second_run, after_moment).
+const TEXT_KEYS = new Set(['kind', 'pace', 'plan', 'feature', 'moment', 'step', 'where', 'which', 'error', 'from', 'source', 'reason']);
 const CODE = /^[a-z0-9_:-]{1,24}$/i;
 
 export function sanitise(props: Props): Props {
