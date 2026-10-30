@@ -294,7 +294,7 @@ const PHRASE2 = 6; // its second word
 const REPEAT = 7; // "the the"
 const OFF = 8; // off-script
 
-type Anchor = { h: number; k: number; back: boolean; hold?: boolean };
+type Anchor = { h: number; k: number; back: boolean; hold?: boolean; tie?: boolean };
 
 /**
  * What the anchor search remembers about each start in the current run (indexed by position in
@@ -324,6 +324,7 @@ function findAnchor(
   lastAnchor: number,
   st: Starts,
   settled: number, // heard words from here on may still be rewritten by the recogniser
+  release: number, // a held jump resting on this heard word lands instead (the final alignment)
 ): Anchor | 'wait' | null {
   const n = p.length;
   const near = sentencesFrom(idx, ptr, n, NEAR_SENTENCES);
@@ -358,6 +359,7 @@ function findAnchor(
     }
     let waiting = false;
     let pick = -1;
+    let tie = false; // picked among identical copies
     while (cands.length) {
       if (cands.length === 1 && enough(cands[0], len)) {
         pick = cands[0];
@@ -371,6 +373,7 @@ function findAnchor(
         // than a leap, and holding marks nothing either way.
         if (ahead === undefined || ok[0] >= ptr) {
           pick = ahead ?? (ok.length ? ok[ok.length - 1] : -1);
+          tie = ok.length > 1;
           break;
         }
       }
@@ -460,9 +463,9 @@ function findAnchor(
       // the one before and picked up at the start of the last one. Otherwise (the closing line
       // quoted early, a refrain, "sorry, let me start again" on a passage that ends with its
       // opening line) the pointer holds and those words are heard as off-script.
-      if (k >= idx.finalStart && ptr < idx.finalStart && !(k === idx.finalStart && ptr >= idx.penultStart)) {
+      if (h !== release && k >= idx.finalStart && ptr < idx.finalStart && !(k === idx.finalStart && ptr >= idx.penultStart)) {
         live.splice(keep, li + 1 - keep);
-        return { h, k, back, hold: true };
+        return { h, k, back, hold: true, tie };
       }
     }
     live.splice(keep, li + 1 - keep);
@@ -476,8 +479,31 @@ function findAnchor(
 /**
  * Lines up what the recogniser heard with the passage. Re-runs from scratch on every recogniser
  * update and is pure, so it self-corrects when the recogniser revises a word it already sent.
+ *
+ * The final alignment (session end: `settled = heard.length`, nothing more is coming) never leaves
+ * a jump into the last sentence held. Live, a hold keeps a refrain or an early-quoted closing line
+ * from finishing the session; at the end, if the transcript still finishes in that hold, the reader
+ * went there: the jump lands (the gap red, the last-sentence words they said inked). If the anchor
+ * was a tie between identical copies, nothing is inked, but every word before it counts as
+ * skipped, so accuracy can't read 100% for a reader who skipped.
  */
 export function align(passage: PassageWord[], heard: string[], settled = heard.length - SETTLE): Alignment {
+  const first = alignOnce(passage, heard, settled, -1);
+  if (settled < heard.length || !first.held) return first.out;
+  if (!first.held.tie) return alignOnce(passage, heard, settled, first.held.h).out;
+  const out = first.out;
+  const k = first.held.k;
+  const status = out.status.map((s, j) => (j < k && s === 'pending' ? 'skipped' : s));
+  const added = status.filter((s, j) => s !== out.status[j]).length;
+  return { ...out, status, next: Math.max(out.next, k), skipped: out.skipped + added };
+}
+
+function alignOnce(
+  passage: PassageWord[],
+  heard: string[],
+  settled: number,
+  release: number,
+): { out: Alignment; held?: Anchor } {
   const n = passage.length;
   const H = heard.length;
   const idx = n ? indexFor(passage) : undefined;
@@ -512,6 +538,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
   let blockedUntil = 0; // words before a resync anchor are off-script
   let pending: Anchor | null = null;
   let shadow = -1; // held at the end (see findAnchor): the last-sentence word expected next
+  let holding: Anchor | undefined; // the held anchor, while the hold lasts
   let lastAnchor = -1;
   let budget = 8 * H + 64; // rewinds are bounded, whatever the transcript
   let doneHit: Uint8Array | null = null; // at the end of the passage: which words are inked
@@ -519,8 +546,10 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
 
   for (let i = 0; i < H; i++) {
     if (pending && i === pending.h) {
-      if (pending.hold) shadow = pending.k;
-      else if (pending.back) bp = pending.k;
+      if (pending.hold) {
+        shadow = pending.k;
+        holding = pending;
+      } else if (pending.back) bp = pending.k;
       else {
         next = pending.k;
         bp = -1;
@@ -713,7 +742,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
     }
     const found =
       n > 0 && run.length >= 2 && budget > 0 && !(snapNext >= n && doneHit && doneMissing === 0)
-        ? findAnchor(passage, idx!, heard, kind, at, run, runStart, snapNext, lastAnchor, st, settled)
+        ? findAnchor(passage, idx!, heard, kind, at, run, runStart, snapNext, lastAnchor, st, settled, release)
         : null;
     const anchor = found === 'wait' ? null : found;
     if (!anchor || (confirm && (kind[anchor.h] === FWD || kind[anchor.h] === BACK))) {
@@ -814,7 +843,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
   };
   // Re-reading behind the pointer and not yet back at it (the word before the pointer means it is).
   if (lastOn >= 0 && kind[lastOn] === BACK && at[lastOn] < next - 1) out.rereadingAt = at[lastOn];
-  return out;
+  return { out, held: shadow >= 0 ? holding : undefined };
 }
 
 /**

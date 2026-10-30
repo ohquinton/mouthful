@@ -491,7 +491,14 @@ function skipFailures(cases: Case[]) {
     // "the" skipped, or "schedule | the project", the first): a hold is right if one of them holds.
     const options = [c0, ...(c0.alts ?? [])];
     const jumps = options.filter((o) => !holdsAtEnd(o));
-    if (options.some((o) => holdsAtEnd(o) && held(o))) continue;
+    if (options.some((o) => holdsAtEnd(o) && held(o))) {
+      // Live it holds; Finish saves the settled alignment, which must be the honest one: the gap
+      // red, the last sentence inked (qa-critic: a held skip saved 100% accuracy).
+      const saved = align(c0.passage, c0.heard, c0.heard.length).status;
+      const t = truthFor(c0, saved);
+      if (code(saved) !== code(expected(t))) fails.push(`${c0.label}: Finish saves\n  want ${code(expected(t))}\n  got  ${code(saved)}`);
+      continue;
+    }
     if (!jumps.length) {
       fails.push(`${c0.label}: should hold at the end, got ${code(got)}`);
       continue;
@@ -526,6 +533,47 @@ describe('2. skips', () => {
     expect(a.status.slice(8, 14)).toEqual(Array(6).fill('skipped'));
     expect(a.skipped).toBe(6);
     expect(a.done).toBe(true);
+  });
+
+  // qa-critic: a skip into the last sentence held forever, so Finish saved 100% accuracy for a
+  // reader who skipped 48 of 75 words. Live it still holds; the settled alignment lands the jump.
+  it('a skip into the last sentence holds live, and Finish saves it with the gap red', () => {
+    const p = preparePassage(PASSAGES.find((x) => x.id === 'night-shift')!.text);
+    const k = keysOf(p);
+    const fs = sentenceRanges(p).at(-1)![0];
+    const heard = [...k.slice(0, 6), ...k.slice(fs)];
+    const live = align(p, heard);
+    expect(live.done).toBe(false); // no auto-finish on what may be a refrain
+    expect(live.status.slice(fs).includes('read')).toBe(false);
+    const saved = align(p, heard, heard.length);
+    expect(saved.skipped).toBe(fs - 6);
+    expect(saved.read).toBe(6 + p.length - fs);
+    expect(saved.done).toBe(true);
+    expect(saved.read / (saved.read + saved.skipped)).toBeLessThan(0.5);
+  });
+
+  it('a mid-passage refrain then the last sentence: Finish saves the skipped middle as red', () => {
+    const text =
+      'We ship every Friday. Our rule is simple: test it, ship it, fix it. Last month we missed one Friday because a vendor slipped. ' +
+      'Our rule is simple: test it, ship it, fix it. Next quarter we add a second region and more support staff for the launch.';
+    const p = preparePassage(text);
+    const said = tokenise(
+      'we ship every friday our rule is simple test it ship it fix it next quarter we add a second region and more support staff for the launch',
+    );
+    expect(align(p, said).done).toBe(false);
+    const saved = align(p, said, said.length);
+    const rs = sentenceRanges(p);
+    expect(code(saved.status)).toBe(
+      'r'.repeat(rs[1][1]) + 's'.repeat(rs[3][1] - rs[1][1]) + 'r'.repeat(p.length - rs[3][1]),
+    );
+    // the opposite error: read straight through, nothing turns red at Finish
+    const straight = keysOf(p);
+    expect(align(p, straight, straight.length).skipped).toBe(0);
+    // the closing line quoted early as an aside, then the passage read on: nothing red, nothing extra
+    const thanks = preparePassage('I led the migration of our billing system to the new platform. We cut support tickets by a third in two months. Thank you.');
+    const aside = tokenise('i led the migration oh thank you of our billing system to the new platform we cut support tickets by a third in two months thank you');
+    const a = align(thanks, aside, aside.length);
+    expect([a.read, a.skipped]).toEqual([thanks.length, 0]);
   });
 
   it('a dropped clause no longer turns the rest of the answer red', () => {
@@ -799,10 +847,12 @@ describe('6. recogniser realism', () => {
       const before = score(c, legacyAlign(c.passage, heard).status);
       const after = score(c, align(c.passage, heard).status);
       if (after.falseGreen > before.falseGreen) fails.push(`${c.label}: false green ${before.falseGreen} → ${after.falseGreen}`);
-      // A skip into the last sentence holds (section 2): the old aligner inked a few of those words
-      // by chance in its lookahead; a hold inks none, by design. Its false greens still count above.
+      // A skip into the last sentence holds live (section 2) and inks nothing, by design. What Finish
+      // saves (the settled alignment) must ink at least what the old aligner did, holds included.
       const holds = [c, ...(c.alts ?? [])].some(holdsAtEnd);
-      if (!holds && after.inkedSaid < before.inkedSaid) fails.push(`${c.label}: inked ${before.inkedSaid} → ${after.inkedSaid}`);
+      const saved = holds ? score(c, align(c.passage, heard, heard.length).status) : after;
+      if (saved.falseGreen > before.falseGreen) fails.push(`${c.label}: saved false green ${before.falseGreen} → ${saved.falseGreen}`);
+      if (saved.inkedSaid < before.inkedSaid) fails.push(`${c.label}: inked ${before.inkedSaid} → ${saved.inkedSaid}`);
     }
     expect(summary(fails)).toEqual(NONE);
   });
