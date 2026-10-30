@@ -7,6 +7,8 @@ other testers' phones still need the paid account (RELEASE.md).
 Requirements for Expo SDK 58 (docs.expo.dev/versions/v58.0.0): **Xcode 26.4+**, **Node 22.13+**, iPhone on
 **iOS 16.4+**.
 
+**Shortcut:** after installing Xcode (step 1), copy `scripts/setup-mac.sh` to the Mac and run `bash setup-mac.sh`. It does steps 2–6 and stops with a plain message whenever it needs you.
+
 ## 1. Xcode
 
 1. Xcode → About Xcode: version must be **26.4 or newer**. If not, update it in the App Store.

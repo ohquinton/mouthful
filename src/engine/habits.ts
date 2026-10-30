@@ -165,7 +165,7 @@ const CUES: Record<string, number> = {
   'opener-yk': B | PA | SH,
   // kind of / sort of
   trailing: B | PB,
-  // Locked: approx, quotative, hedge, backchannel, subj-unclear, and-like-it
+  // Locked: approx, quotative, hedge, backchannel, subj-unclear, and-like-it, yk-object
 };
 
 type Verdict = { label: HabitLabel; reason: string; hint?: 1 };
@@ -204,6 +204,8 @@ function ruleLike(c: Ctx, i: number): Verdict {
     if (INTENS.has(r)) return unsure('subj-unclear'); // "i like really spicy food" or "i like really want it"
     return real('verb');
   }
+  // A stuttered verb is still the verb: "i like like three things".
+  if (l === 'like' && (SUBJ.has(l2) || VERB_LEFT.has(l2))) return real('verb');
   // "it just like stopped": before a finite verb is never a comparison.
   if (l === 'just' && (PAST.has(r) || BE.has(r))) return filler('before-verb');
   if (COMPARE_LEFT.has(l)) return real('comparison');
@@ -259,8 +261,10 @@ function ruleSo(c: Ctx, i: number): Verdict {
   if (/^(think|thought|hope|guess|believe|suppose|if|do|did|does|done|doing|said|say|says|told|even|not|or|why)$/.test(l))
     return real('pro-form');
   if (r === 'on' || r === 'forth' || r === 'called' || r === 'as' || (r === 'to' && r2 === 'speak')) return real('fixed-phrase');
-  // Degree: "so much", "so many", "so good", "so quickly".
-  if (/^(much|many|far|long|little|few|well|often|soon)$/.test(r) || isAdj(r)) return real('degree');
+  // Degree: "so much", "so many", "so good", "so quickly". A stuttered degree word is still one:
+  // "so so much happened".
+  const degree = (x: string) => /^(much|many|far|long|little|few|well|often|soon)$/.test(x) || isAdj(x);
+  if (degree(r) || (r === 'so' && degree(r2))) return real('degree');
   // Purpose: "so that we can".
   if (r === 'that') {
     if (BE.has(r2) || !r2) return unsure('discourse'); // "so that was the plan"
@@ -304,6 +308,9 @@ function ruleAdverb(c: Ctx, i: number, word: 'actually' | 'basically' | 'literal
   // Mid-clause after a subject, modal or be-verb: "i actually think", "it's basically free".
   const mid = SUBJ.has(l) || BE.has(l) || VERB_LEFT.has(l) || l === 'it' || l === 'this' || l === 'that';
   if (mid) return unsure(word === 'literally' ? 'intensifier' : 'mid-clause');
+  // After a filler but before an adjective or participle it may be the degree word it looks like:
+  // "we were like basically done" (= practically done). The "like" is the filler there.
+  if (stackL && !stackR && (isAdj(r) || PAST.has(r))) return unsure('intensifier');
   if (stackR || stackL) return filler('stacked');
   if (!l || c.hb[i] || CONJ.has(l) || l === 'so' || l === 'okay' || l === 'well' || l === 'yeah' || l === 'no') return unsure('opener');
   if (!r) return unsure('sentence-end'); // "it works actually"
@@ -340,6 +347,8 @@ function ruleIMean(c: Ctx, i: number): Verdict {
   return unsure('repair'); // "i mean the second one": a self-repair, often meaningful
 }
 
+/** Words after "you know" that carry on talking rather than name its object. */
+const HABIT_NEXT = set('like so basically literally actually i mean kind sort kinda sorta right well oh yeah okay just um uh');
 const YK_REAL_LEFT = set(
   "do did does don't didn't doesn't if would will could should might as what which how now all everyone people who whom whether someone anyone everything let that i'd we'd won't can can't",
 );
@@ -364,6 +373,10 @@ function ruleYouKnow(c: Ctx, i: number): Verdict {
   if (l === 'like' || l === 'basically' || l === 'literally' || l === 'actually' || (l === 'of' && (l2 === 'kind' || l2 === 'sort')) || l === 'kinda')
     return filler('stacked');
   if (/^(with|to|for|of|in|on|at|from|about|into)$/.test(l) && r) return unsure('prep-before', 1); // "talked to you know the client"
+  // Before a word that can't start a clause or a complement, it's most likely the verb and its
+  // object: "you know python, you know java". Locked: a burst of those is a list, not a tic.
+  if (r && !CLAUSE_SUBJ.has(r) && !DET.has(r) && !DEMO.has(r) && !CONJ.has(r) && !INTENS.has(r) && !isAdj(r) && !PAST.has(r) && !BE.has(r) && !isNum(r) && !HABIT_NEXT.has(r))
+    return unsure('yk-object');
   if (!l || c.hb[i] || CONJ.has(l) || l === 'so' || l === 'okay' || l === 'well') return unsure('opener-yk'); // "you know i think"
   if (!r) return unsure('tag'); // "it was hard you know"
   if (CLAUSE_SUBJ.has(r)) return unsure('new-clause', 1); // "it was hard you know we had no budget"

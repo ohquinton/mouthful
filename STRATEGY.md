@@ -5,8 +5,12 @@ Written after a full read of the codebase. Quinton asked for blunt, ambitious fe
 
 ## What Mouthful is for
 
-Help people speak better out loud for a real moment: **fewer filler words, steadier pace, better
-emphasis, clearer articulation**, and knowing what they'll say. Articulation here means clear and fluent,
+Help people, many of them speaking English as a second language, speak better out loud: **clearer
+articulation, fewer filler words, steadier pace, better emphasis, a wider vocabulary in the subjects they
+need**, and knowing what they'll say. Tagline: "Find the words. Say them clearly." The promise is broad
+(interviews, presentations, everyday English practice, vocabulary by subject); the store listing still leads
+with one concrete moment, because a new app wins by being sharper, not broader (ELSA, Stimuler and BoldVoice
+own "improve your English"). Articulation here means clear and fluent,
 never "sounding native" (principle 1: we measure what the phone heard, not pronunciation). Glide (words ink in as you speak) is the core mechanic and
 the marketing asset: a 7-second screen recording of it explains the app.
 
@@ -107,11 +111,17 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
   6. brand-namer: round 2 from marketing's direction (docs/DILEMMAS.md #1) (running).
   6b. One Minute (docs/briefs/one-minute.md): after habits.ts merges, speech-engine builds `engine/minute.ts` (Flow), then mobile-engineer replaces Free talk with One Minute behind tester mode.
   6c. mobile-engineer: pre-beta steals: honest billing copy + "Cancel in Settings" on the paywall, rating-prompt timing rule, target-length lights, Scan Text tip (running).
+  6d. speech-engine: minute.ts free thinking ~8 s + `timeToFirstWord` in the summary and trend (DILEMMAS #15); then mobile-engineer: show "You started after N s" on the One Minute Tape with its coaching line.
+  6e. mobile-engineer: target length per DILEMMAS #16 (no per-part lights; whole-answer target in the final run-through; paste-time "runs about 3:10" warning; custom target field on scripts).
+  6f. main session: rename to SaidClearly in src/brand.ts once brand-namer clears it.
+  6g. mobile-engineer: onboarding redesign (docs/briefs/onboarding-redesign.md). The S0 mic-denied trap first, then the date, then the copy.
   7. product-lead: emphasis coaching brief (third core goal), ready for after the beta gate.
   8. design-ux: onboarding critique and redesign brief (first 60 seconds), then a full visual pass once it runs on the iPhone.
 - **Then:** mobile-engineer suppresses "Pick up from…" and pause counting while re-reading (uses the new field); logs a tapped word later inked by backfill as a correction only once; investigates the pre-existing "A network error occurred." on the web Day 1 screen. Then qa-critic attacks the resync again.
 - **Open decision (name):** docs/NAME-CHECK.md. US risk medium (Foundry One's "Mouthful: Voice to To-Do List", Education, since March 2026). Keep Mouthful for the beta; decide before any branding spend or public launch. Name lives only in src/brand.ts.
 - **Then:** the Mac. Xcode is installed on Quinton's MacBook Air (M2). Check the Xcode/macOS that Expo SDK 58 needs, clone the private repo, `npx expo run:ios --device` with a free Apple ID (7-day signing), rebuild for Sentry's native code. Apple Developer signup still pending.
+
+**Polish list** (after launch-critical work; never block new building on these): Drop mascot pilot in Rive; quiet animations from docs/design/ANIMATION.md; App Store slide fixes (sentence-case pack titles, icon amber vs cursor colour); privacy policy and site text to say SaidClearly; Taste-rule pass over existing screens.
 
 ## Wave 4 backlog (qa-critic, 2026-10-27: no S0/S1; fix the S2s before the phone beta)
 
