@@ -441,12 +441,47 @@ function caughtUp(c: Case, want: WordStatus[], t: number): boolean {
   return a.next === upto && code(a.status.slice(0, upto)) === code(want.slice(0, upto));
 }
 
+// When a jump ahead is allowed and how long it may take (qa-critic's findings, section 10). A copy
+// of the spec, so the test doesn't trust the code:
+//   - The recogniser may still rewrite the last 2 words, so a jump waits until the words it rests
+//     on have 2 more after them (SPEC_SETTLE), unless they reach the end of the passage.
+//   - A jump past the reader's sentence and the next one is far: it needs 2 more words read on
+//     past its anchor (SPEC_CARRY_ON), in case the anchor is an aside quoting a later line.
+//   - A jump into the last 8 words of the passage (within the last sentence) finishes the read, so
+//     it holds unless the reader was already in the last sentence, or was in the one before and
+//     picked up at the start of the last one.
+const SPEC_SETTLE = 2;
+const SPEC_CARRY_ON = 2;
+const SPEC_ENDGAME = 8;
+
+const sentenceIndex = (p: PassageWord[], k: number) => sentenceRanges(p).findIndex(([s, e]) => k >= s && k < e);
+const skipStart = (c: Case) => c.said.indexOf(false);
+const isFarJump = (c: Case) => sentenceIndex(c.passage, c.resume!.passage) > sentenceIndex(c.passage, skipStart(c)) + 1;
+function holdsAtEnd(c: Case): boolean {
+  const rs = sentenceRanges(c.passage);
+  const n = c.passage.length;
+  const finalStart = rs[rs.length - 1][0];
+  const penultStart = rs.length > 1 ? rs[rs.length - 2][0] : 0;
+  const k = c.resume!.passage;
+  const ptr = skipStart(c);
+  return k >= Math.max(finalStart, n - SPEC_ENDGAME) && ptr <= finalStart && !(k === finalStart && ptr >= penultStart);
+}
+/** Resumed words Glide may need before it has caught up. */
+const catchUpWithin = (c: Case) => sureAfter(c) + SPEC_SETTLE + (isFarJump(c) ? SPEC_CARRY_ON : 0);
+
 const RESYNC_HISTOGRAM: Record<string, number> = {};
 
 function skipFailures(cases: Case[]) {
   const fails: string[] = [];
   for (const c0 of cases) {
     const got = align(c0.passage, c0.heard).status;
+    if (holdsAtEnd(c0)) {
+      // Held: nothing after the pointer is claimed, and the session doesn't end itself.
+      const a = align(c0.passage, c0.heard);
+      const fg = got.filter((s, k) => s === 'read' && !c0.said[k]).length;
+      if (a.done || fg || a.next > c0.resume!.passage) fails.push(`${c0.label}: should hold at the end, got ${code(got)}`);
+      continue;
+    }
     const c = truthFor(c0, got);
     const want = expected(c);
     if (code(got) !== code(want)) {
@@ -455,13 +490,13 @@ function skipFailures(cases: Case[]) {
   got  ${code(got)}`);
       continue;
     }
-    const sure = sureAfter(c);
+    const within = catchUpWithin(c);
     let t = 1;
-    while (t < sure && !caughtUp(c, want, t)) t++;
-    const bucket = t <= 3 ? '1-3' : t <= 5 ? '4-5' : t <= 8 ? '6-8' : '9+';
+    while (t < within && !caughtUp(c, want, t)) t++;
+    const bucket = t <= 3 ? '1-3' : t <= 5 ? '4-5' : t <= 7 ? '6-7' : '8+';
     RESYNC_HISTOGRAM[bucket] = (RESYNC_HISTOGRAM[bucket] ?? 0) + 1;
-    if (!caughtUp(c, want, Math.min(sure, c.passage.length - c.resume!.passage))) {
-      fails.push(`${c.label}: not caught up after ${sure} words`);
+    if (!caughtUp(c, want, Math.min(within, c.passage.length - c.resume!.passage))) {
+      fails.push(`${c.label}: not caught up after ${within} words`);
     }
   }
   return fails;
@@ -499,16 +534,19 @@ describe('2. skips', () => {
     expect(summary(skipFailures(SENTENCE_SKIPS))).toEqual(NONE);
   });
 
-  it('resyncs within 3 words whenever the reader resumes on words it can be sure of', () => {
-    const cases = [...SKIPS, ...SENTENCE_SKIPS];
+  // Was "within 3 words". Since qa-critic's findings a jump also waits for the recogniser to
+  // settle (2 words) and, when far, for 2 words read on past the anchor: 5 words near, 7 far.
+  it('resyncs within 5 words (7 past the next sentence) whenever the reader resumes on words it can be sure of', () => {
+    const cases = [...SKIPS, ...SENTENCE_SKIPS].filter((c) => !holdsAtEnd(c));
     const exact = cases.filter((c) => sureAfter(c) === 3);
     expect(summary(skipFailures(exact))).toEqual(NONE);
     for (const k of Object.keys(RESYNC_HISTOGRAM)) delete RESYNC_HISTOGRAM[k];
     skipFailures(cases);
     const total = Object.values(RESYNC_HISTOGRAM).reduce((a, b) => a + b, 0);
     const rows = ['resumed words until caught up | skips'];
-    for (const b of ['1-3', '4-5', '6-8', '9+']) rows.push(`${b} | ${RESYNC_HISTOGRAM[b] ?? 0} (${((100 * (RESYNC_HISTOGRAM[b] ?? 0)) / total).toFixed(1)}%)`);
-    rows.push(`${exact.length} of ${cases.length} skips resume on 3 words Glide can be sure of; all of those are caught up by the 3rd word`);
+    for (const b of ['1-3', '4-5', '6-7', '8+']) rows.push(`${b} | ${RESYNC_HISTOGRAM[b] ?? 0} (${((100 * (RESYNC_HISTOGRAM[b] ?? 0)) / total).toFixed(1)}%)`);
+    const far = exact.filter(isFarJump).length;
+    rows.push(`${exact.length} of ${cases.length} skips resume on 3 words Glide can be sure of; all are caught up by the 5th word (${far} far ones by the 7th)`);
     console.log(rows.join('\n'));
   });
 });
@@ -865,5 +903,340 @@ describe('9. determinism', () => {
     for (const c of [...cases].reverse()) align(c.passage, c.heard.slice(0, 7));
     const again = cases.map((c) => JSON.stringify(align(preparePassage(c.passage.map((w) => w.display).join(' ')), [...c.heard])));
     expect(again).toEqual(first);
+  });
+});
+
+// ------------------------------------------------------------------------------------------------
+// 10. qa-critic's findings on the first resync. Each block started as a failing test; the
+// generators are ports of qa-critic's repro scripts with a fixed seed (same numbers every run).
+
+/** Same linear congruential generator qa-critic used, so the case sets match its numbers. */
+const seeded = (seed: number) => () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+const QA_TEXTS: Text[] = [...PASSAGES.map((p) => ({ id: p.id, text: p.text })), ...SCRIPTS];
+const QA_FUZZ_TEXTS: Text[] = [
+  ...PASSAGES.map((p) => ({ id: p.id, text: p.text })),
+  ...WORD_PACKS.flatMap((pack) => pack.passages.map((p, i) => ({ id: `w.${pack.id}.${i}`, text: p.text }))),
+  ...SCRIPTS,
+];
+const skippedWordsOf = (p: PassageWord[], a: Alignment) => p.filter((_, i) => a.status[i] === 'skipped').map((w) => w.display);
+const garble = (w: string) => (w.length > 3 ? w.slice(0, -2) + 'zq' : 'zz');
+
+describe('10a. a refrain never finishes the read early', () => {
+  const REFRAIN =
+    'Thank you all for coming in today. This quarter we moved the billing system to the new platform and cut support tickets by a third. ' +
+    'Next quarter we will finish the migration for the last two regions. Thank you all for coming in today.';
+  const p = preparePassage(REFRAIN);
+  const opening = 'thank you all for coming in today this quarter we moved the billing system to the new platform';
+
+  it('"sorry, let me start again" + the opening line (also the closing line) is a re-read, not a jump to the end', () => {
+    for (const tail of ['sorry let me start again thank you all for coming in today', 'sorry let me start again thank you all for coming in today this quarter']) {
+      const heard = tokenise(`${opening} ${tail}`);
+      for (const h of prefixes(heard)) {
+        const a = align(p, h);
+        expect([h.length, a.done, a.skipped, a.next <= 18]).toEqual([h.length, false, 0, true]);
+      }
+      expect(align(p, heard).next).toBe(18); // still waiting at "and cut support tickets"
+    }
+  });
+
+  it('reading on from the restart finishes cleanly', () => {
+    const a = align(p, tokenise(`${opening} sorry let me start again ${REFRAIN}`));
+    expect(a.done).toBe(true);
+    expect(a.skipped).toBe(0);
+  });
+
+  it('an aside that quotes the closing line never ends the session', () => {
+    const q = preparePassage('I want this job because it combines health and software. I spent four years as a nurse. That is why I want this job.');
+    const a = align(q, tokenise('i want this job because it combines health and software i spent four years oh and why i want this job'));
+    expect(a.done).toBe(false);
+    expect(a.status.slice(-5)).not.toContain('read');
+    const r = preparePassage('I want this job because it combines health and software. I spent four years as a nurse in a busy ward. That is why I want this job.');
+    const b = align(r, tokenise('i want this job because it combines health and software i spent four years as a i want this job'));
+    expect(b.done).toBe(false);
+    expect(b.skipped).toBe(0);
+  });
+
+  it('a real skip in the second-last sentence, then the whole last sentence, still finishes', () => {
+    const q = preparePassage('We cut costs by ten percent this year. The board asked for more detail on hiring. Thanks for listening.');
+    const a = align(q, tokenise('we cut costs by ten percent this year the board asked for more detail sorry thanks for listening'));
+    expect(a.done).toBe(true);
+    expect(skippedWordsOf(q, a)).toEqual(['on', 'hiring.']);
+  });
+
+  it('in every text, quoting the last sentence from the first half never finishes the read', () => {
+    const fails: string[] = [];
+    for (const t of [...BUILT_IN, ...SCRIPTS]) {
+      const q = preparePassage(t.text);
+      const rs = sentenceRanges(q);
+      if (rs.length < 3) continue;
+      const [fs, fe] = rs[rs.length - 1];
+      const keys = keysOf(q);
+      for (let cut = 3; cut < rs[rs.length - 2][0]; cut += 4) {
+        const heard = [...keys.slice(0, cut), 'sorry', ...keys.slice(fs, fe)];
+        for (const h of prefixes(heard)) {
+          if (align(q, h).done) {
+            fails.push(`${t.id} cut ${cut} @${h.length}: done`);
+            break;
+          }
+        }
+      }
+    }
+    expect(summary(fails)).toEqual(NONE);
+  });
+});
+
+describe('10b. stutters never turn read words red', () => {
+  it('night-shift: "by midnight lights were back back the monitors" leaves only "the" red', () => {
+    const q = preparePassage(
+      'Not often, she said, but often enough that we know what to do. By midnight the lights were back, the monitors were humming, and the coffee in the break room was, unfortunately, still terrible.',
+    );
+    const h = tokenise('not often she said but often enough that we know what to do by midnight lights were back back the monitors were humming');
+    expect(skippedWordsOf(q, legacyAlign(q, h))).toEqual(['the']);
+    expect(skippedWordsOf(q, align(q, h))).toEqual(['the']);
+  });
+
+  it('light noise (drops, mishearings, stutters, habit words, 3-word restarts): never more said words red than before, in any run', () => {
+    // qa-critic's generator: 150 runs per text, 3,900 in all.
+    const rnd = seeded(9);
+    const OFFW = ['banana', 'sorry', 'wait', 'um', 'like', 'actually', 'hmm', 'okay', 'well', 'right'];
+    let cases = 0;
+    let better = 0;
+    let fgNew = 0;
+    let fgOld = 0;
+    const worse: string[] = [];
+    for (const t of QA_FUZZ_TEXTS) {
+      const q = preparePassage(t.text);
+      const keys = keysOf(q);
+      for (let rep = 0; rep < 150; rep++) {
+        const heard: string[] = [];
+        const said = keys.map(() => false);
+        for (let k = 0; k < keys.length; k++) {
+          const r = rnd();
+          if (r < 0.04) continue; // dropped
+          if (r < 0.08) {
+            heard.push('zz' + keys[k]); // misheard
+            continue;
+          }
+          heard.push(keys[k]);
+          said[k] = true;
+          const r2 = rnd();
+          if (r2 < 0.05) heard.push(keys[k]); // stutter
+          else if (r2 < 0.12) heard.push(OFFW[Math.floor(rnd() * OFFW.length)]);
+          else if (r2 < 0.15 && k > 2) heard.push(keys[k - 2], keys[k - 1], keys[k]); // restart the phrase
+        }
+        cases++;
+        const n = align(q, heard);
+        const l = legacyAlign(q, heard);
+        const red = (a: Alignment) => a.status.filter((s, k) => s !== 'read' && said[k]).length;
+        const fg = (a: Alignment) => a.status.filter((s, k) => s === 'read' && !said[k]).length;
+        fgNew += fg(n);
+        fgOld += fg(l);
+        if (red(n) > red(l)) worse.push(`${t.id} #${rep}: ${red(l)} → ${red(n)}\n  heard: ${heard.join(' ')}`);
+        if (red(n) < red(l)) better++;
+      }
+    }
+    console.log(`light-noise fuzz: ${cases} runs; more said words red than before in ${worse.length}, fewer in ${better}; false greens ${fgOld} → ${fgNew}`);
+    expect(cases).toBe(3900);
+    expect(summary(worse)).toEqual(NONE);
+    expect(fgNew).toBeLessThanOrEqual(fgOld);
+  });
+});
+
+describe('10c. one interim revision never undoes a resync', () => {
+  it('why-this-job: "… two interests i know how much thyme clinician loose" keeps the cursor where it was', () => {
+    const t = SCRIPTS.find((s) => s.id === 'why-this-job')!;
+    const q = preparePassage(t.text);
+    const keys = keysOf(q);
+    const heard = [...keys.slice(0, 12), ...keys.slice(24)];
+    const seq = [heard.slice(0, 19), [...heard.slice(0, 16), 'thyme', 'clinician', 'loose'], heard.slice(0, 20)].map((h) => align(q, h).next);
+    for (let i = 1; i < seq.length; i++) expect([seq, seq[i - 1] - seq[i] <= 4]).toEqual([seq, true]);
+  });
+
+  it('after a 12-word skip, garbling the last 1–3 words retreats the cursor more than 4 words no more often than before', () => {
+    const count = (f: typeof align) => {
+      let total = 0;
+      let big = 0;
+      let worst = 0;
+      for (const t of QA_TEXTS) {
+        const q = preparePassage(t.text);
+        const keys = keysOf(q);
+        for (const at of [12, 30]) {
+          if (keys.length < at + 40) continue;
+          const heard = [...keys.slice(0, at), ...keys.slice(at + 12)];
+          for (let i = at + 1; i < at + 10; i++) {
+            for (let k = 1; k <= 3; k++) {
+              const good = f(q, heard.slice(0, i));
+              const bad = f(q, heard.slice(0, i).map((w, j) => (j >= i - k ? garble(w) : w)));
+              let lost = 0;
+              for (let x = 0; x < q.length; x++) if (good.status[x] !== 'pending' && bad.status[x] === 'pending') lost++;
+              total++;
+              if (lost > 4) big++;
+              worst = Math.max(worst, lost);
+            }
+          }
+        }
+      }
+      return { total, big, worst };
+    };
+    const before = count(legacyAlign);
+    const after = count(align);
+    console.log(`garbled tail after a skip: ${after.total} cases; retreats over 4 words ${before.big} → ${after.big}, worst ${before.worst} → ${after.worst}`);
+    expect(after.total).toBe(621);
+    expect(after.big).toBeLessThanOrEqual(before.big);
+  });
+});
+
+describe('10d. asides that quote later words', () => {
+  const T = 'The project starts in March. We hired two engineers for the launch. The budget for the project is fixed. Sales will grow in the spring.';
+
+  it('"i hope sales will grow this year" does not ink the last sentence or move the cursor there', () => {
+    const q = preparePassage(T);
+    const heard = tokenise('the project starts in march i hope sales will grow this year we hired two engineers');
+    for (const h of prefixes(heard)) expect([h.length, align(q, h).next <= 9]).toEqual([h.length, true]);
+    const a = align(q, heard);
+    expect(a.next).toBe(9);
+    expect(a.skipped).toBe(0);
+    expect(a.status.slice(20)).not.toContain('read');
+  });
+
+  it('asides of 3 later words, then back to where the reader was: far ones never ink or leap', () => {
+    // qa-critic's generator: "sorry wait <3 words from 8, 15 or 25 ahead> no", then 6 words from where they were.
+    const QA_STOP = new Set('a an the and or but if so of to in on at by for with from is are was were we i you it this that our my be have has had'.split(' '));
+    const counts = (f: typeof align) => {
+      const out = { cases: 0, falseGreen: 0, leap: 0, tenAhead: 0, far: 0, farFalseGreen: 0, farLeap: 0 };
+      for (const t of QA_TEXTS) {
+        const q = preparePassage(t.text);
+        const keys = keysOf(q);
+        const n = q.length;
+        const rs = sentenceRanges(q);
+        const sentOf = (k: number) => rs.findIndex(([s, e]) => k >= s && k < e);
+        for (let pos = 5; pos < n - 30; pos += 3) {
+          for (const d of [8, 15, 25]) {
+            const c = pos + d;
+            if (c + 3 > n) continue;
+            const chunk = keys.slice(c, c + 3);
+            if (chunk.every((w) => QA_STOP.has(w))) continue;
+            const stopAt = Math.min(pos + 6, c);
+            const heard = [...keys.slice(0, pos), 'sorry', 'wait', ...chunk, 'no', ...keys.slice(pos, stopAt)];
+            out.cases++;
+            let maxNext = 0;
+            for (const h of prefixes(heard)) maxNext = Math.max(maxNext, f(q, h).next);
+            const a = f(q, heard);
+            const fg = [c, c + 1, c + 2].filter((k) => a.status[k] === 'read' && k >= stopAt).length;
+            const far = sentOf(c) > sentOf(pos) + 1; // beyond the reader's sentence and the next
+            if (far) out.far++;
+            if (fg) out.falseGreen++;
+            if (maxNext > stopAt + 2) out.leap++;
+            if (a.next - stopAt >= 10) out.tenAhead++;
+            if (far && fg) out.farFalseGreen++;
+            if (far && maxNext > stopAt + 2) out.farLeap++;
+          }
+        }
+      }
+      return out;
+    };
+    const before = counts(legacyAlign);
+    const after = counts(align);
+    console.log(`asides (legacy): ${JSON.stringify(before)}\nasides (now):    ${JSON.stringify(after)}`);
+    expect(after.cases).toBe(720);
+    expect(after.farFalseGreen).toBe(0);
+    expect(after.farLeap).toBe(0);
+  });
+});
+
+describe('10e. performance on long scripts', () => {
+  it('a 500-word script with a 150-word ramble stays under 1 ms per call, worst case', () => {
+    const rnd = seeded(5);
+    const all = keysOf(preparePassage([...PASSAGES.map((x) => x.text), ...SCRIPTS.map((s) => s.text)].join(' ')));
+    const rows = ['words | transcript | heard | worst call ms (before → after)'];
+    for (const [N, R] of [
+      [300, 100],
+      [500, 150],
+    ]) {
+      const q = preparePassage(all.slice(0, N).join(' '));
+      const k = keysOf(q);
+      const vocab = [...new Set(k)];
+      const ramble = () => Array.from({ length: R }, () => vocab[Math.floor(rnd() * vocab.length)]);
+      const shapes: [string, string[]][] = [
+        [`ramble ${R} at 50`, [...k.slice(0, 50), ...ramble(), ...k.slice(50)]],
+        [`ramble ${R} at the end`, [...k.slice(0, N - 20), ...ramble()]],
+        ['read twice', [...k, ...k]],
+        ['wrong passage from word 10', [...k.slice(0, 10), ...ramble(), ...ramble()]],
+      ];
+      for (const [label, heard] of shapes) {
+        // every 7th prefix, longest first; each call's time is its best of 5 runs (the rest is noise)
+        const worst = (f: typeof align) => {
+          let w = 0;
+          for (let len = heard.length; len > 0; len -= 7) {
+            const h = heard.slice(0, len);
+            let m = Infinity;
+            for (let rep = 0; rep < 5; rep++) {
+              const t0 = performance.now();
+              f(q, h);
+              m = Math.min(m, performance.now() - t0);
+            }
+            w = Math.max(w, m);
+          }
+          return w;
+        };
+        worst(align); // warm up
+        const b = worst(legacyAlign);
+        const a = worst(align);
+        rows.push(`${N} | ${label} | ${heard.length} | ${b.toFixed(3)} → ${a.toFixed(3)}`);
+        expect([N, label, a < 1]).toEqual([N, label, true]);
+      }
+    }
+    console.log(rows.join('\n'));
+  });
+});
+
+describe('10f. rereadingAt: where a re-read is, for the session screen', () => {
+  const p = preparePassage(PASSAGES.find((x) => x.id === 'night-shift')!.text);
+  const keys = keysOf(p);
+  const rs = sentenceRanges(p);
+
+  it('is absent on a straight read and in Free talk', () => {
+    for (const h of prefixes(keys)) expect('rereadingAt' in align(p, h)).toBe(false);
+    expect('rereadingAt' in align([], tokenise('so um we shipped it'))).toBe(false);
+  });
+
+  it('follows a re-read word by word and clears when it reaches the pointer', () => {
+    const [s1, e1] = rs[1];
+    const heard = [...keys.slice(0, e1), ...keys.slice(s1, e1), ...keys.slice(e1, e1 + 3)];
+    const seen = prefixes(heard).map((h) => align(p, h).rereadingAt);
+    const during = seen.slice(e1, e1 + (e1 - s1) - 1).filter((x): x is number => x !== undefined);
+    expect(during.length).toBeGreaterThan(3);
+    for (let i = 1; i < during.length; i++) expect(during[i]).toBeGreaterThan(during[i - 1]);
+    expect(during.every((k) => k >= s1 && k < e1)).toBe(true);
+    expect(seen[seen.length - 1]).toBeUndefined(); // back at the pointer and reading on
+  });
+
+  it('lets the session screen tell a backfill re-read from a stall', () => {
+    // Skip sentence 2, read 5 words of sentence 3, go back and read sentence 2, then on (qa-critic's a11).
+    const [a2, b2] = rs[1];
+    const heard = [...keys.slice(0, a2), ...keys.slice(b2, b2 + 5), ...keys.slice(a2, b2), ...keys.slice(b2)];
+    // What the screen does with the contract: the pointer or rereadingAt moving is progress, so
+    // neither the "Pick up from" nudge (6 s) nor a mid-sentence pause (2 s) fires during the re-read.
+    const sim = (useField: boolean) => {
+      let lastNext = 0;
+      let lastRe: number | undefined;
+      let lastMove = 0;
+      let stalls = 0;
+      for (let i = 1; i <= heard.length; i++) {
+        const t = i * 400;
+        const a = align(p, heard.slice(0, i));
+        const moved = a.next !== lastNext || (useField && a.rereadingAt !== lastRe);
+        if (moved) {
+          if (t - lastMove > 2000) stalls++;
+          lastMove = t;
+        }
+        lastNext = a.next;
+        lastRe = a.rereadingAt;
+      }
+      return stalls;
+    };
+    expect(sim(false)).toBeGreaterThan(0); // the stall the screen sees today
+    expect(sim(true)).toBe(0);
+    expect(align(p, heard).skipped).toBe(0);
   });
 });
