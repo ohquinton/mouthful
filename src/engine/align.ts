@@ -41,6 +41,7 @@ const HESITATIONS = new Set(['um', 'umm', 'uh', 'uhh', 'uhm', 'erm', 'er', 'ah',
 // so they're reported on the Tape and never scored, while reading or in free talk.
 const HABIT_WORDS = new Set(['like', 'basically', 'actually', 'literally', 'so', 'right', 'okay', 'anyway']);
 const HABIT_PHRASES = new Set(['you know', 'i mean', 'kind of', 'sort of', 'you see']);
+const PHRASE_START = new Set([...HABIT_PHRASES].map((p) => p.split(' ')[0]));
 
 // Some words the recogniser writes as digits or symbols. Map the common ones back.
 const NUMBER_WORDS: Record<string, string> = {
@@ -123,18 +124,25 @@ export function wordsMatch(heard: string, expected: string): boolean {
 // window behind, and without help every word after that turns red. So when several words in a
 // row don't line up, Glide looks for those words elsewhere in the passage and picks up there:
 //   - Trigger: RESYNC_AFTER unconfirmed words (2 if they are the passage's last words).
-//     Hesitations and habit words never count (principle 7). "Unconfirmed" = since the last two
-//     words that matched one after the other, so a stray "the" that lands nearby can't hide being
-//     lost. A pair right after unconfirmed words is checked against the rest of the passage first.
+//     Hesitations, habit words and stutters (the same word twice in a row) never count (principle
+//     7). "Unconfirmed" = since the last two words that matched one after the other, so a stray
+//     "the" that lands nearby can't hide being lost. A pair right after unconfirmed words is
+//     checked against the rest of the passage first. Words a confirmed pair inked are never undone.
 //   - Anchor: the earliest run of heard words that matches the passage in order, with at least one
 //     word that isn't a stopword. Two words are enough if that pair appears once in the whole
 //     passage and sits before the pointer or within the current sentence and the next two. Further
 //     ahead, or if the pair appears more than once, it needs three or more words until one copy is
-//     left; identical copies of MAX_ANCHOR words go to the nearest one ahead.
+//     left. Identical copies of MAX_ANCHOR words go to the nearest one ahead, unless one is behind
+//     the pointer: then Glide keeps listening until they differ (starting again beats a leap).
 //   - Ahead: the gap is marked skipped (red, so the reader can tap it: principle 2) and reading
-//     carries on from the anchor. Words before the anchor that matched by chance are undone.
+//     carries on from the anchor. Words before the anchor that matched by chance are undone. A jump
+//     waits until the words it rests on are SETTLE words from the end of the transcript (interim
+//     revisions); past the next sentence it also needs CARRY_ON words read on (asides that quote a
+//     later line). Into the last sentence it holds, unless the reader was already there or picked
+//     up at its first word from the sentence before: those words are off-script, nothing inks and
+//     the session doesn't finish itself (a refrain, the closing line quoted early).
 //   - Behind: a re-read. The pointer stays put; re-read words ink any red word they cover
-//     (backfill) and the pointer moves on once the re-read reaches it.
+//     (backfill) and the pointer moves on once the re-read reaches it. `rereadingAt` reports it.
 // Separately, a jump onto a stopword ("the", "and") only counts once the next word carries on from
 // it, so a stray "the" never paints the words before it red.
 // Everything is recomputed from the full transcript on every call: pure, so a revised interim
@@ -165,14 +173,15 @@ const CARRY_ON = 2;
 /** Identical copies this long are a tie, broken toward the nearest one ahead (unless one is behind). */
 const MAX_ANCHOR = 6;
 /** The recogniser still rewrites its last few words. A jump ahead waits until the words it rests
- *  on are at least this many words from the end of the transcript, so one revision can't undo it. */
+ *  on are at least this many words from the end of the transcript, so rewriting the last SETTLE
+ *  words can't undo it. Callers can pass `settled` to align() (e.g. heard.length once the
+ *  session has ended and nothing more will be rewritten). */
 const SETTLE = 2;
-/** A jump landing this close to the end (in the last sentence) would finish the read: see findAnchor. */
-const ENDGAME = 8;
 /** Anchor starts tried per word: the latest words of a long stuck run (bounds the search). */
 const MAX_STARTS = 24;
 
 type Matches = { at: number[]; bits: Uint8Array };
+const NO_BITS = new Uint8Array(1);
 type PassageIndex = {
   sentEnd: Int32Array;
   stop: Uint8Array;
@@ -261,7 +270,7 @@ const PHRASE2 = 6; // its second word
 const REPEAT = 7; // "the the"
 const OFF = 8; // off-script
 
-type Anchor = { h: number; k: number; back: boolean };
+type Anchor = { h: number; k: number; back: boolean; hold?: boolean };
 
 /**
  * What the anchor search remembers about each start in the current run (indexed by position in
@@ -269,7 +278,7 @@ type Anchor = { h: number; k: number; back: boolean };
  * on its own words and the ones after it, so a dead start stays dead and a waiting one picks up
  * where it stopped.
  */
-type Starts = { dead: Uint8Array; cands: (number[] | undefined)[]; len: Int32Array };
+type Starts = { dead: Uint8Array; cands: (number[] | undefined)[]; len: Int32Array; firstWait: number };
 
 function findAnchor(
   p: PassageWord[],
@@ -297,7 +306,8 @@ function findAnchor(
   const bitsAt = (j: number) => matchesOf(p, idx, heard[run[j]]).bits;
 
   const last = run.length - 1;
-  let wait = false; // something may still anchor once more words arrive
+  let wait = -1; // the first start that may still anchor once more words arrive
+  let reachedBy: Int32Array | undefined;
   for (let s = Math.max(0, last - MAX_STARTS); s < last; s++) {
     if (st.dead[s]) continue;
     let cands = st.cands[s];
@@ -337,7 +347,7 @@ function findAnchor(
     st.cands[s] = cands;
     st.len[s] = len;
     if (waiting) {
-      wait = true;
+      if (wait < 0) wait = s;
       continue;
     }
     if (pick < 0 || at[run[s]] === pick) {
@@ -362,34 +372,63 @@ function findAnchor(
       continue;
     }
     if (!back) {
-      // How far the reader has carried on, in order, from the anchor.
-      let ext = len;
-      while (s + ext <= last && pick + ext < n && bitsAt(s + ext)[pick + ext] === 1) ext++;
-      const toEnd = pick + ext >= n; // nothing can follow, so there is nothing to wait for
-      // The end of the passage: a jump there finishes the session at once, so only one that's
-      // plainly honest. Either the reader was already in the last sentence, or they were in the
-      // sentence before and picked up at the start of the last one. Otherwise ("sorry, let me start
-      // again: thank you all…" when the passage ends with its opening line), hold.
-      if (k >= Math.max(idx.finalStart, n - ENDGAME) && ptr <= idx.finalStart && !(k === idx.finalStart && ptr >= idx.penultStart)) {
+      // An anchor at or behind a word this run already matched in order is the reader going back
+      // over it ("block it out but to | out but to notice"), not a jump: it would undo those words.
+      if (!reachedBy) {
+        // Furthest passage word matched in order by run[0..r], built once per call.
+        reachedBy = new Int32Array(run.length);
+        let m = -1;
+        for (let r = 0; r < run.length; r++) {
+          if (kind[run[r]] === FWD && at[run[r]] > m) m = at[run[r]];
+          reachedBy[r] = m;
+        }
+      }
+      // h is run[s] or a word walked back to before it: either way run words before h are run[0..s-1] at most.
+      let rb = s - 1;
+      while (rb >= 0 && run[rb] >= h) rb--;
+      if (rb >= 0 && k <= reachedBy[rb]) {
         st.dead[s] = 1;
         continue;
       }
+      // How far the reader has carried on, in order, from the anchor.
+      // A passage habit word ("say so now") was heard as a habit word, so it isn't in the run.
+      let ext = len;
+      let off = 0;
+      while (s + ext <= last && pick + ext + off < n) {
+        const b = bitsAt(s + ext);
+        const q = pick + ext + off;
+        if (b[q] === 1) ext++;
+        else if (HABIT_WORDS.has(p[q].key) && b[q + 1] === 1) {
+          off++;
+          ext++;
+        } else break;
+      }
+      const toEnd = pick + ext + off >= n; // nothing can follow, so there is nothing to wait for
       // Far ahead (past the next sentence) the anchor may be an aside quoting a later line, so it
       // needs CARRY_ON more words read on past it.
       const need = k >= far ? len + CARRY_ON : len;
       if (ext < need && !toEnd) {
-        if (s + ext > last) wait = true;
-        else st.dead[s] = 1; // the reader went somewhere else
+        if (s + ext <= last) st.dead[s] = 1; // the reader went somewhere else
+        else if (wait < 0) wait = s;
         continue;
       }
       if (!toEnd && run[s + need - 1] >= settled) {
-        wait = true;
+        if (wait < 0) wait = s;
         continue;
+      }
+      // The last sentence: a jump there runs straight to the end and finishes the session, so only
+      // one that's plainly honest. Either the reader was already in the last sentence, or was in
+      // the one before and picked up at the start of the last one. Otherwise (the closing line
+      // quoted early, a refrain, "sorry, let me start again" on a passage that ends with its
+      // opening line) the pointer holds and those words are heard as off-script.
+      if (k >= idx.finalStart && ptr < idx.finalStart && !(k === idx.finalStart && ptr >= idx.penultStart)) {
+        return { h, k, back, hold: true };
       }
     }
     return { h, k, back };
   }
-  return wait ? 'wait' : null;
+  st.firstWait = wait;
+  return wait >= 0 ? 'wait' : null;
 }
 
 /**
@@ -412,7 +451,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
   // to rewind to if a resync reinterprets them.
   let runStart = 0;
   const run: number[] = [];
-  const st: Starts = { dead: new Uint8Array(H), cands: [], len: new Int32Array(H) };
+  const st: Starts = { dead: new Uint8Array(H), cands: [], len: new Int32Array(H), firstWait: -1 };
   const addToRun = (i: number) => {
     st.dead[run.length] = 0;
     st.cands[run.length] = undefined;
@@ -425,12 +464,14 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
   let habitGap = false; // a habit word since the last match: "in, like, to" isn't two words in a row
   let blockedUntil = 0; // words before a resync anchor are off-script
   let pending: Anchor | null = null;
+  let shadow = -1; // held at the end (see findAnchor): the last-sentence word expected next
   let lastAnchor = -1;
   let budget = 8 * H + 64; // rewinds are bounded, whatever the transcript
 
   for (let i = 0; i < H; i++) {
     if (pending && i === pending.h) {
-      if (pending.back) bp = pending.k;
+      if (pending.hold) shadow = pending.k;
+      else if (pending.back) bp = pending.k;
       else {
         next = pending.k;
         bp = -1;
@@ -439,7 +480,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
       prevJumped = false;
       habitGap = false;
       runStart = i;
-      run.length = 0;
+      if (run.length) run.length = 0;
       snapNext = next;
       snapBp = bp;
       snapPrev = prev;
@@ -450,13 +491,27 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
     at[i] = -1;
     held[i] = -1;
     let confirm = false;
+    // Where this word matches the passage, as a lookup (cached per passage and word, so the
+    // lookahead below costs no string comparisons).
+    const mb = n ? matchesOf(passage, idx!, w).bits : NO_BITS;
+    // Held at the end: words that carry on through the last sentence are off-script, never matched
+    // in the lookahead (where they'd ink words the reader skipped). Anything else ends the hold.
+    if (shadow >= 0) {
+      const on = mb[shadow] === 1 ? 1 : mb[shadow + 1] === 1 ? 2 : 0;
+      if (on) {
+        kind[i] = OFF;
+        shadow += on;
+        continue;
+      }
+      if (!HESITATIONS.has(w) && !HABIT_WORDS.has(w)) shadow = -1;
+    }
 
     let match = -1;
     let back = false;
     if (i >= blockedUntil) {
       if (bp >= 0) {
         for (let k = bp; k < Math.min(bp + LOOKAHEAD, next); k++) {
-          if (wordsMatch(w, passage[k].key)) {
+          if (mb[k] === 1) {
             match = k;
             back = true;
             break;
@@ -465,7 +520,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
       }
       if (match < 0) {
         for (let k = next; k < Math.min(next + LOOKAHEAD, n); k++) {
-          if (wordsMatch(w, passage[k].key)) {
+          if (mb[k] === 1) {
             match = k;
             break;
           }
@@ -538,7 +593,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
       prevJumped = jumped;
       if (confirm && !run.length) {
         runStart = i + 1;
-        run.length = 0;
+        if (run.length) run.length = 0;
         snapNext = next;
         snapBp = bp;
         snapPrev = match;
@@ -549,7 +604,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
       // ("and | the project budget" after a skip, not the "the project" inside the window).
       addToRun(i);
     } else {
-      const pair = i + 1 < H && !(pending && pending.h === i + 1) ? `${w} ${heard[i + 1]}` : '';
+      const pair = PHRASE_START.has(w) && i + 1 < H && !(pending && pending.h === i + 1) ? `${w} ${heard[i + 1]}` : '';
       if (pair && HABIT_PHRASES.has(pair)) {
         kind[i] = PHRASE;
         kind[i + 1] = PHRASE2;
@@ -567,11 +622,18 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
         habitGap = true;
         continue;
       }
-      // Repeating a word just read ("the the", "back back") is a stumble, not progress. It never
-      // counts toward a resync or starts an anchor: a stutter is the reader on track.
+      // Repeating a word just read ("the the", "back back") is a stumble, not progress.
       if (next > 0 && w === passage[next - 1].key) {
         kind[i] = REPEAT;
-        continue;
+        // Said twice in a row it's a stutter, the reader on track: it never counts toward a resync.
+        // The words either side of it still aren't two in a row ("team the | the project budget"
+        // may be a stutter, or a skip that resumes on the same word).
+        if (i > 0 && heard[i - 1] === w) {
+          habitGap = true;
+          continue;
+        }
+        // Otherwise ("until the | storm … steadied the lantern") it may be a lost reader's word.
+        if (i >= blockedUntil) addToRun(i);
       } else {
         kind[i] = OFF;
         if (i < blockedUntil) continue;
@@ -586,10 +648,14 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
         : null;
     const anchor = found === 'wait' ? null : found;
     if (!anchor || (confirm && (kind[anchor.h] === FWD || kind[anchor.h] === BACK))) {
-      // Confirm the pair, unless the words before it might still fit better elsewhere.
-      if (confirm && found !== 'wait') {
+      // Confirm the pair, unless the words before it might still fit better elsewhere. The one
+      // exception: the only start still waiting is the pair itself, and the one place it fits is
+      // where it already matched ("often | she", waiting only for a third word). That can only agree.
+      const w0 = st.firstWait;
+      const agrees = w0 === run.length - 2 && st.cands[w0]?.length === 1 && st.cands[w0]![0] === at[run[w0]];
+      if (confirm && (found !== 'wait' || agrees)) {
         runStart = i + 1;
-        run.length = 0;
+        if (run.length) run.length = 0;
         snapNext = next;
         snapBp = bp;
         snapPrev = prev;
@@ -604,11 +670,12 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
     // Ahead: words before the anchor matched by chance, so they are undone. Behind (a re-read):
     // they stand, so the pointer never moves back.
     blockedUntil = anchor.back ? runStart : anchor.h;
+    shadow = -1;
     next = snapNext;
     bp = snapBp;
     prev = snapPrev;
     prevJumped = snapJumped;
-    run.length = 0;
+    if (run.length) run.length = 0;
     i = runStart - 1;
   }
 
