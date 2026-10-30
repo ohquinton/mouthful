@@ -91,6 +91,8 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
 
 **Competitors (2026-10-29, docs/COMPETITORS.md):** Perora (free, nearly our feature set) and Sayglide (free voice-follow) mean follow-the-voice and on-device aren't moats. Our edge: the dated moment plan, honest recognition, per-context delivery feedback, honest pricing. Open dilemmas: docs/DILEMMAS.md.
 
+**Review mining (2026-10-29, docs/MARKET-RESEARCH.md):** billing is the category's #1 pain (621 of 2,863 reviews); memorising to a date is the strongest love signal; only 14 reviews mention interviews (presentations 49, lines 38), so interview demand is unproven: recruit presenters for the beta too and don't lock the headline to "interview".
+
 ## Resume here (paused 2026-10-28)
 
 - **In progress:** speech-engine fixing qa-critic's 6 resync findings (S1 refrain "start again" jumps to the closing line and auto-finishes; S1 stutter after a dropped word turns said words red; S2 one interim revision makes the cursor retreat up to 19 words; S2 asides quoting later words pull the cursor ahead; S2 3.6–5.3 ms per call on 300–500-word scripts, target ≤1 ms; plus an additive `align` field so the screen can tell a re-read). Stopped mid-way. WIP (failing tests + partial align.ts) is on branch `wip/resync-qa-fixes` (GitHub), with qa-critic's repro scripts in `wip/qa-resync/`. Restart speech-engine from that branch with the same brief; don't merge the WIP as is.
@@ -103,6 +105,7 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
   5. speech-engine: beta sheet carries listener restarts/glitches (`reviewRow` in review.ts) + exact steadiness timing via heard-token counts if the beta shows it matters.
   6. brand-namer: round 2 from marketing's direction (docs/DILEMMAS.md #1) (running).
   6b. One Minute (docs/briefs/one-minute.md): after habits.ts merges, speech-engine builds `engine/minute.ts` (Flow), then mobile-engineer replaces Free talk with One Minute behind tester mode.
+  6c. mobile-engineer: pre-beta steals: honest billing copy + "Cancel in Settings" on the paywall, rating-prompt timing rule, target-length lights, Scan Text tip (running).
   7. product-lead: emphasis coaching brief (third core goal), ready for after the beta gate.
   8. design-ux: onboarding critique and redesign brief (first 60 seconds), then a full visual pass once it runs on the iPhone.
 - **Then:** mobile-engineer suppresses "Pick up from…" and pause counting while re-reading (uses the new field); logs a tapped word later inked by backfill as a correction only once; investigates the pre-existing "A network error occurred." on the web Day 1 screen. Then qa-critic attacks the resync again.

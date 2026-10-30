@@ -282,3 +282,7 @@ but couldn't trigger it here). Never present a plausible finding as confirmed.
 - [ ] Did I list what I couldn't check?
 - [ ] Did I avoid suggesting large rewrites when a small fix exists?
 - [ ] Am I reporting taste as a bug? (That's S3 at most.)
+
+## Web harness on Windows
+
+Serving a web export from a long path (e.g. the scratchpad) breaks font loading: paths over 260 characters make `os.path.exists` fail, the SPA fallback serves index.html for the font files, and Chrome reports "A network error occurred." (OTS parsing error). Use `\\?\` long-path support in the server, or export to a short path. It is a harness problem, not an app bug; fonts ship in the iOS binary.

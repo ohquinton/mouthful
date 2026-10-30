@@ -63,7 +63,8 @@ move it to DECISIONS.md (one line) and mark it **Decided** here with the date.
   reviews). Dry Run already sells $9.99 one-time packs.
 - **Options:** keep only the annual and monthly plans (with a trial); add a ~$9.99 14-day Moment Pass that
   **doesn't auto-renew**; or make the Moment Pass the main offer.
-- **Claude's take:** add the Moment Pass, sold as "no auto-renew". It answers the market's biggest complaint
+- **Review mining (2,863 reviews):** billing and cancelling is the category's #1 pain (621 complaints).
+- **Claude's take:** likely yes. Add the Moment Pass, sold as "no auto-renew". It answers the market's biggest complaint
   and fits a dated moment. The price waits for the beta's real "$10 now?" commits.
 - **Status:** open until the beta ($10 commit question).
 
@@ -77,7 +78,9 @@ move it to DECISIONS.md (one line) and mark it **Decided** here with the date.
 ### 9. Fade mode: when
 - **Why:** the resync condition is met, but Perora, Run Lines and OffBook already do memorising. Fade is
   table stakes for "know it cold", not a moat. The moat is the dated plan it sits in.
-- **Status:** after the beta gate (false red ≤ ~2/100 for accented readers), 2 levels first.
+- **Review mining:** memorising to a date is the clearest love + urgency signal (MemoCoach: "I have 3 days to learn 4 pages"). It's a race with Perora.
+- **Marketing's take:** start building now behind tester mode; keep the accuracy gate for public release.
+- **Status:** open: build now in tester mode, or wait for the beta gate (false red ≤ ~2/100 for accented readers). 2 levels first either way.
 
 ### 10. An opt-in AI layer
 - **Why:** the first strategy review said refusing AI leaves the most valuable feedback ("you forgot the
@@ -87,6 +90,33 @@ move it to DECISIONS.md (one line) and mark it **Decided** here with the date.
 - **Claude's take:** opt-in post-session cloud pass, after the beta. It also fixes the um/uh undercount
   (CLAUDE.md "Not built yet" #5). It needs its own consent screen and privacy policy section.
 - **Status:** open, after the beta.
+
+### 11. Hear it back without saving it
+- **Why:** "you don't actually get to hear yourself" is a pain in Vocal Image and ELSA; instant playback is loved in
+  BoldVoice. Today recordings are kept only with an explicit yes (principle 3).
+- **Options:** keep the last run in memory only, playable on the Tape, discarded on leaving unless the reader taps
+  Keep; or keep today's rule (recordings only with the switch on).
+- **Claude's take:** in-memory playback, discarded by default. It's the biggest "this helps me" moment we're missing.
+  Needs release-privacy sign-off and a policy line.
+- **Status:** open.
+
+### 12. When to ask for an App Store rating
+- **Why:** 17 complaints about being asked before the app helped.
+- **Claude's take:** only after the second finished run that reached its part, or the day after the moment's date,
+  and never more than Apple's limit. Never during or straight after a bad session.
+- **Status:** open; pre-beta, small.
+
+### 13. Follow up after the moment
+- **Why:** nobody does it. "How did Thursday go?" turns a one-off into a relationship (and the next moment).
+- **Claude's take:** a gentle check-in the day after the date with two taps (went well / not great), then "What's
+  next?" to start a new moment. Never a guilt streak.
+- **Status:** open; build in the beta.
+
+### 14. Which moment leads the store page
+- **Why:** only 14 of 2,863 reviews mention interviews; presentations (49) and lines (38) lead.
+- **Claude's take:** don't lock the headline to "interview". Recruit beta testers with presentations too and let
+  the beta show which moment people pick.
+- **Status:** open until the beta.
 
 ---
 

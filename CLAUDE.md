@@ -6,7 +6,7 @@ Mouthful helps adults rehearse what they'll actually say at work (an interview a
 
 Formerly "Cadence" (renamed: at least two speaking apps already use that name). The product name lives in `src/brand.ts` only.
 
-Strategy, bets and open decisions: `STRATEGY.md` (read it before planning work). Open product dilemmas: `docs/DILEMMAS.md`. Competitors: `docs/COMPETITORS.md`. Feature briefs: `docs/briefs/`.
+Strategy, bets and open decisions: `STRATEGY.md` (read it before planning work). Open product dilemmas: `docs/DILEMMAS.md`. Competitors: `docs/COMPETITORS.md`. What users love, ask for and hate (2,863 reviews): `docs/MARKET-RESEARCH.md`. Feature briefs: `docs/briefs/`.
 Product spec (written under the old name): https://claude.ai/artifact/7y5W1WCUVuHKrXsHjLFAmC
 Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the versioned docs.
 
@@ -70,7 +70,7 @@ Today shows the active moment's plan (`PlanCard`): learn the words → say them 
 ## Commands
 
 ```bash
-npm test                  # engine + store tests (323); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
+npm test                  # engine + store tests (353); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)
@@ -99,5 +99,5 @@ npx eas-cli@latest build --profile development --platform ios
 - Recoverable recogniser errors (AirPods, network blips, busy) are hidden and restarted; 3 in 10 s with nothing heard ends the session with `repeated-failure`. iOS `interrupted` (call, Siri, backgrounding), `network` and `repeated-failure` stop listening; `resume()` (Carry on) keeps the read, while `language-not-supported` only offers Try again. The cap is unverified on Android phones.
 - Steadiness leaves out resync jumps and re-reads (same `reachedAt` stamp on 3+ words, or next to a skipped word). A one-word gap later backfilled can still read ~12% fast in that sentence, and a real drag right after a red word may be dropped. Exact fix if needed: stamp heard-token counts per word in the session screen.
 - Glide resyncs after skips and re-reads: 3 unconfirmed words, then a unique 2-word match nearby or 3+ words further away. Resuming on stopwords or habit words takes 4–8 words. A re-read doesn't move the pointer; it inks the red words it covers. Parameters: `RESYNC_AFTER` 3, `NEAR_SENTENCES` 2, `CARRY_ON` 2, `MAX_ANCHOR` 6.
-- Plan steps 1, 2, 3 and 5 are free. Step 4 is free once: the first saved script session (`freeRunUsed` in `pro.ts`). Every way into a script part goes through `canRehearse()` in `session/[id].tsx`. Deleting the script doesn't give the run back; Reset all data does. The full paywall shows once, as the reader leaves that run's Tape (`ahaPaywallShown`); everything after is a soft wall. A script added from the Scripts tile with no moment can't later be linked to a moment's step 3.
+- Plan steps 1, 2, 3 and 5 are free. Step 4 is free once: the first saved script session that reached 80% of part 1 or its last sentence (`countsAsRun`, `freeRunUsed` in `pro.ts`); an earlier Finish asks first and saves nothing. Every way into a script part goes through `canRehearse()` in `session/[id].tsx`. Deleting the script doesn't give the run back; Reset all data does. The full paywall shows once, as the reader leaves that run's Tape (`ahaPaywallShown`); everything after is a soft wall. Step 3 can link a script you already saved ("Use a script you've saved"). Corrections are logged at Finish, only for words the recogniser never inked (`keptCorrections`).
 - `patches/expo-speech-recognition+58.0.0.patch` makes iOS check on-device support for the locale we listen in (the library only checked the device default, and iOS silently falls back to the server). Android's on-device check still ignores locale. Re-check the patch when upgrading the library.

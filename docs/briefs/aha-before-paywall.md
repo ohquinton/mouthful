@@ -80,3 +80,7 @@ reach (`plan_step_done` step=script) shouldn't fall.
 - Users with no script never see the full paywall. Deliberate; watch `paywall_view` from `you`.
 
 Out of scope: Moment Pass, Fade mode, chunker changes, engine work.
+
+## Revision (2026-10-29, after qa-critic)
+
+The free run counts only when Glide reached 80% of part 1 or its last sentence (`countsAsRun`). Finishing earlier asks: "Finish now? Your free run counts when you reach the end of part 1. If you stop here, this read isn't saved and your free run is still yours." (Keep reading is the default.) Part 2+ wall: "Your free run is part 1. Rehearse every part with Pro." The aha paywall also opens once after a swipe-back, and on Today if the app was killed on the Tape.
