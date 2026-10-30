@@ -121,6 +121,8 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
 - **Open decision (name):** docs/NAME-CHECK.md. US risk medium (Foundry One's "Mouthful: Voice to To-Do List", Education, since March 2026). Keep Mouthful for the beta; decide before any branding spend or public launch. Name lives only in src/brand.ts.
 - **Then:** the Mac. Xcode is installed on Quinton's MacBook Air (M2). Check the Xcode/macOS that Expo SDK 58 needs, clone the private repo, `npx expo run:ios --device` with a free Apple ID (7-day signing), rebuild for Sentry's native code. Apple Developer signup still pending.
 
+**Polish list** (after launch-critical work; never block new building on these): Drop mascot pilot in Rive; quiet animations from docs/design/ANIMATION.md; App Store slide fixes (sentence-case pack titles, icon amber vs cursor colour); privacy policy and site text to say SaidClearly; Taste-rule pass over existing screens.
+
 ## Wave 4 backlog (qa-critic, 2026-10-27: no S0/S1; fix the S2s before the phone beta)
 
 - S2: Finish while the `interrupted` card is up saves a session that counts the call as reading time (wpm ~20). Hide Finish while failed, or shift the clock like the consent gate (`session/[id].tsx`, src/app).
