@@ -21,6 +21,8 @@ export default function PackScreen() {
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
   const [book, setBook] = useState<WordBook>({});
+  // Recalling a word is practice, not evidence of mastery. This never changes the word book.
+  const [practisingWord, setPractisingWord] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -88,7 +90,28 @@ export default function PackScreen() {
                 </Pressable>
               </View>
               <Text style={[styles.meaning, { color: colors.ink }]}>{w.meaning}</Text>
-              <Text style={[styles.example, { color: colors.muted }]}>“{w.example}”</Text>
+              {w.practice && practisingWord === w.word ? (
+                <View style={[styles.practice, { borderColor: colors.line }]}>
+                  <Text style={[styles.practiceTitle, { color: colors.ink }]}>In your own words</Text>
+                  <Text style={[styles.meaning, { color: colors.ink }]}>{w.practice}</Text>
+                  <Text style={[styles.sub, { color: colors.muted }]}>Say it out loud. Take a moment to think. This exercise isn’t recorded or scored.</Text>
+                </View>
+              ) : (
+                <Text style={[styles.example, { color: colors.muted }]}>“{w.example}”</Text>
+              )}
+              {w.practice && (
+                <Pressable
+                  onPress={() => setPractisingWord(practisingWord === w.word ? null : w.word)}
+                  accessibilityRole="button"
+                  accessibilityLabel={practisingWord === w.word ? `Show the example for ${w.word}` : `Practise ${w.word} in your own words`}
+                  accessibilityState={{ expanded: practisingWord === w.word }}
+                  style={({ pressed }) => [styles.practiceButton, { opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <Text style={[styles.practiceTitle, { color: colors.signal }]}>
+                    {practisingWord === w.word ? 'Show example' : 'Use it yourself'}
+                  </Text>
+                </Pressable>
+              )}
               <View style={styles.cardBottom}>
                 <Mastery days={e?.cleanDays.length ?? 0} colors={colors} />
                 <Text style={[styles.status, { color: colors.muted }]}>
@@ -101,7 +124,7 @@ export default function PackScreen() {
 
         <Text style={[styles.section, { color: colors.ink }]}>Say them in context</Text>
         <Text style={[styles.sub, { color: colors.muted }]}>
-          Short passages that use these words the way people actually say them at work.
+          Short passages that put the words into a complete thought.
         </Text>
         {pack.passages.map((p, n) => (
           <Pressable
@@ -140,6 +163,9 @@ const styles = StyleSheet.create({
   hear: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   meaning: { fontSize: 16, lineHeight: 22, marginTop: 4 },
   example: { fontFamily: fonts.reading, fontSize: 15, lineHeight: 22 },
+  practice: { borderTopWidth: 1, paddingTop: space(1.5), marginTop: space(1), gap: space(1) },
+  practiceTitle: { fontSize: 15, fontWeight: '600' },
+  practiceButton: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingRight: space(2) },
   cardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   status: { fontSize: 13, fontWeight: '600' },
   section: { fontSize: 17, fontWeight: '700', marginTop: space(2) },

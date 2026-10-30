@@ -43,7 +43,7 @@ export default function Library() {
       {/* Word Packs */}
       <SectionTitle>Word Packs</SectionTitle>
       <Text style={[styles.blurb, { color: colors.muted }]}>
-        New words for work, what they mean and how to say them out loud.
+        Find the precise word. Learn what it means, then put it into a thought of your own.
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packs}>
         {WORD_PACKS.map((p) => {

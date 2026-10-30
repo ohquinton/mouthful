@@ -4,11 +4,13 @@ Updated 2026-10-30 after reading the local Claude project conversations and the 
 
 ## The product Quinton wants
 
-**Find the words. Say them clearly.** Help adults, including people speaking English as a second language, speak better in real situations: fewer fillers, steadier pace, better emphasis, clearer delivery, and vocabulary they can actually use. Interviews and presentations are useful entry points, not the limits of the product. Reading and Glide are training methods; success means speaking better when the script is gone.
+**Find the words. Say them clearly.** Help people become more articulate: think on their feet, find precise words, build vocabulary, and improve pace, emphasis, delivery and presence. ESL users are included, but ESL is not the central positioning. Interviews and presentations are useful applications, not the limits of the product. Reading and Glide are training methods; success means speaking better when the script is gone.
 
-Quinton explicitly corrected the narrower interview framing on October 27: the app is also for improving speaking, fillers, pace consistency and emphasis. On October 30 he chose SaidClearly and broadened the promise to everyday English and vocabulary by subject. Do not silently narrow that ambition back to a teleprompter or interview-only app.
+Quinton explicitly corrected the narrower interview framing on October 27. On October 30 he chose SaidClearly and broadened the promise. His latest direct correction to Codex supersedes the earlier ESL emphasis: articulation, quick thinking, vocabulary and overall speaking are the centre; ESL speakers belong without defining the product. The desired feel is intellectually aspirational, a little sophisticated, without exclusion or condescension. Do not silently narrow this to a teleprompter, interview preparation or language-learning app.
 
 He wants a commercially minded collaborator who builds, questions weak assumptions, and gives blunt, useful feedback. Revenue ambition is motivation, not a forecast. Do not agree just to please him, equate more agents with progress, or turn every decision into another permission question. Preserve his decisions and the reasons behind them across sessions.
+
+Latest operating constraint: money is scarce. A genuinely useful product comes before revenue. Reuse existing capabilities, prefer inexpensive experiments, and question unnecessary subscriptions, services and feature scope. Ambition is not permission to spend money or make unsupported outcome claims. Challenge assumptions, including the founder's, with concrete reasoning and a better alternative.
 
 He wants visible progress: show believable changes in starting, finishing an answer, and delivery rather than inventing reassuring scores. He has asked to handle Mac setup himself for now; avoid repeatedly interrupting development to ask about Apple enrollment. A hoped-for launch in roughly two weeks is an aspiration, not evidence that release checks have passed.
 
@@ -19,7 +21,7 @@ Codex's suggested next product emphasis (a recommendation, not an approved featu
 ## Settled direction
 
 - **Name:** SaidClearly. Bundle identifiers, repo/slug and scheme remain `mouthful`. Name research is preliminary screening, not legal clearance; do not reopen naming without a reason or a request.
-- **Positioning:** broad speaking improvement; demonstrate one concrete use case in acquisition rather than attempting to explain every feature at once.
+- **Positioning:** articulate thinking and speaking for anyone who wants to express themselves better; demonstrate one concrete use case in acquisition. Aspirational does not mean using obscure words for status. Make advanced ideas accessible without making the product remedial.
 - **Practice:** own-script rehearsal plus spontaneous One Minute practice. One Minute replaces Free talk as one mode, initially behind tester mode. Flow describes continuity of speech, not an accent or pronunciation grade.
 - **Fillers:** the October 29 context-classifier decision supersedes the old blanket ban on habit-word scoring. Label filler/real/unsure, allow overrule, and keep unvalidated signals out of the score. Corpus success alone does not establish real-speaker fairness.
 - **One Minute:** the first roughly eight seconds of thinking are free; time to first word is shown separately and trended. Fairness still needs phone evidence.
@@ -61,10 +63,18 @@ All eight local Codex roles have been prepared from the committed Claude role br
 
 ## Sources and scope
 
+## First vocabulary expansion after the founder correction
+
+Added the free Make your point pack: eight precise, broadly useful words, two contextual passages, and self-guided prompts that hide the example while the learner forms their own thought. These prompts do not record, score, or change mastery. No service or dependency was added. Brand and library copy now reflect the broader speaking ambition. Existing pack IDs remain stable.
+
+Validation: 37 suites / 584 tests passed, including the added passages in the recognition stress corpus. A fixed corpus-count assertion now derives its expected count from the corpus size; accuracy assertions remain unchanged. TypeScript passed; lint has zero errors and 13 existing warnings. Browser verification confirmed prompt/example toggling and unchanged displayed mastery. Native phone testing and independent review remain outstanding. Jest reported an open-handle warning before exiting successfully.
+
+## Source coverage
+
 Project-only top-level Claude logs in both Mouthful directories, plus `CLAUDE.md`, `STRATEGY.md`, `DECISIONS.md`, `TESTING.md`, `docs/DILEMMAS.md`, feature briefs, competitor/review notes, design guidance and agent briefs. User wishes, assistant proposals, implemented behavior and externally validated outcomes are deliberately kept separate. External accounts, nested subagent logs and real-device behavior were not exhaustively audited during this catch-up.
 
 Coverage: parsed 11 top-level conversation files across the two project directories. The newest contained 3,177 JSONL records, 39 short direct user prompts, explicit product-choice answers, older pasted user turns, and 209 assistant narrative messages (extensive excerpts and full targeted decision/handoff messages read). The ten earlier files yielded 41 user-role text entries and 51 assistant narratives, 53,339 characters; all substantive conversation in that extraction was read. Role counts include some tool notifications and are not counts of distinct human decisions. API blobs, tool dumps and injected skill text were excluded from intent analysis. This is broad context recovery, not a claim to have read every byte or audited every implementation.
 
-Two user-supplied pasted histories (4,679 and 1,788 lines) were also checked for every visible human-prompt marker and selected surrounding decisions, particularly filler detection, the broader ESL/vocabulary goal, name/tagline, the mascot, build-forward preferences and final engineering handoffs. Large code/tool dumps were not read line by line. These largely corroborate the JSONL history.
+Two user-supplied pasted histories (4,679 and 1,788 lines) were also checked for every visible human-prompt marker and selected surrounding decisions, particularly filler detection, the broader speaking/vocabulary goal, name/tagline, the mascot, build-forward preferences and final engineering handoffs. Large code/tool dumps were not read line by line. These largely corroborate the JSONL history; the latest live correction about ESL positioning takes precedence over both.
 
 Validation of the integrated branch: 37 test suites / 584 tests passed; TypeScript passed; lint reported zero errors and 13 warnings. All eight local agent TOMLs parsed and had unique names plus required fields. The independent reviewer hit a usage limit before producing findings, so independent review remains outstanding. No phone validation, build submission or deployment occurred. The local config files are prepared; runtime discovery of the two added roles has not been verified.

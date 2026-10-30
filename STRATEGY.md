@@ -5,6 +5,8 @@ Written after a full read of the codebase. Quinton asked for blunt, ambitious fe
 
 ## What Mouthful is for
 
+**Latest founder correction, 2026-10-30 (Codex):** articulation, quick thinking, precise vocabulary, pacing and delivery are the core. This is not primarily an ESL app; ESL users are welcome alongside fluent speakers. The experience should feel intellectually aspirational and accessible, not remedial or showy. Product usefulness comes before revenue, and the budget is tight. This supersedes the audience emphasis in the historical review below; it does not discard its useful research or privacy rules.
+
 Help people, many of them speaking English as a second language, speak better out loud: **clearer
 articulation, fewer filler words, steadier pace, better emphasis, a wider vocabulary in the subjects they
 need**, and knowing what they'll say. Tagline: "Find the words. Say them clearly." The promise is broad

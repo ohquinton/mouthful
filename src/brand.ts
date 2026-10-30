@@ -6,8 +6,8 @@ export const BRAND = {
   // The hook. "That word's a mouthful" can stay as an ad line.
   tagline: 'Find the words. Say them clearly.',
   // The longer promise, for the store's promo text and the line under the hook.
-  promise: 'Build the words you need for any subject, practise them out loud, and speak clearly when it counts: interviews, presentations and everyday English.',
-  storeSubtitle: 'Practise what you’ll say',
+  promise: 'Find precise words, think on your feet, and practise speaking with clarity, pace and presence.',
+  storeSubtitle: 'Articulation & vocabulary',
   // Source: docs/privacy.md, published in the public ohquinton/mouthful-site repo. Keep both in sync.
   // Move to quintonjackson.ca/mouthful/privacy once that page exists.
   privacyUrl: 'https://github.com/ohquinton/mouthful-site/blob/main/privacy.md',
