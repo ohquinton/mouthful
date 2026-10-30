@@ -10,9 +10,10 @@ import { listenerSummary, loadSessions, SavedSession, updateSession } from '../s
 import { ReplayButton } from '../components/Replay';
 import { PrimaryButton, SecondaryButton } from '../components/ui';
 import { fonts, space, useColors } from '../theme';
+import { BRAND } from '../brand';
 
 /**
- * Tester mode only. Listen to the recording next to what Mouthful marked, and mark every
+ * Tester mode only. Listen to the recording next to what the app marked, and mark every
  * word it got wrong, including the ones the reader didn't notice. Everything stays on the phone;
  * the export is numbers only.
  */
