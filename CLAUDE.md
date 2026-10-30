@@ -33,6 +33,7 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
   - `steadiness.ts` — pace by stretch of the passage (breaths left out) and a 0–100 steadiness; shown on the Tape as `PaceStrip`, not part of the score
   - `locale.ts` — which English the recogniser listens for (reader's choice in You, else the phone's region)
   - `habits.ts` — habit-word classifier: each like/so/you know/actually/basically/literally/i mean/kind of/sort of/right labelled filler, real or unsure (context rules, bursts, pauses); corpus + holdout in `__tests__/fixtures/habits-*.json`. Not wired into scoring yet
+  - `minute.ts` — One Minute engine: long pauses (> 2.5 s after the first word), Flow slots (kept going, pauses, pace scored; um/uh and habit fillers shown), coaching line, own-history trend (`FLOW_SCORED` is the one switch, `FLOW_VERSION` tags sessions). Screen not wired yet (docs/briefs/one-minute.md)
   - `days.ts` — calendar-day maths (`daysBetween`, `calendarDay`), safe across clock changes
 - `src/speech/gate.ts` — when speech counts as on-device (Android only from API 33) and whether a variety is supported
 - `src/speech/useListener.ts` — recogniser wrapper: on-device/consent, restarts, voice level, optional recording, `reset()` for retries
@@ -71,7 +72,7 @@ Today shows the active moment's plan (`PlanCard`): learn the words → say them 
 ## Commands
 
 ```bash
-npm test                  # engine + store tests (411); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
+npm test                  # engine + store tests (445); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)
@@ -91,6 +92,7 @@ npx eas-cli@latest build --profile development --platform ios
 ## Known limits
 
 - The habit classifier's precision (100% dev, 100% holdout, 0 false accusations) is measured only on an author-written corpus, cleaner than real recogniser output: a ceiling, not an estimate. um/uh never decide a habit label (they're stripped before the rules run). Recommended to score first: like, you know; the rest stay shown-only.
+- One Minute pauses use recogniser result times, not audio, so server bursts may invent pauses; per-minute rates use talk time with a 30 s floor. "Kept going" lets someone think ~45 s then talk 15+ words and still score well (a spec gap, DILEMMAS #15).
 - Habit words aren't scored until the classifier is validated (principle 7), so for now someone who says "like" every third word is told so only by the Tape's habit-word line.
 - On-device recognisers often drop "um" and "uh", so filler counts run low. Item 5 above fixes that.
 - First-word lag is a proxy for highlight delay (voice level crossing a threshold → first inked word). It isn't measured on web, which has no voice levels.

@@ -120,6 +120,21 @@ move it to DECISIONS.md (one line) and mark it **Decided** here with the date.
   the beta show which moment people pick.
 - **Status:** open until the beta.
 
+### 15. One Minute: should long thinking count?
+- **Why:** the brief's "kept going" runs from the start to the last heard word, so someone can think ~45 s, then say
+  15+ words, and still get the full kept-going slot (50 s silence then 10 s of talk scores about 89).
+- **Options:** keep it (thinking time is excluded on purpose, to be fair to ESL speakers); cap thinking time
+  (e.g. only the first 10 s are free); or score kept going from the first word.
+- **Claude's take:** cap it at ~10 s. That protects slow starters without letting a minute be mostly silence.
+- **Status:** open.
+
+### 16. Target length lights: harsh on long answers?
+- **Why:** a 300-word interview answer with a 2-minute target shows red on every part.
+- **Options:** keep it (honest: it's too long); warn when pasting ("this runs about 3:10"); let the reader set
+  their own target (e.g. a 5-minute presentation slot).
+- **Claude's take:** both the paste-time warning and a custom target. Honest and in the reader's control.
+- **Status:** open.
+
 ---
 
 ## Decided
