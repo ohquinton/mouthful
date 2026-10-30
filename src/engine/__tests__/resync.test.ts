@@ -921,8 +921,12 @@ describe('7. hesitations and habit words never trigger or anchor a resync', () =
 
 /** align() may take at most this many times legacyAlign's total time over a shape's prefixes. */
 const PERF_RATIO_MAX = 4;
-/** Backstop: no single call (best of its runs) may take longer than this, however loaded the machine. */
-const PERF_CEILING_MS = 5;
+/**
+ * Backstop: no single call (best of its runs) may take longer than this. Only for something
+ * catastrophic (a quadratic blow-up): with three Jest runs at once on a laptop every time here
+ * rises ~4× (worst call 6.8 ms, ratios unchanged), so a tight absolute bound would be a false alarm.
+ */
+const PERF_CEILING_MS = 20;
 
 type Race = { ratio: number; worst: { before: number; after: number }; median: { before: number; after: number } };
 
