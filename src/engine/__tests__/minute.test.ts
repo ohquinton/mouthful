@@ -4,6 +4,7 @@
 import { tokenise } from '../align';
 import { classifyHabits } from '../habits';
 import {
+  FREE_THINK_MS,
   FLOW_SCORED,
   FLOW_SLOTS,
   FLOW_VERSION,
@@ -321,6 +322,146 @@ describe('minuteSummary', () => {
       const r = minuteSummary({ tokens: words, heardTimes: even(words.length, 0, 60), startedAt: 0, slots: promoted })!;
       const plain = flowScore({ ...r.input, habitFillersPerMin: 0 }, promoted);
       expect(r.flow).toBe(plain);
+    });
+  });
+});
+
+// ------------------------------------------------------------------------------------------------
+// DILEMMAS #15 (decided 2026-10-30): the first ~8 s before the first word are free; thinking past
+// that counts against "kept going". Time to first word is its own number, trended and coached.
+
+describe('free thinking time and time to first word', () => {
+  const filler = (n: number) => Array.from({ length: n }, (_, k) => `word${k}`);
+  /** `n` words evenly from `first` s to `last` s, listening started at 0. */
+  const minute = (n: number, first: number, last: number) => minuteSummary({ tokens: filler(n), heardTimes: even(n, first, last), startedAt: 0 })!;
+  /** Words at 150 wpm from `first` to `last` s. */
+  const at150 = (first: number, last: number) => minute(Math.max(15, Math.round((150 * (last - first)) / 60)), first, last);
+
+  it('exports the free thinking time: 8 s', () => {
+    expect(FREE_THINK_MS).toBe(8000);
+  });
+
+  it('the loophole: 50 s of silence then 10 s of talk scores far below a speaker who started within 8 s', () => {
+    const silent = at150(50, 60);
+    const prompt = at150(6, 60);
+    expect(silent.talkSeconds).toBe(60); // still "talked to the end", so not the stopped-early line
+    expect(silent.timeToFirstWordSeconds).toBe(50);
+    expect(silent.keptGoingSeconds).toBe(18); // 60 − (50 − 8)
+    expect(prompt.flow).toBe(100);
+    expect(silent.flow).toBeLessThanOrEqual(75); // was 100 before: the whole minute counted
+    expect(prompt.flow - silent.flow).toBeGreaterThanOrEqual(25);
+  });
+
+  it('starting at 6 s scores the same as starting at 0 s', () => {
+    const now = at150(0, 60);
+    const six = at150(6, 60);
+    expect(six.timeToFirstWordSeconds).toBe(6);
+    expect(now.timeToFirstWordSeconds).toBe(0);
+    expect(six.keptGoingSeconds).toBe(60);
+    expect(six.flow).toBe(now.flow);
+  });
+
+  it('exact boundaries: 8.0 s is free, every tenth after it counts', () => {
+    expect(at150(8, 60).keptGoingSeconds).toBe(60);
+    expect(at150(8.1, 60).keptGoingSeconds).toBe(59.9);
+    expect(at150(8.5, 60).keptGoingSeconds).toBe(59.5);
+    expect(at150(9, 60).keptGoingSeconds).toBe(59);
+    expect(at150(20, 60).keptGoingSeconds).toBe(48);
+    // Kept going is explainable from the shown numbers: talk seconds − (time to first word − 8).
+    for (const first of [0, 7.9, 8, 8.1, 12.3, 30, 50]) {
+      const r = at150(first, 60);
+      expect(r.keptGoingSeconds).toBeCloseTo(r.talkSeconds - Math.max(0, r.timeToFirstWordSeconds - 8), 5);
+      expect(r.input.keptGoingSeconds).toBe(r.keptGoingSeconds);
+    }
+  });
+
+  it('time to first word is measured from startedAt to the first heard word, to one decimal', () => {
+    const r = minuteSummary({ tokens: filler(20), heardTimes: even(20, 6.04, 30).map((t) => t + 5000), startedAt: 5000 })!;
+    expect(r.timeToFirstWordSeconds).toBe(6);
+    const r2 = minuteSummary({ tokens: filler(20), heardTimes: even(20, 6.06, 30), startedAt: 0 })!;
+    expect(r2.timeToFirstWordSeconds).toBe(6.1);
+  });
+
+  it('thinking long and stopping early both count, never below zero', () => {
+    const r = at150(30, 40); // thinks 30 s, talks 10 s
+    expect(r.keptGoingSeconds).toBe(18); // 40 − 22
+    const late = minute(20, 59, 60);
+    expect(late.keptGoingSeconds).toBe(9); // 60 − 51
+    expect(minuteSummary({ tokens: filler(20), heardTimes: even(20, 70, 75), startedAt: 0 })!.keptGoingSeconds).toBe(0);
+  });
+
+  it('bumps FLOW_VERSION, so minutes scored the old way never mix in a trend', () => {
+    expect(FLOW_VERSION).not.toBe('1-k40p35w25');
+    expect(FLOW_VERSION).toBe('2-k40p35w25');
+  });
+
+  describe('coaching', () => {
+    const START = 'Start within 5 seconds: say the word back, then one thing it reminds you of.';
+    const ok = { talkSeconds: 60, longPauses: 0, wpm: 140, habitFillersPerMin: 0 };
+
+    it('a slow start that is the top issue gets the start line', () => {
+      expect(minuteLine({ ...ok, timeToFirstWordSeconds: 20 })).toBe(START);
+      expect(at150(50, 60).line).toBe(START);
+      expect(at150(9, 60).line).toBe(START); // the only thing that cost anything
+    });
+
+    it('8 s or less never gets the start line', () => {
+      expect(minuteLine({ ...ok, timeToFirstWordSeconds: 8 })).toBe('You kept going the whole minute.');
+      expect(minuteLine({ ...ok, timeToFirstWordSeconds: 0 })).toBe('You kept going the whole minute.');
+      expect(minuteLine(ok)).toBe('You kept going the whole minute.'); // not given: as before
+      expect(at150(8, 60).line).toBe('You kept going the whole minute.');
+    });
+
+    it('picks the bigger loss when the start competes with stopping early, pauses or speed', () => {
+      // Started at 10 s (2 s lost), stopped at 30 s (30 s lost): stopping is the issue.
+      expect(minuteLine({ ...ok, talkSeconds: 30, timeToFirstWordSeconds: 10 })).toMatch(/^You stopped at 30 s/);
+      // Started at 30 s (22 s lost), stopped at 40 s (20 s lost): starting is.
+      expect(minuteLine({ ...ok, talkSeconds: 40, timeToFirstWordSeconds: 30 })).toBe(START);
+      // 3 long pauses (26 points) beat a 9 s start (under 1 point) …
+      expect(minuteLine({ ...ok, longPauses: 3, timeToFirstWordSeconds: 9 })).toMatch(/^When you lose the thread/);
+      // … but a 50 s start (28 points) beats them.
+      expect(minuteLine({ ...ok, longPauses: 3, timeToFirstWordSeconds: 50 })).toBe(START);
+      expect(minuteLine({ ...ok, wpm: 200, timeToFirstWordSeconds: 9 })).toBe('Breathe between ideas.');
+      expect(minuteLine({ ...ok, wpm: 200, timeToFirstWordSeconds: 25 })).toBe(START);
+    });
+
+    it('no line ever contains "pronounc", "accent" or "correct"', () => {
+      const all = flowSlotsFrom(['keptGoing', 'pauses', 'pace', 'um', 'habit']);
+      for (const timeToFirstWordSeconds of [0, 8, 8.1, 15, 50])
+        for (const talkSeconds of [12, 44, 60])
+          for (const longPauses of [0, 3])
+            for (const wpm of [90, 200])
+              for (const slots of [FLOW_SLOTS, all])
+                expect(minuteLine({ talkSeconds, longPauses, wpm, habitFillersPerMin: 4, topHabit: 'like', timeToFirstWordSeconds }, slots)).not.toMatch(BAD_WORDS);
+    });
+  });
+
+  describe('trend', () => {
+    const v = FLOW_VERSION;
+    const s = (flow: number, timeToFirstWordSeconds?: number, flowVersion = v) => ({ flow, flowVersion, timeToFirstWordSeconds });
+
+    it('trends time to first word against the median of your last 5 minutes of the same version', () => {
+      const past = [s(80, 20), s(80, 12, 'other'), s(80, 9), s(80, 7), s(80, 6), s(80, 10), s(80, 5)];
+      const t = minuteTrend(past, v, 82, 4)!;
+      expect(t.median).toBe(80);
+      expect(t.firstWord).toEqual({ median: 7, count: 5, delta: -3, direction: 'faster' });
+    });
+
+    it('lower is better: slower, faster or about the same (within 1 s)', () => {
+      const past = [s(80, 6), s(80, 6), s(80, 6)];
+      expect(minuteTrend(past, v, 80, 9)!.firstWord!.direction).toBe('slower');
+      expect(minuteTrend(past, v, 80, 6.9)!.firstWord!.direction).toBe('same');
+      expect(minuteTrend(past, v, 80, 5)!.firstWord!.direction).toBe('same');
+      expect(minuteTrend(past, v, 80, 4.9)!.firstWord!.direction).toBe('faster');
+      expect(minuteTrend(past, v, 80)!.firstWord).toEqual({ median: 6, count: 3 });
+    });
+
+    it('no first-word trend under 3 past minutes that have one (the Flow trend is unchanged)', () => {
+      const past = [s(70), s(80), s(90, 4), s(60, 5)];
+      const t = minuteTrend(past, v, 75, 3)!;
+      expect(t.median).toBe(75);
+      expect(t.firstWord).toBeUndefined();
+      expect(minuteTrend([s(70, 3), s(80, 3)], v, 75, 3)).toBeNull();
     });
   });
 });
