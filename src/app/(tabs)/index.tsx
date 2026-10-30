@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { estimateSeconds, formatDuration as duration, PASSAGES, passageOfTheDay } from '../../content/passages';
 import { MOMENTS } from '../../content/moments';
+import { minutePromptOfTheDay } from '../../content/prompts';
 import { loadSessions, SavedSession, streak, thisWeek } from '../../store/sessions';
 import { useProfile } from '../../store/profile';
 import { ahaPaywallRoute, ahaPending, claimAhaPaywall, requirePro } from '../../pro';
@@ -58,6 +59,8 @@ export default function Today() {
   const readIds = new Set(sessions.map((s) => s.passageId));
   const unseen = PASSAGES.find((p) => !readIds.has(p.id) && p.id !== today.id) ?? PASSAGES[(PASSAGES.indexOf(today) + 1) % PASSAGES.length];
 
+  // Tester mode: Free talk is One Minute (beta first, then everyone), showing the day's word.
+  const minute = profile.testerMode === true;
   const tiles = [
     {
       key: 'scripts',
@@ -70,8 +73,8 @@ export default function Today() {
     },
     {
       key: 'talk',
-      title: 'Free talk',
-      sub: '60 seconds, no script',
+      title: minute ? 'One Minute' : 'Free talk',
+      sub: minute ? `Today: ${minutePromptOfTheDay().text}` : '60 seconds, no script',
       icon: 'chatbubble-ellipses-outline' as const,
       badge: false,
       onPress: () => router.push('/talk'),
@@ -160,7 +163,9 @@ export default function Today() {
               {t.badge && <ProBadge />}
             </View>
             <Text style={[styles.tileTitle, { color: colors.ink }]}>{t.title}</Text>
-            <Text style={[styles.tileSub, { color: colors.muted }]}>{t.sub}</Text>
+            <Text style={[styles.tileSub, { color: colors.muted }]} numberOfLines={3}>
+              {t.sub}
+            </Text>
           </Pressable>
         ))}
       </View>
