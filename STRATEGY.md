@@ -102,6 +102,7 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
   3. mobile-engineer: re-read handling on screen (no "Pick up from…", no pause counted) using align's new re-read field.
   4. marketing-lead: competitor teardown (Sayglide, Sayso, Dry Run, DryRun, OffBook, Run Lines): what they do, where we're truly different, what that changes in STRATEGY.
   4b. speech-engine (B): habit-word classifier (`src/engine/habits.ts`), labelled corpus, precision/recall report (running).
+  4c. speech-engine: make the resync speed test (resync.test.ts §10e) robust to a busy machine: it fails in parallel Jest on a loaded laptop and may flake on CI. Options: measure per-call median over many runs with a CI-aware ceiling, or move it to a separate perf script that CI runs serially.
   5. speech-engine: beta sheet carries listener restarts/glitches (`reviewRow` in review.ts) + exact steadiness timing via heard-token counts if the beta shows it matters.
   6. brand-namer: round 2 from marketing's direction (docs/DILEMMAS.md #1) (running).
   6b. One Minute (docs/briefs/one-minute.md): after habits.ts merges, speech-engine builds `engine/minute.ts` (Flow), then mobile-engineer replaces Free talk with One Minute behind tester mode.
