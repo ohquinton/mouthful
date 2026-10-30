@@ -31,6 +31,9 @@ function even(n: number, from: number, to: number): number[] {
 const CLEAN: FlowInput = { keptGoingSeconds: 60, longPauses: 0, wpm: 140, umPerMin: 0, habitFillersPerMin: 0 };
 
 const BAD_WORDS = /pronounc|accent|correct/i;
+/** Plain English for ESL readers: no idioms or phrasal shortcuts in coaching (qa-critic, 2026-10-30). */
+const IDIOMS = /lose the thread|run out|get stuck|on track|keep it up|nail it|hang of|on the spot/i;
+const PAUSE_LINE = 'When you pause, say the word again and one thing it reminds you of.';
 
 describe('longPauses', () => {
   it('criterion 1: ignores the thinking time before the first word and counts two 3 s gaps', () => {
@@ -154,7 +157,7 @@ describe('minuteLine', () => {
   const ok = { talkSeconds: 60, longPauses: 0, wpm: 140, habitFillersPerMin: 0 };
 
   it('criterion 3: stopped at 30 s gets the stopped-early line with the seconds', () => {
-    expect(minuteLine({ ...ok, talkSeconds: 30 })).toBe("You stopped at 30 s. When you run out, say what you'd add with more time.");
+    expect(minuteLine({ ...ok, talkSeconds: 30 })).toBe('You stopped at 30 s. When you have nothing more to say, say what you would add with more time.');
   });
 
   it('never shows a number that contradicts the line (44.9 s reads as 44 s, not 45)', () => {
@@ -163,12 +166,12 @@ describe('minuteLine', () => {
   });
 
   it('then 3+ long pauses, then above 185 wpm, else kept going', () => {
-    expect(minuteLine({ ...ok, longPauses: 3 })).toBe('When you lose the thread, say the word again and one thing it reminds you of.');
+    expect(minuteLine({ ...ok, longPauses: 3 })).toBe(PAUSE_LINE);
     expect(minuteLine({ ...ok, longPauses: 2, wpm: 186 })).toBe('Breathe between ideas.');
     expect(minuteLine({ ...ok, wpm: 185 })).toBe('You kept going the whole minute.');
     // Order: stopping early beats pauses beats speed.
     expect(minuteLine({ talkSeconds: 20, longPauses: 5, wpm: 200, habitFillersPerMin: 0 })).toMatch(/^You stopped at 20 s/);
-    expect(minuteLine({ ...ok, longPauses: 5, wpm: 200 })).toMatch(/^When you lose the thread/);
+    expect(minuteLine({ ...ok, longPauses: 5, wpm: 200 })).toBe(PAUSE_LINE);
   });
 
   it('mentions habit fillers only when that slot is scored', () => {
@@ -187,6 +190,7 @@ describe('minuteLine', () => {
             for (const slots of [FLOW_SLOTS, all]) {
               const line = minuteLine({ talkSeconds, longPauses, wpm, habitFillersPerMin, topHabit: 'you know' }, slots);
               expect(line).not.toMatch(BAD_WORDS);
+              expect(line).not.toMatch(IDIOMS);
               expect(line.length).toBeGreaterThan(0);
             }
   });
@@ -418,7 +422,7 @@ describe('free thinking time and time to first word', () => {
       // Started at 30 s (22 s lost), stopped at 40 s (20 s lost): starting is.
       expect(minuteLine({ ...ok, talkSeconds: 40, timeToFirstWordSeconds: 30 })).toBe(START);
       // 3 long pauses (26 points) beat a 9 s start (under 1 point) …
-      expect(minuteLine({ ...ok, longPauses: 3, timeToFirstWordSeconds: 9 })).toMatch(/^When you lose the thread/);
+      expect(minuteLine({ ...ok, longPauses: 3, timeToFirstWordSeconds: 9 })).toBe(PAUSE_LINE);
       // … but a 50 s start (28 points) beats them.
       expect(minuteLine({ ...ok, longPauses: 3, timeToFirstWordSeconds: 50 })).toBe(START);
       expect(minuteLine({ ...ok, wpm: 200, timeToFirstWordSeconds: 9 })).toBe('Breathe between ideas.');
@@ -432,7 +436,9 @@ describe('free thinking time and time to first word', () => {
           for (const longPauses of [0, 3])
             for (const wpm of [90, 200])
               for (const slots of [FLOW_SLOTS, all])
-                expect(minuteLine({ talkSeconds, longPauses, wpm, habitFillersPerMin: 4, topHabit: 'like', timeToFirstWordSeconds }, slots)).not.toMatch(BAD_WORDS);
+                expect(minuteLine({ talkSeconds, longPauses, wpm, habitFillersPerMin: 4, topHabit: 'like', timeToFirstWordSeconds }, slots)).not.toMatch(
+                  new RegExp(`${BAD_WORDS.source}|${IDIOMS.source}`, 'i'),
+                );
     });
   });
 
