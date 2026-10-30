@@ -7,15 +7,15 @@ import { getPack, packPassageId } from '../content/wordpacks';
 import { scriptChunkId } from '../content/resolve';
 import { useProfile } from '../store/profile';
 import type { SavedSession } from '../store/sessions';
-import { canAddScript, freeRunUsed, requirePro } from '../pro';
+import { freeRunUsed } from '../pro';
 import { fonts, space, useColors } from '../theme';
 import { ProBadge } from './ui';
 
 /**
  * The active moment's five-step plan: what's done, and one button for what's next.
- * `sessions` and `scriptCount` come from Today (it reloads them on focus), for the free run.
+ * `sessions` come from Today (it reloads them on focus), for the free run.
  */
-export function PlanCard({ sessions, scriptCount }: { sessions: SavedSession[]; scriptCount: number }) {
+export function PlanCard({ sessions }: { sessions: SavedSession[] }) {
   const colors = useColors();
   const { profile } = useProfile();
   const m = getMoment(profile.moment?.id);
@@ -30,6 +30,10 @@ export function PlanCard({ sessions, scriptCount }: { sessions: SavedSession[]; 
   const freeRunLeft = !profile.pro && !runUsed;
   const locked = (s: PlanStep) => s.pro && !profile.pro && runUsed;
 
+  // Step 3 always opens scripts/new: it offers a script they've already saved (free, even when
+  // their one free script was added from the Scripts tile) and walls only a second new one.
+  const addScript = () => router.push({ pathname: '/scripts/new', params: { moment: m.id, step: 'script' } });
+
   const go = (s: PlanStep) => {
     switch (s.id) {
       case 'learn':
@@ -37,14 +41,9 @@ export function PlanCard({ sessions, scriptCount }: { sessions: SavedSession[]; 
       case 'context':
         return router.push({ pathname: '/session/[id]', params: { id: packPassageId(pack.id, 0), step: 'context', pace: m.pace } });
       case 'script':
-        // The first script is free; a second one is Pro.
-        if (!canAddScript({ pro: profile.pro, scriptCount }) && !requirePro(profile, 'scripts')) return;
-        return router.push({ pathname: '/scripts/new', params: { moment: m.id, step: 'script' } });
+        return addScript();
       case 'rehearse':
-        if (!scriptId) {
-          if (!canAddScript({ pro: profile.pro, scriptCount }) && !requirePro(profile, 'scripts')) return;
-          return router.push({ pathname: '/scripts/new', params: { moment: m.id, step: 'script' } });
-        }
+        if (!scriptId) return addScript();
         // No gate here on purpose: session/[id].tsx checks canRehearse() for every way in.
         return router.push({ pathname: '/session/[id]', params: { id: scriptChunkId(scriptId, 0), step: 'rehearse', pace: m.pace } });
       case 'retest':

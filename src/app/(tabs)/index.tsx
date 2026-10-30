@@ -7,8 +7,7 @@ import { estimateSeconds, formatDuration as duration, PASSAGES, passageOfTheDay 
 import { MOMENTS } from '../../content/moments';
 import { loadSessions, SavedSession, streak, thisWeek } from '../../store/sessions';
 import { useProfile } from '../../store/profile';
-import { requirePro } from '../../pro';
-import { loadScripts } from '../../content/scripts';
+import { ahaPaywallRoute, ahaPending, claimAhaPaywall, requirePro } from '../../pro';
 import { PlanCard } from '../../components/PlanCard';
 import { ProBadge } from '../../components/ui';
 import { fonts, space, useColors } from '../../theme';
@@ -21,17 +20,34 @@ function greeting(d = new Date()) {
 export default function Today() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile } = useProfile();
+  const { profile, ready, update } = useProfile();
   const [sessions, setSessions] = useState<SavedSession[]>([]);
-  const [scriptCount, setScriptCount] = useState(0);
   const today = passageOfTheDay();
 
   useFocusEffect(
     useCallback(() => {
       loadSessions().then(setSessions);
-      // PlanCard needs it: a free reader's first script is free, a second is Pro.
-      loadScripts().then((all) => setScriptCount(all.length));
     }, []),
+  );
+
+  // The aha paywall, if the free run's Tape never got to open it (the app was killed there).
+  // Once: claimAhaPaywall() for this launch (the Tape's Done lands here and has claimed it
+  // already), ahaPaywallShown for good. Waits for the saved profile, so Pro isn't misread.
+  const { pro, ahaPaywallShown, moment } = profile;
+  useFocusEffect(
+    useCallback(() => {
+      if (!ready || pro || ahaPaywallShown) return;
+      let live = true;
+      loadSessions().then((all) => {
+        const run = ahaPending({ profile: { pro, ahaPaywallShown }, sessions: all });
+        if (!live || !run || !claimAhaPaywall()) return;
+        update({ ahaPaywallShown: true });
+        router.push(ahaPaywallRoute(run, moment));
+      });
+      return () => {
+        live = false;
+      };
+    }, [ready, pro, ahaPaywallShown, moment, update]),
   );
 
   const { days, freezeUsed } = streak(sessions);
@@ -91,7 +107,7 @@ export default function Today() {
 
       {/* What you're preparing for comes first */}
       {profile.moment ? (
-        <PlanCard sessions={sessions} scriptCount={scriptCount} />
+        <PlanCard sessions={sessions} />
       ) : (
         <View style={[styles.prep, { backgroundColor: colors.card }]}>
           <Text style={[styles.prepTitle, { color: colors.cardInk }]}>What are you preparing for?</Text>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -14,7 +14,7 @@ import { resolvePassage, sourceOf } from '../content/resolve';
 import { preparePassage, PassageWord } from '../engine/align';
 import { paceSteadiness, PaceSegment } from '../engine/steadiness';
 import { PaceStrip } from '../components/PaceStrip';
-import { ahaNumbers, ahaPaywallDue, requirePro } from '../pro';
+import { ahaPaywallDue, ahaPaywallRoute, claimAhaPaywall, requirePro } from '../pro';
 import { track } from '../analytics';
 import { fonts, space, useColors } from '../theme';
 
@@ -52,50 +52,47 @@ export default function Tape() {
   // ---- The full paywall after the free run (docs/briefs/aha-before-paywall.md) ----
   // Never on top of the Tape: they see their result and can tap "I said it" first. It opens as
   // they leave (Done, the plan row, Read it again, or a back gesture), once. The numbers come from
-  // `s` as it is now, so corrections count.
-  // Set the moment it's taken (not state), so the unmount check below can't open it twice.
-  const ahaTaken = useRef(false);
+  // `s` as it is now, so corrections count. claimAhaPaywall() makes it once per launch whoever
+  // asks (Today asks too, on focus, for a reader whose app was killed here); the profile flag
+  // makes it once for good.
   const ahaDue = !!s && ahaPaywallDue({ profile, sessions: all, sessionId: s.id });
 
-  /** Marks the paywall shown (so it opens once) and returns its route, with numbers only. */
-  const takeAha = (session: SavedSession) => {
-    ahaTaken.current = true;
+  /** If the aha paywall is due and nobody has opened it yet, claims it and returns its route. */
+  const takeAha = () => {
+    if (!ahaDue || !s || !claimAhaPaywall()) return undefined;
     update({ ahaPaywallShown: true });
-    const n = ahaNumbers(session);
-    // The moment's name goes in the headline only when this is the moment's own script.
-    const m = profile.moment;
-    const own = !!m?.scriptId && session.passageId.startsWith(`s.${m.scriptId}.`);
-    return {
-      pathname: '/paywall' as const,
-      params: { from: 'aha', wpm: String(n.wpm), words: String(n.words), heard: String(n.heard), ...(own && m ? { moment: m.id } : {}) },
-    };
+    return ahaPaywallRoute(s, profile.moment);
   };
 
-  // A back gesture (or Android back) leaves without our buttons. Let it go, then open the
-  // paywall over wherever they land. The latest "open it" is kept in a ref for the unmount.
-  const openOnLeave = useRef<(() => void) | undefined>(undefined);
+  // A back gesture (iOS swipe, Android back, the browser's back) leaves without our buttons.
+  // Expo Router 58 emits `removed` once this screen is out of the stack, however it left; our
+  // buttons claim the paywall before they navigate, so for them this finds nothing to do. It
+  // fires after unmount, so it reads the last render's takeAha from a ref, and (as the router
+  // docs say) the unsubscribe waits a microtask so the event still reaches us. The paywall then
+  // opens over wherever they landed.
+  const navigation = useNavigation();
+  const takeAhaRef = useRef(takeAha);
   useEffect(() => {
-    openOnLeave.current =
-      ahaDue && s
-        ? () => {
-            if (ahaTaken.current) return;
-            const route = takeAha(s);
-            setTimeout(() => router.push(route), 0);
-          }
-        : undefined;
+    takeAhaRef.current = takeAha;
   });
-  useEffect(() => () => openOnLeave.current?.(), []);
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('removed', () => {
+      const route = takeAhaRef.current();
+      if (route) setTimeout(() => router.push(route), 0);
+    });
+    return () => queueMicrotask(unsubscribe);
+  }, [navigation]);
 
   const done = () => {
-    if (!ahaDue || !s || ahaTaken.current) return router.dismissTo('/');
-    const route = takeAha(s);
+    const route = takeAha();
     router.dismissTo('/');
-    router.push(route);
+    if (route) router.push(route);
   };
 
   const again = () => {
     if (!s) return;
-    if (ahaDue && !ahaTaken.current) return router.replace(takeAha(s));
+    const route = takeAha();
+    if (route) return router.replace(route);
     if (s.passageId === 'talk') router.replace('/talk');
     else router.replace({ pathname: '/session/[id]', params: { id: s.passageId, pace: s.context ?? 'reading' } });
   };

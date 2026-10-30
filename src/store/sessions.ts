@@ -28,6 +28,11 @@ export type SavedSession = {
   habits?: Record<string, number>; // like, so, you know: reported on the Tape, never scored
   segments?: PaceSegment[]; // pace of each stretch of the passage (engine/steadiness.ts)
   steadiness?: number; // 0–100; shown on the Tape, not part of the score
+  /**
+   * Script parts only: Glide reached 80% of the part or its last sentence (pro.ts partReached).
+   * false means an early Finish, which doesn't count as a run. Unset on older sessions (counts).
+   */
+  partReached?: boolean;
   /** Tester mode only (supervised beta). Stays on the phone; never sent anywhere. */
   review?: {
     statuses: string; // see engine/review.ts
@@ -95,6 +100,19 @@ export function correctSessionWord(s: SavedSession, word: string): SavedSession 
     s.context ?? 'reading',
   );
   return { ...base, readCount, accuracy, score };
+}
+
+/**
+ * Which Glide taps ("I said it" on a red word) are still corrections when the read ends.
+ * `rawStatus` is the recogniser's own status for each word at Finish, before corrections.
+ * A tapped word the recogniser later inked anyway (a late result, or the resync backfill) is
+ * 'read' there: the recogniser got it, so logging it as a correction would make the
+ * recognition_correction metric overcount its misses. One that went back to 'pending' (a
+ * revision pulled the pointer back) isn't a miss either. Only words still 'skipped' count.
+ * Returned in passage order.
+ */
+export function keptCorrections(rawStatus: readonly string[], corrected: ReadonlySet<number>): number[] {
+  return [...corrected].filter((i) => rawStatus[i] === 'skipped').sort((x, y) => x - y);
 }
 
 export async function getSession(id: string): Promise<SavedSession | undefined> {
