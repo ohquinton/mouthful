@@ -1,5 +1,19 @@
 // Glide's "is the reader still going?" decisions, kept pure so they're tested without a phone.
 // session/[id].tsx calls these from the effect that reacts to the pointer moving.
+import { align, withCorrections, type Alignment, type PassageWord } from './engine/align';
+
+/**
+ * The alignment a session is saved from (finish, the too-short check, the free run's early-Finish
+ * check, Finish after an error). Live, align() holds a jump until its words are 2 from the end of
+ * what was heard, because the recogniser may still rewrite them. At the end nothing more is
+ * coming, so every heard word is settled (settled = heard.length); otherwise a jump resting on the
+ * last words never lands, the words it skipped never turn red, and accuracy reads 100%.
+ * `raw` is the recogniser's view, `final` includes the reader's "I said it" taps.
+ */
+export function finalAlignment(words: PassageWord[], heard: string[], corrected: Set<number>): { raw: Alignment; final: Alignment } {
+  const raw = align(words, heard, heard.length);
+  return { raw, final: withCorrections(raw, corrected) };
+}
 
 /** Where the pointer is, and (only during a re-read behind it) which word was just re-read. */
 export type PointerState = { next: number; rereadingAt?: number };

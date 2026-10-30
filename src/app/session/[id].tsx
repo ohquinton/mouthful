@@ -38,7 +38,7 @@ import { space, useColors } from '../../theme';
 import { DICTIONARY, packPassageId } from '../../content/wordpacks';
 import { clock, LENGTH_LABEL, lengthZone, spokenClock, targetForPassage } from '../../content/targets';
 import { noteRoughPatch } from '../../rating';
-import { isLost, pauseAfter, progressKind } from '../../glide';
+import { finalAlignment, isLost, pauseAfter, progressKind } from '../../glide';
 
 const MIN_WORDS_TO_SCORE = 15;
 
@@ -325,8 +325,8 @@ function GlideSessionView({
    * heard word counts as settled; otherwise a jump waiting at the last word would never land.
    */
   const settledAlignment = useCallback(() => {
-    const finalRaw = align(words, heard, heard.length);
-    return { finalRaw, fin: withCorrections(finalRaw, corrected) };
+    const { raw: finalRaw, final: fin } = finalAlignment(words, heard, corrected);
+    return { finalRaw, fin };
   }, [words, heard, corrected]);
 
   const finish = useCallback(async () => {
