@@ -1,6 +1,6 @@
 # SaidClearly (formerly Mouthful)
 
-**Rehearse it out loud. Say it clearly when it counts.**
+**Find the words. Say them clearly.**
 
 Mouthful helps adults rehearse what they'll actually say at work (an interview answer, a presentation, a raise conversation, a meeting update) out loud. You read with Glide, the words ink in as you say them, and you see your pace, fillers and the words you tripped on. Then you practise those words alone and in a sentence.
 

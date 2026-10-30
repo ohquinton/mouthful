@@ -5,8 +5,12 @@ Written after a full read of the codebase. Quinton asked for blunt, ambitious fe
 
 ## What Mouthful is for
 
-Help people speak better out loud for a real moment: **fewer filler words, steadier pace, better
-emphasis, clearer articulation**, and knowing what they'll say. Articulation here means clear and fluent,
+Help people, many of them speaking English as a second language, speak better out loud: **clearer
+articulation, fewer filler words, steadier pace, better emphasis, a wider vocabulary in the subjects they
+need**, and knowing what they'll say. Tagline: "Find the words. Say them clearly." The promise is broad
+(interviews, presentations, everyday English practice, vocabulary by subject); the store listing still leads
+with one concrete moment, because a new app wins by being sharper, not broader (ELSA, Stimuler and BoldVoice
+own "improve your English"). Articulation here means clear and fluent,
 never "sounding native" (principle 1: we measure what the phone heard, not pronunciation). Glide (words ink in as you speak) is the core mechanic and
 the marketing asset: a 7-second screen recording of it explains the app.
 
