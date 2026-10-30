@@ -46,7 +46,10 @@ type Props = Record<string, string | number | boolean | null | undefined>;
  * transcripts can't leak into analytics even if someone adds a careless track() call.
  */
 // `reason`: why the rating prompt was shown (rating.ts RatingReason: second_run, after_moment).
-const TEXT_KEYS = new Set(['kind', 'pace', 'plan', 'feature', 'moment', 'step', 'where', 'which', 'error', 'from', 'source', 'reason']);
+// `flow_version`: One Minute's Flow formula code from engine/minute.ts FLOW_VERSION (e.g. 1-k40p35w25).
+// One Minute also uses `which` for the prompt id (p01–p36) or the habit-word code (like, you_know),
+// and `kind` for minute | habit. Never the prompt text or a word the reader said.
+const TEXT_KEYS = new Set(['kind', 'pace', 'plan', 'feature', 'moment', 'step', 'where', 'which', 'error', 'from', 'source', 'reason', 'flow_version']);
 const CODE = /^[a-z0-9_:-]{1,24}$/i;
 
 export function sanitise(props: Props): Props {

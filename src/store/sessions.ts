@@ -3,6 +3,8 @@ import { correctedAccuracy, sessionScore } from '../engine/score';
 import type { ReviewMarks } from '../engine/review';
 import type { PaceSegment } from '../engine/steadiness';
 import { calendarDay } from '../engine/days';
+import type { HabitWord } from '../engine/habits';
+import type { FlowInput } from '../engine/minute';
 
 export type SavedSession = {
   id: string;
@@ -35,6 +37,36 @@ export type SavedSession = {
   partReached?: boolean;
   /** Your own scripts only: the target length in seconds (content/targets.ts). Shown on the Tape. */
   targetSeconds?: number;
+  /**
+   * One Minute (docs/briefs/one-minute.md). Set only on a finished minute that had a Flow; Free
+   * talk and older sessions leave all of these unset. passageId stays 'talk'.
+   */
+  kind?: 'minute';
+  /** 0–100. Whether you kept talking (engine/minute.ts). Not the same scale as `score`. */
+  flow?: number;
+  /** Which Flow formula made `flow`. Trends compare only the same version. */
+  flowVersion?: string;
+  /** The prompt's id (content/prompts.ts), never its text. */
+  promptId?: string;
+  level?: 1 | 2 | 3;
+  /** Token indices of likely fillers the reader marked "I meant that". Never the words. */
+  overruled?: number[];
+  /** The minute's numbers, so the Tape can redraw (and recompute) without the transcript. */
+  minute?: {
+    longPauses: number;
+    longestPauseSeconds: number;
+    talkSeconds: number;
+    wpm: number;
+    words: number;
+    umCount: number;
+    umPerMin: number;
+    /** Likely fillers at Finish: token index + which habit word (a fixed list of codes). */
+    habitFillers: { index: number; word: HabitWord }[];
+    /** "unsure" uses: shown as a quiet count, never as fillers. */
+    habitUnsure: number;
+    /** What Flow was computed from (engine FlowInput). */
+    input: FlowInput;
+  };
   /** Tester mode only (supervised beta). Stays on the phone; never sent anywhere. */
   review?: {
     statuses: string; // see engine/review.ts

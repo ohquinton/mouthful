@@ -18,9 +18,26 @@ import { ahaPaywallDue, ahaPaywallRoute, claimAhaPaywall, requirePro } from '../
 import { track } from '../analytics';
 import { clock, lengthZone, spokenClock } from '../content/targets';
 import { maybeAskForRating } from '../rating';
+import { minuteTrend } from '../engine/minute';
+import type { HabitWord } from '../engine/habits';
+import { habitCode, overruleFiller, pastMinutes, trendText } from '../store/minute';
+import { MinuteResult } from '../components/MinuteResult';
 import { fonts, space, useColors } from '../theme';
 
 const CONTEXT_LABEL = { reading: 'reading aloud', presenting: 'presenting', talking: 'talking' } as const;
+
+/** A finished One Minute with its Flow. Anything else (Free talk, reading, older sessions) shows the usual Tape. */
+const isMinuteSession = (x: SavedSession) => x.kind === 'minute' && typeof x.flow === 'number' && !!x.minute;
+
+/** The big number: Flow for a minute, the score for everything else. */
+const headline = (x: SavedSession) => (isMinuteSession(x) ? x.flow! : x.score);
+
+/** This minute against your own earlier minutes of the same Flow version. */
+function minuteTrendText(s: SavedSession, all: SavedSession[]): string {
+  const version = s.flowVersion ?? '';
+  const past = pastMinutes(all, all.findIndex((x) => x.id === s.id), version);
+  return trendText(minuteTrend(past, version, s.flow), past.length);
+}
 
 export default function Tape() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -44,9 +61,9 @@ export default function Tape() {
       if (all[i].segments) resolvePassage(all[i].passageId).then((p) => p && setPassageWords(preparePassage(p.text)));
       setPrev(all.slice(0, i).reverse().find((x) => x.passageId === all[i].passageId) ?? all[i - 1]);
       setDays(streak(all).days);
-      // The one celebratory moment: the score counts up over 600ms.
+      // The one celebratory moment: the score (or a minute's Flow) counts up over 600ms.
       count.addListener(({ value }) => setShown(Math.round(value)));
-      Animated.timing(count, { toValue: all[i].score, duration: 600, useNativeDriver: false }).start();
+      Animated.timing(count, { toValue: headline(all[i]), duration: 600, useNativeDriver: false }).start();
     });
     return () => count.removeAllListeners();
   }, [id, count]);
@@ -102,7 +119,31 @@ export default function Tape() {
     else router.replace({ pathname: '/session/[id]', params: { id: s.passageId, pace: s.context ?? 'reading' } });
   };
 
+  // "I meant that" on a likely filler. One tap at a time, so a double tap can't log twice.
+  const saving = useRef(false);
+  const meant = async (index: number, word: HabitWord) => {
+    if (!s || saving.current) return;
+    const next = overruleFiller(s, index);
+    if (next === s) return;
+    saving.current = true;
+    setS(next);
+    if (next.flow !== s.flow) {
+      count.setValue(headline(next));
+      setShown(headline(next));
+    }
+    try {
+      await updateSession(s.id, { overruled: next.overruled, flow: next.flow, minute: next.minute });
+    } finally {
+      saving.current = false;
+    }
+    Haptics.selectionAsync().catch(() => {});
+    // The habit word's code only (like, you_know), never the words around it.
+    track('recognition_correction', { where: 'tape', kind: 'habit', which: habitCode(word) });
+  };
+
   if (!s) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+
+  const isMinute = isMinuteSession(s);
 
   const ctx = s.context ?? (s.passageId === 'talk' ? 'talking' : 'reading');
   const [lo, hi] = PACE_BANDS[ctx];
@@ -168,6 +209,10 @@ export default function Tape() {
         <Text style={[styles.streak, { color: colors.ember, borderColor: colors.line }]}>🔥 {days}</Text>
       </View>
 
+      {isMinute ? (
+        <MinuteResult s={s} shown={shown} trend={minuteTrendText(s, all)} onMeant={meant} colors={colors} />
+      ) : (
+      <>
       <View style={styles.scoreRow}>
         <Text style={[styles.score, { color: colors.ink }]}>{shown}</Text>
         <Text style={[styles.outOf, { color: colors.muted }]}>/100</Text>
@@ -213,6 +258,8 @@ export default function Tape() {
       )}
 
       <Text style={[styles.coach, { color: colors.ink }]}>{line}</Text>
+      </>
+      )}
 
       {s.stumbled.length > 0 && (
         <View style={[styles.fixCard, { backgroundColor: colors.card }]}>
@@ -259,7 +306,7 @@ export default function Tape() {
         <Text style={[styles.secondaryText, { color: colors.ink }]}>Done</Text>
       </Pressable>
       <Pressable onPress={again}>
-        <Text style={[styles.again, { color: colors.muted }]}>{s.passageId === 'talk' ? 'Try another prompt' : 'Read it again'}</Text>
+        <Text style={[styles.again, { color: colors.muted }]}>{isMinute ? 'Another minute' : s.passageId === 'talk' ? 'Try another prompt' : 'Read it again'}</Text>
       </Pressable>
     </ScrollView>
   );
