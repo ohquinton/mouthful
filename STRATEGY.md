@@ -89,6 +89,8 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
 4. After Phase 1: Fade mode (2 levels) if false red ≤ ~2/100 for accented readers; watch word if the hand-tally supports it.
 5. Beta with 10 readers (half ESL), per TESTING.md. Ask each: "Would you pay $10 to use this before your next interview?"
 
+**Competitors (2026-10-29, docs/COMPETITORS.md):** Perora (free, nearly our feature set) and Sayglide (free voice-follow) mean follow-the-voice and on-device aren't moats. Our edge: the dated moment plan, honest recognition, per-context delivery feedback, honest pricing. Open dilemmas: docs/DILEMMAS.md.
+
 ## Resume here (paused 2026-10-28)
 
 - **In progress:** speech-engine fixing qa-critic's 6 resync findings (S1 refrain "start again" jumps to the closing line and auto-finishes; S1 stutter after a dropped word turns said words red; S2 one interim revision makes the cursor retreat up to 19 words; S2 asides quoting later words pull the cursor ahead; S2 3.6–5.3 ms per call on 300–500-word scripts, target ≤1 ms; plus an additive `align` field so the screen can tell a re-read). Stopped mid-way. WIP (failing tests + partial align.ts) is on branch `wip/resync-qa-fixes` (GitHub), with qa-critic's repro scripts in `wip/qa-resync/`. Restart speech-engine from that branch with the same brief; don't merge the WIP as is.
@@ -99,8 +101,8 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
   4. marketing-lead: competitor teardown (Sayglide, Sayso, Dry Run, DryRun, OffBook, Run Lines): what they do, where we're truly different, what that changes in STRATEGY.
   4b. speech-engine (B): habit-word classifier (`src/engine/habits.ts`), labelled corpus, precision/recall report (running).
   5. speech-engine: beta sheet carries listener restarts/glitches (`reviewRow` in review.ts) + exact steadiness timing via heard-token counts if the beta shows it matters.
-  6. brand-namer: round 2 once Quinton gives a direction (feeling, theme, any names he likes).
-  6b. product-lead: brief for the one-word, one-minute impromptu talk with an honest rating (articulation).
+  6. brand-namer: round 2 from marketing's direction (docs/DILEMMAS.md #1) (running).
+  6b. One Minute (docs/briefs/one-minute.md): after habits.ts merges, speech-engine builds `engine/minute.ts` (Flow), then mobile-engineer replaces Free talk with One Minute behind tester mode.
   7. product-lead: emphasis coaching brief (third core goal), ready for after the beta gate.
   8. design-ux: onboarding critique and redesign brief (first 60 seconds), then a full visual pass once it runs on the iPhone.
 - **Then:** mobile-engineer suppresses "Pick up from…" and pause counting while re-reading (uses the new field); logs a tapped word later inked by backfill as a correction only once; investigates the pre-existing "A network error occurred." on the web Day 1 screen. Then qa-critic attacks the resync again.

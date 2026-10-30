@@ -75,3 +75,39 @@ recordings; switch to voice-level silence if off).
 
 Free talk counts the silence before the first word as a pause (`useListener` stamps `lastHeardAt` at start;
 `talk.tsx` counts the start-to-first-word gap). It biases against slow starters. Fix with One Minute.
+
+## Revision 2 (product-lead, after the classifier decision): replaces the rating section and criteria 2, 4, 6
+
+Flow is made of **slots**, each either scored or shown. A slot moves from shown to scored through one engine
+constant set at merge time (never at runtime, never via a remote flag). Weights renormalise over scored slots
+only, so a shown slot never moves Flow.
+
+| Slot | Weight when scored | At launch |
+|---|---|---|
+| Kept going (seconds to last heard word ÷ 60) | 40 | scored |
+| Long pauses (> 2.5 s, after the first word) | 35 | scored |
+| Pace in band (`paceScore`, talking) | 25 | scored |
+| um/uh per minute | 15 | shown: "the phone heard 2 (it misses some)" |
+| Likely habit fillers per minute (`habits.ts`, `filler` only) | 15 | shown: "likely fillers", tap to overrule |
+
+When both filler slots are scored: kept going 30, pauses 25, pace 15, um/uh 15, habit fillers 15. "real" and
+"unsure" never count. "I meant that" works in both states (changes the count; recomputes Flow once scored) and
+logs `recognition_correction` with `kind: 'habit'`, `which: <word code>`. Promote the habit slot only at
+≥ ~90% corpus precision, the Phase 1 tally agreeing, and an overrule rate below ~1 in 10 flagged words for
+accented testers (per tester). Promote um/uh only if the tally shows ≥ ~70% caught. Each session saves
+`flowVersion`; trends compare same-version sessions only. Copy while shown: "Likely fillers: like ×3, you know
+×1. Tap any you meant." Coaching may mention habit fillers only once they're scored.
+
+Revised criteria:
+
+- **2.** 60 s, no long pauses, 140 wpm → Flow 100 regardless of um/uh and habit counts while shown. With the
+  habit slot set to scored in a test, 6 likely fillers/min lowers Flow and "unsure" labels don't.
+- **2b.** 3 likely fillers + 1 "I meant that" → shown count 2; scored Flow equals Flow computed with 2.
+- **4.** `minuteTrend` is null with fewer than 3 past sessions of the same `flowVersion`, else compares against
+  the median of their last 5.
+- **6.** The Tape shows Flow, the "not your accent" line, um/uh "(it misses some)", likely fillers as tappable
+  chips, and one coaching line. A tap saves the overrule and survives a restart. The session stores `flow`,
+  `flowVersion` and overrule counts, never the words around a flagged word.
+
+Analytics add `habit_fillers`, `habit_unsure`, `habit_overruled`, `flow_version`. Sequencing: `habits.ts`
+merges first → `minute.ts` (imports the labels, never edits habits.ts) → mobile.

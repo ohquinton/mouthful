@@ -6,7 +6,7 @@ Mouthful helps adults rehearse what they'll actually say at work (an interview a
 
 Formerly "Cadence" (renamed: at least two speaking apps already use that name). The product name lives in `src/brand.ts` only.
 
-Strategy, bets and open decisions: `STRATEGY.md` (read it before planning work).
+Strategy, bets and open decisions: `STRATEGY.md` (read it before planning work). Open product dilemmas: `docs/DILEMMAS.md`. Competitors: `docs/COMPETITORS.md`. Feature briefs: `docs/briefs/`.
 Product spec (written under the old name): https://claude.ai/artifact/7y5W1WCUVuHKrXsHjLFAmC
 Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the versioned docs.
 
@@ -18,7 +18,7 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
 4. **No single "correct" pace.** Reading 130–165, presenting 120–155, talking 120–170 (`PACE_BANDS`). Shown as a suggested range. Pace is only ever compared within one context (Progress chart chips, Day 1 vs now).
 5. **Reward steadiness, not speed.** The pacer runs at the middle of the range; we don't race your best.
 6. **During Glide, nothing competes with the text.** Motion is limited to the ink cursor, the words inking in, and the footer.
-7. **Only hesitations are fillers.** um, uh, erm are scored. Habit words (like, so, actually, you know) are reported on the Tape and never scored, in reading or free talk, because we can't tell a habit from a reader rephrasing or the recogniser mishearing.
+7. **Only fillers we can tell from context count.** um, uh, erm are scored. Habit words (like, so, you know, actually…) are labelled filler, real or unsure by a context classifier (`engine/habits.ts`: the words around them, pauses, repetition bursts). Only "filler" counts, the reader can always overrule ("I meant that"), and a word enters any score only after it reaches ≥ ~90% precision on the labelled corpus and the beta hand tally agrees. Until then it is shown, not scored (DECISIONS 2026-10-29).
 8. **A failed attempt always has a way back.** Too-short sessions show Try again, which resets everything (transcript, timer, corrections, marks) and listens again.
 
 ## Layout
@@ -89,7 +89,7 @@ npx eas-cli@latest build --profile development --platform ios
 
 ## Known limits
 
-- Habit words are never scored, so someone who says "like" every third word isn't told so by the score, only by the Tape's habit-word line.
+- Habit words aren't scored until the classifier is validated (principle 7), so for now someone who says "like" every third word is told so only by the Tape's habit-word line.
 - On-device recognisers often drop "um" and "uh", so filler counts run low. Item 5 above fixes that.
 - First-word lag is a proxy for highlight delay (voice level crossing a threshold → first inked word). It isn't measured on web, which has no voice levels.
 - Very short Free talk sessions inflate fillers per minute.
