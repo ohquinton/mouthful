@@ -29,7 +29,7 @@ plus one character of our own in Rive, not stock packs.
 
 ## Mascot (sketches in docs/design/mascot/)
 
-One quiet character, Headspace-style: shape and eyes, no mouth that could frown, no age, skin or gender. Reacts
+**Decided 2026-10-30: the Drop is the mascot** (pilot on onboarding + empty states first). One quiet character, Headspace-style: shape and eyes, no mouth that could frown, no age, skin or gender. Reacts
 by settling, never sadness. Concepts: **Drop** (ink drop that fills your words; design-ux's pick), Bubble (reads
 as a chatbot), Pebble (breathes; strong for the One Minute ring and the Paused card).
 
@@ -37,8 +37,9 @@ as a chatbot), Pebble (breathes; strong for the One Minute ring and the Paused c
   vs your own history, never about accuracy or score), heat-strip "day done", One Minute countdown, Paused card,
   small on the paywall header.
 - Never: Glide (principle 6), the too-short card, Fix-it, or next to any number it could seem to grade.
-- Colour: amber (#E3A33A) is both the icon highlight and the `ember` warning token. Add a `glow` token for
-  celebration, or celebrate in `good` (theme.ts is main-session only).
+- Colour (decided 2026-10-30): no new token and no glow effects. Celebrations use the existing `good`
+  colour, quietly; amber means "watch out" only. The Drop is flat, two colours, no shine (the sketch's highlight
+  dot goes). See "Taste" in .claude/agents/04-design-ux.md.
 
 ## Animation moments (outside Glide; all respect Reduce Motion)
 

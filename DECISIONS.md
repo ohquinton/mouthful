@@ -2,6 +2,7 @@
 
 One line per decision: date, decision, why. Newest first.
 
+- **2026-10-30 · Mascot: the Drop** (flat, no mouth, never sad), piloted on onboarding and empty states. **No glow effects and no new colour:** celebrations use the existing `good` colour; amber means "watch out" only. Design rule: it must never look vibe-coded (Taste section in the design-ux agent).
 - **2026-10-30 · Tagline: "Find the words. Say them clearly."** Covers vocabulary by subject and articulation, works for interviews, presentations and everyday English, simple for ESL speakers, never grades. Positioning broadened to ESL speaking practice and vocabulary; the store still leads with one concrete moment.
 - **2026-10-30 · Name: SaidClearly** (Quinton). Clearance and a lawyer consult before branding spend.
 - **2026-10-30 · One Minute: first ~8 s of thinking free; time to first word shown as its own trended number.** Trains starting fast, closes the "silent minute" loophole (DILEMMAS #15).
