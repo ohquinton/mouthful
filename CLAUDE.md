@@ -33,7 +33,7 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
   - `steadiness.ts` — pace by stretch of the passage (breaths left out) and a 0–100 steadiness; shown on the Tape as `PaceStrip`, not part of the score
   - `locale.ts` — which English the recogniser listens for (reader's choice in You, else the phone's region)
   - `habits.ts` — habit-word classifier: each like/so/you know/actually/basically/literally/i mean/kind of/sort of/right labelled filler, real or unsure (context rules, bursts, pauses); corpus + holdout in `__tests__/fixtures/habits-*.json`. Not wired into scoring yet
-  - `minute.ts` — One Minute engine: long pauses (> 2.5 s after the first word), Flow slots (kept going, pauses, pace scored; um/uh and habit fillers shown), coaching line, own-history trend (`FLOW_SCORED` is the one switch, `FLOW_VERSION` tags sessions). Screen not wired yet (docs/briefs/one-minute.md)
+  - `minute.ts` — One Minute engine: long pauses (> 2.5 s after the first word), Flow slots (kept going, pauses, pace scored; um/uh and habit fillers shown), coaching line, own-history trend (`FLOW_SCORED` is the one switch, `FLOW_VERSION` tags sessions). Wired into `talk.tsx` (One Minute when tester mode is on; Free talk otherwise), Flow on the Tape (docs/briefs/one-minute.md)
   - `days.ts` — calendar-day maths (`daysBetween`, `calendarDay`), safe across clock changes
 - `src/speech/gate.ts` — when speech counts as on-device (Android only from API 33) and whether a variety is supported
 - `src/speech/useListener.ts` — recogniser wrapper: on-device/consent, restarts, voice level, optional recording, `reset()` for retries
@@ -72,7 +72,7 @@ Today shows the active moment's plan (`PlanCard`): learn the words → say them 
 ## Commands
 
 ```bash
-npm test                  # engine + store tests (518); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
+npm test                  # engine + store tests (556); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)
