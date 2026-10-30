@@ -97,6 +97,7 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
   2. mobile-engineer: app fixes + aha QA fixes (running) → merge → qa-critic reviews.
   3. mobile-engineer: re-read handling on screen (no "Pick up from…", no pause counted) using align's new re-read field.
   4. marketing-lead: competitor teardown (Sayglide, Sayso, Dry Run, DryRun, OffBook, Run Lines): what they do, where we're truly different, what that changes in STRATEGY.
+  4b. speech-engine (B): habit-word classifier (`src/engine/habits.ts`), labelled corpus, precision/recall report (running).
   5. speech-engine: beta sheet carries listener restarts/glitches (`reviewRow` in review.ts) + exact steadiness timing via heard-token counts if the beta shows it matters.
   6. brand-namer: round 2 once Quinton gives a direction (feeling, theme, any names he likes).
   6b. product-lead: brief for the one-word, one-minute impromptu talk with an honest rating (articulation).
