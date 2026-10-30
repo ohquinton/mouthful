@@ -17,6 +17,12 @@ export type Moment = {
   pace: PaceContext;
   scriptPrompt: string;
   scriptPlaceholder: string;
+  /**
+   * How long the whole script should take, in seconds, when the moment has a usual slot (an
+   * interview answer: about 2 minutes). Unset: the target comes from the script's length at the
+   * middle of the pace band (content/targets.ts).
+   */
+  targetSeconds?: number;
 };
 
 export const MOMENTS: Moment[] = [
@@ -30,6 +36,7 @@ export const MOMENTS: Moment[] = [
     pace: 'talking',
     scriptPrompt: 'Paste your answer to the question you’re dreading.',
     scriptPlaceholder: 'Tell me about yourself… I’m a data analyst with three years of experience in…',
+    targetSeconds: 120,
   },
   {
     id: 'presentation',

@@ -14,7 +14,7 @@ import {
   tokenise,
   withCorrections,
 } from '../../engine/align';
-import { PaceContext, pacerIndex, pacerWpm, paceZone, sessionScore, wordsPerMinute } from '../../engine/score';
+import { PACE_BANDS, PaceContext, pacerIndex, pacerWpm, paceZone, sessionScore, wordsPerMinute } from '../../engine/score';
 import type { Passage } from '../../content/passages';
 import { resolvePassage, sourceOf } from '../../content/resolve';
 import { keptCorrections, loadSessions, saveSession } from '../../store/sessions';
@@ -36,6 +36,8 @@ import { MicGate, gateStates } from '../../components/MicGate';
 import { ListenError } from '../../components/ListenError';
 import { space, useColors } from '../../theme';
 import { DICTIONARY, packPassageId } from '../../content/wordpacks';
+import { clock, LENGTH_LABEL, lengthZone, spokenClock, targetForPassage } from '../../content/targets';
+import { noteRoughPatch } from '../../rating';
 
 const MID_SENTENCE_PAUSE_MS = 2000;
 const BREATH_PAUSE_MS = 450;
@@ -46,13 +48,18 @@ function defaultPace(id: string): PaceContext {
   return id.startsWith('s.') ? 'presenting' : 'reading';
 }
 
+/** Route params come from anywhere (deep links too): only a pace band we have counts. */
+function paceParam(pace: string | undefined, id: string): PaceContext {
+  return pace && Object.prototype.hasOwnProperty.call(PACE_BANDS, pace) ? (pace as PaceContext) : defaultPace(id);
+}
+
 export default function GlideSession() {
-  const { id, cold, step, pace } = useLocalSearchParams<{ id: string; cold?: string; step?: string; pace?: PaceContext }>();
+  const { id, cold, step, pace: paceRaw } = useLocalSearchParams<{ id: string; cold?: string; step?: string; pace?: string }>();
   const colors = useColors();
   const { profile, ready } = useProfile();
   const [passage, setPassage] = useState<Passage | null | undefined>(undefined);
   // Whether this read is the free reader's one free script run (pro.ts). Undefined until checked.
-  const [freeRun, setFreeRun] = useState<{ yes: boolean; day1At?: number }>();
+  const [freeRun, setFreeRun] = useState<{ yes: boolean; day1At?: number; target?: number }>();
 
   useEffect(() => {
     resolvePassage(id ?? '').then((p) => setPassage(p ?? null));
@@ -62,7 +69,10 @@ export default function GlideSession() {
   // again" and deep links all land here, so a script part never starts without canRehearse()
   // saying yes, and a cold read never starts without canColdRead(). Waits for the profile, so a
   // Pro reader opening a deep link at launch isn't walled by the default profile.
-  const momentPackId = getMoment(profile.moment?.id)?.packId;
+  const momentDef = getMoment(profile.moment?.id);
+  const momentPackId = momentDef?.packId;
+  const momentScriptId = profile.moment?.scriptId;
+  const pace = passage ? paceParam(paceRaw, passage.id) : 'reading';
   useEffect(() => {
     if (!ready || !passage) return;
     let live = true;
@@ -75,19 +85,21 @@ export default function GlideSession() {
       wall('cold');
       return;
     }
-    loadSessions().then((sessions) => {
+    // The target length (your own scripts only) loads alongside, so the footer chip is there from the start.
+    const target = targetForPassage(passage.id, { def: momentDef, scriptId: momentScriptId }, pace);
+    Promise.all([loadSessions(), target]).then(([sessions, targetSeconds]) => {
       if (!live) return;
       const args = { pro: profile.pro, sessions, passageId: passage.id };
       if (!canRehearse(args)) {
         wall(rehearseWall(args));
         return;
       }
-      setFreeRun({ yes: isFreeRun(args), day1At: sessions.find((s) => s.passageId === 'baseline')?.at });
+      setFreeRun({ yes: isFreeRun(args), day1At: sessions.find((s) => s.passageId === 'baseline')?.at, target: targetSeconds });
     });
     return () => {
       live = false;
     };
-  }, [ready, passage, profile.pro, cold, momentPackId]);
+  }, [ready, passage, profile.pro, cold, momentPackId, momentDef, momentScriptId, pace]);
 
   if (passage === undefined || (passage && !freeRun)) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   if (passage === null) {
@@ -105,9 +117,10 @@ export default function GlideSession() {
       passage={passage}
       cold={cold === '1'}
       step={step}
-      pace={pace ?? defaultPace(passage.id)}
+      pace={pace}
       freeRun={freeRun!.yes}
       day1At={freeRun!.day1At}
+      targetSeconds={freeRun!.target}
     />
   );
 }
@@ -126,6 +139,7 @@ function GlideSessionView({
   pace,
   freeRun,
   day1At,
+  targetSeconds,
 }: {
   passage: Passage;
   cold: boolean;
@@ -133,6 +147,8 @@ function GlideSessionView({
   pace: PaceContext;
   freeRun: boolean;
   day1At?: number;
+  /** Your own script's target length (content/targets.ts). Undefined: no time chip. */
+  targetSeconds?: number;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -353,6 +369,7 @@ function GlideSessionView({
       segments: segments.length ? segments : undefined,
       steadiness: steady?.score,
       partReached: reachedPart,
+      targetSeconds,
       review: tester
         ? {
             // The recogniser's statuses, so a tapped word it still missed is 'c' (it was 'r' from
@@ -397,7 +414,7 @@ function GlideSessionView({
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (isBaseline && !profile.onboarded) router.replace({ pathname: '/onboarding/day1', params: { id: sessionId } });
     else router.replace({ pathname: '/tape', params: { id: sessionId } });
-  }, [a, raw, listener, passage, words, sentenceEnds, pace, corrected, profile, update, step, isBaseline, tester, freeRun, day1At]);
+  }, [a, raw, listener, passage, words, sentenceEnds, pace, corrected, profile, update, step, isBaseline, tester, freeRun, day1At, targetSeconds]);
 
   /**
    * The Finish button. On the free run, before Glide has reached most of part 1, it asks first:
@@ -468,6 +485,12 @@ function GlideSessionView({
     await listener.resume();
   }, [listener]);
 
+  // A too-short read or a recogniser that stopped: no rating ask this launch (rating.ts).
+  const failedNow = listener.state === 'error';
+  useEffect(() => {
+    if (tooShort || failedNow) noteRoughPatch();
+  }, [tooShort, failedNow]);
+
   // The session ends itself on the last word.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to the recogniser reaching the last word; finish() is guarded by finished.current
@@ -487,6 +510,11 @@ function GlideSessionView({
   const zoneColor = zone === 'good' ? colors.good : zone === 'fast' ? colors.stumble : zone === 'slow' ? colors.ember : colors.line;
   // Word boxes are measured by onLayout into a ref; the cursor reads the latest one each render.
   const cursorBox = boxes.current[a.next];
+  // Target length chip (your own scripts only): neutral, then amber "wrap up", then red "over
+  // time". Colour and words together, never colour alone. Nothing moves; only the colour changes.
+  const timeZone = targetSeconds ? lengthZone(seconds, targetSeconds) : undefined;
+  const timeColor = timeZone === 'over' ? colors.stumble : timeZone === 'near' ? colors.ember : colors.muted;
+  const timeLabel = timeZone ? LENGTH_LABEL[timeZone] : undefined;
   // eslint-disable-next-line react-hooks/refs -- read-only timing ref; see `seconds` above
   const showPacer = pacer !== null && startedAt.current > 0 && Math.abs(pacer - a.next) >= 2;
 
@@ -633,6 +661,18 @@ function GlideSessionView({
 
       {/* Footer: voice ribbon, live pace, pacer, finish */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + space(1.5) }]}>
+        {targetSeconds !== undefined && timeZone && (
+          <View
+            style={[styles.timeChip, { borderColor: timeZone === 'under' ? colors.line : timeColor }]}
+            accessible
+            accessibilityLabel={`${spokenClock(seconds)} of a ${spokenClock(targetSeconds)} target${timeLabel ? `, ${timeLabel}` : ''}`}
+          >
+            <Text style={[styles.timeText, { color: timeZone === 'under' ? colors.muted : timeColor }]}>
+              {clock(seconds)} / {clock(targetSeconds)}
+              {timeLabel ? ` · ${timeLabel}` : ''}
+            </Text>
+          </View>
+        )}
         <View style={styles.footerRow}>
           <View style={styles.paceGroup}>
             <VoiceRibbon level={level} color={listener.state === 'listening' ? zoneColor : colors.line} />
@@ -664,6 +704,8 @@ const styles = StyleSheet.create({
   flow: { flexDirection: 'row', flexWrap: 'wrap' },
   footer: { paddingHorizontal: space(3), paddingTop: space(1.5) },
   footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  timeChip: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingHorizontal: space(1.25), paddingVertical: 4, marginBottom: space(1) },
+  timeText: { fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
   paceGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   wpm: { fontSize: 20, fontWeight: '600', fontVariant: ['tabular-nums'] },
   wpmUnit: { fontSize: 13, marginLeft: -4 },

@@ -12,6 +12,7 @@ import { listenLocale, useListener } from '../speech/useListener';
 import { PrimaryButton } from '../components/ui';
 import { useProfile } from '../store/profile';
 import { track } from '../analytics';
+import { noteRoughPatch } from '../rating';
 import { useVoiceLevel, VoiceRibbon } from '../components/VoiceRibbon';
 import { MicGate, gateStates } from '../components/MicGate';
 import { ListenError } from '../components/ListenError';
@@ -49,6 +50,10 @@ export default function FreeTalk() {
   // The recogniser stopped for good (e.g. it can't listen for this English). A routine error
   // while it's still listening restarts by itself, so it shows nothing.
   const failed = listener.state === 'error';
+  // No rating ask in a launch where the recogniser let them down (rating.ts).
+  useEffect(() => {
+    if (failed) noteRoughPatch();
+  }, [failed]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 250);
@@ -128,6 +133,7 @@ export default function FreeTalk() {
     if (counts.spoken < MIN_WORDS) {
       // The guard resets in begin(), which the Try again button calls.
       setStartedAt(0);
+      noteRoughPatch();
       track('session_too_short', { spoken: counts.spoken, kind: 'talk' });
       setNotice(counts.spoken === 0 ? 'The mic didn’t hear anything. Hold the phone a little closer and try again.' : `Only ${counts.spoken} ${counts.spoken === 1 ? 'word' : 'words'} came through. Try again a little closer to the mic.`);
       return;

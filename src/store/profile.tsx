@@ -27,6 +27,8 @@ export type Profile = {
   paywallSeen: boolean;
   /** The full paywall after the free script run has opened once (pro.ts ahaPaywallDue). After that, soft walls only. */
   ahaPaywallShown?: boolean;
+  /** When we asked for an App Store rating (epoch ms), the last 365 days only (rating.ts). */
+  ratingAsks?: number[];
 };
 
 const KEY = 'mouthful.profile.v1';
