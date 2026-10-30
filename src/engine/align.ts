@@ -188,6 +188,7 @@ type PassageIndex = {
   finalStart: number; // first word of the last sentence
   penultStart: number; // first word of the sentence before it
   matches: Map<string, Matches>;
+  pairs: Map<string, number[]>;
 };
 const INDEX = new WeakMap<PassageWord[], PassageIndex>();
 
@@ -211,7 +212,7 @@ function indexFor(p: PassageWord[]): PassageIndex {
     };
     const finalStart = startOf(n - 1);
     const penultStart = finalStart > 0 ? startOf(finalStart - 1) : 0;
-    idx = { sentEnd, stop, finalStart, penultStart, matches: new Map() };
+    idx = { sentEnd, stop, finalStart, penultStart, matches: new Map(), pairs: new Map() };
     INDEX.set(p, idx);
   }
   return idx;
@@ -236,6 +237,28 @@ function matchesOf(p: PassageWord[], idx: PassageIndex, w: string): Matches {
   return m;
 }
 
+/**
+ * Passage indices where heard words a then b match one after the other (the start of each pair).
+ * Cached per passage and pair; callers never modify the array.
+ */
+function pairsOf(p: PassageWord[], idx: PassageIndex, a: string, b: string): number[] {
+  const key = a + ' ' + b;
+  let out = idx.pairs.get(key);
+  if (!out) {
+    const m1 = matchesOf(p, idx, a);
+    const m2 = matchesOf(p, idx, b);
+    out = [];
+    if (m1.at.length <= m2.at.length) {
+      for (const k of m1.at) if (m2.bits[k + 1] === 1) out.push(k);
+    } else {
+      for (const k of m2.at) if (k > 0 && m1.bits[k - 1] === 1) out.push(k - 1);
+    }
+    if (idx.pairs.size > 8000) idx.pairs.clear();
+    idx.pairs.set(key, out);
+  }
+  return out;
+}
+
 /** Exclusive end of the pointer's sentence plus `more` sentences after it. */
 function sentencesFrom(idx: PassageIndex, ptr: number, n: number, more: number): number {
   if (ptr >= n) return n;
@@ -245,16 +268,17 @@ function sentencesFrom(idx: PassageIndex, ptr: number, n: number, more: number):
 }
 
 /** Does the next real word after heard[i] carry on from passage word m (within CARRY_ON words)? */
-function carriesOn(passage: PassageWord[], heard: string[], i: number, m: number): boolean {
+function carriesOn(passage: PassageWord[], idx: PassageIndex, heard: string[], i: number, m: number): boolean {
   const w = heard[i];
   for (let j = i + 1; j < heard.length; j++) {
     const x = heard[j];
     if (x === w || HESITATIONS.has(x) || HABIT_WORDS.has(x)) continue;
-    if (j + 1 < heard.length && HABIT_PHRASES.has(`${x} ${heard[j + 1]}`)) {
+    if (j + 1 < heard.length && PHRASE_START.has(x) && HABIT_PHRASES.has(`${x} ${heard[j + 1]}`)) {
       j++;
       continue;
     }
-    for (let k = m + 1; k < Math.min(m + 1 + CARRY_ON, passage.length); k++) if (wordsMatch(x, passage[k].key)) return true;
+    const b = matchesOf(passage, idx, x).bits;
+    for (let k = m + 1; k < Math.min(m + 1 + CARRY_ON, passage.length); k++) if (b[k] === 1) return true;
     return false;
   }
   return false; // nothing after it yet: wait for the next result
@@ -278,7 +302,15 @@ type Anchor = { h: number; k: number; back: boolean; hold?: boolean };
  * on its own words and the ones after it, so a dead start stays dead and a waiting one picks up
  * where it stopped.
  */
-type Starts = { dead: Uint8Array; cands: (number[] | undefined)[]; len: Int32Array; firstWait: number };
+type Starts = {
+  dead: Uint8Array;
+  cands: (number[] | undefined)[];
+  len: Int32Array;
+  firstWait: number;
+  /** Starts not yet dead, in order (so each call skips the dead ones), and how many have been added. */
+  live: number[];
+  added: number;
+};
 
 function findAnchor(
   p: PassageWord[],
@@ -308,13 +340,20 @@ function findAnchor(
   const last = run.length - 1;
   let wait = -1; // the first start that may still anchor once more words arrive
   let reachedBy: Int32Array | undefined;
-  for (let s = Math.max(0, last - MAX_STARTS); s < last; s++) {
-    if (st.dead[s]) continue;
+  // The starts to try: those still live in the window (the latest MAX_STARTS), oldest first.
+  const lo = Math.max(0, last - MAX_STARTS);
+  for (let s = Math.max(st.added, lo); s < last; s++) st.live.push(s);
+  st.added = Math.max(st.added, last);
+  const live = st.live;
+  let keep = 0; // live starts are compacted in place as dead ones drop out
+  for (let li = 0; li < live.length; li++) {
+    const s = live[li];
+    if (s < lo || st.dead[s]) continue;
+    live[keep++] = s;
     let cands = st.cands[s];
     let len = st.len[s];
     if (!cands) {
-      const second = bitsAt(s + 1);
-      cands = matchesOf(p, idx, heard[run[s]]).at.filter((k) => second[k + 1] === 1);
+      cands = pairsOf(p, idx, heard[run[s]], heard[run[s + 1]]);
       len = 2;
     }
     let waiting = false;
@@ -363,7 +402,7 @@ function findAnchor(
     const floor = back ? 0 : ptr;
     for (let x = h - 1; x >= runStart && k - 1 >= floor; x--) {
       if (kind[x] === HES) continue;
-      if (kind[x] === PHRASE || kind[x] === PHRASE2 || !wordsMatch(heard[x], p[k - 1].key)) break;
+      if (kind[x] === PHRASE || kind[x] === PHRASE2 || matchesOf(p, idx, heard[x]).bits[k - 1] !== 1) break;
       h = x;
       k--;
     }
@@ -422,11 +461,14 @@ function findAnchor(
       // quoted early, a refrain, "sorry, let me start again" on a passage that ends with its
       // opening line) the pointer holds and those words are heard as off-script.
       if (k >= idx.finalStart && ptr < idx.finalStart && !(k === idx.finalStart && ptr >= idx.penultStart)) {
+        live.splice(keep, li + 1 - keep);
         return { h, k, back, hold: true };
       }
     }
+    live.splice(keep, li + 1 - keep);
     return { h, k, back };
   }
+  live.length = keep;
   st.firstWait = wait;
   return wait >= 0 ? 'wait' : null;
 }
@@ -451,7 +493,12 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
   // to rewind to if a resync reinterprets them.
   let runStart = 0;
   const run: number[] = [];
-  const st: Starts = { dead: new Uint8Array(H), cands: [], len: new Int32Array(H), firstWait: -1 };
+  const st: Starts = { dead: new Uint8Array(H), cands: [], len: new Int32Array(H), firstWait: -1, live: [], added: 0 };
+  const clearRun = () => {
+    run.length = 0;
+    st.live.length = 0;
+    st.added = 0;
+  };
   const addToRun = (i: number) => {
     st.dead[run.length] = 0;
     st.cands[run.length] = undefined;
@@ -467,6 +514,8 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
   let shadow = -1; // held at the end (see findAnchor): the last-sentence word expected next
   let lastAnchor = -1;
   let budget = 8 * H + 64; // rewinds are bounded, whatever the transcript
+  let doneHit: Uint8Array | null = null; // at the end of the passage: which words are inked
+  let doneMissing = -1; // and how many aren't (-1: not counted yet)
 
   for (let i = 0; i < H; i++) {
     if (pending && i === pending.h) {
@@ -480,7 +529,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
       prevJumped = false;
       habitGap = false;
       runStart = i;
-      if (run.length) run.length = 0;
+      clearRun();
       snapNext = next;
       snapBp = bp;
       snapPrev = prev;
@@ -533,7 +582,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
           const afterOff = prev < 0 && run.length > 0;
           const jump = match > next;
           const unsure = idx!.stop[match] ? jump || afterOff : jump && afterOff;
-          if (unsure && (match < n - 1 ? !carriesOn(passage, heard, i, match) : match - next > 1)) {
+          if (unsure && (match < n - 1 ? !carriesOn(passage, idx!, heard, i, match) : match - next > 1)) {
             held[i] = match;
             match = -1;
           }
@@ -550,7 +599,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
         !back &&
         last >= 0 &&
         (kind[last] === OFF ? match > next : kind[last] === FWD && at[last] < match - 1) &&
-        wordsMatch(heard[last], passage[match - 1].key)
+        matchesOf(passage, idx!, heard[last]).bits[match - 1] === 1
       ) {
         at[last] = match - 1;
         kind[last] = FWD;
@@ -571,6 +620,13 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
         }
       }
       at[i] = match;
+      if (doneHit) {
+        if (!back) doneHit = null; // can't happen at the end; recount to be safe
+        else if (!doneHit[match]) {
+          doneHit[match] = 1;
+          doneMissing--;
+        }
+      }
       const jumped = back ? match > bp : match > next;
       if (back) {
         kind[i] = BACK;
@@ -593,7 +649,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
       prevJumped = jumped;
       if (confirm && !run.length) {
         runStart = i + 1;
-        if (run.length) run.length = 0;
+        clearRun();
         snapNext = next;
         snapBp = bp;
         snapPrev = match;
@@ -642,8 +698,21 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
       }
     }
 
+    // At the end of the passage every anchor is a re-read, and a re-read only matters if it can
+    // ink a red word. With none left there is nothing to search for (the passage read twice, a
+    // recogniser repeating itself at a restart seam).
+    if (n > 0 && snapNext >= n && !doneHit && run.length >= 2) {
+      doneHit = new Uint8Array(n);
+      doneMissing = n;
+      for (let j = 0; j <= i; j++) {
+        if ((kind[j] === FWD || kind[j] === BACK) && !doneHit[at[j]]) {
+          doneHit[at[j]] = 1;
+          doneMissing--;
+        }
+      }
+    }
     const found =
-      n > 0 && run.length >= 2 && budget > 0
+      n > 0 && run.length >= 2 && budget > 0 && !(snapNext >= n && doneHit && doneMissing === 0)
         ? findAnchor(passage, idx!, heard, kind, at, run, runStart, snapNext, lastAnchor, st, settled)
         : null;
     const anchor = found === 'wait' ? null : found;
@@ -655,7 +724,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
       const agrees = w0 === run.length - 2 && st.cands[w0]?.length === 1 && st.cands[w0]![0] === at[run[w0]];
       if (confirm && (found !== 'wait' || agrees)) {
         runStart = i + 1;
-        if (run.length) run.length = 0;
+        clearRun();
         snapNext = next;
         snapBp = bp;
         snapPrev = prev;
@@ -665,6 +734,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
     }
     // Rewind to the start of the run and read it again: off-script up to the anchor, then on.
     budget -= i - runStart + 1;
+    doneHit = null; // rereading the run may change what it inked
     lastAnchor = anchor.h;
     pending = anchor;
     // Ahead: words before the anchor matched by chance, so they are undone. Behind (a re-read):
@@ -675,7 +745,7 @@ export function align(passage: PassageWord[], heard: string[], settled = heard.l
     bp = snapBp;
     prev = snapPrev;
     prevJumped = snapJumped;
-    if (run.length) run.length = 0;
+    clearRun();
     i = runStart - 1;
   }
 
