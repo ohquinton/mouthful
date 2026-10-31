@@ -2,7 +2,7 @@
 
 **Find the words. Say them clearly.**
 
-Mouthful helps adults rehearse what they'll actually say at work (an interview answer, a presentation, a raise conversation, a meeting update) out loud. You read with Glide, the words ink in as you say them, and you see your pace, fillers and the words you tripped on. Then you practise those words alone and in a sentence.
+SaidClearly helps people become more articulate: find precise words, think on their feet, and practise pace, emphasis and delivery. ESL speakers are included, but the product is not centred on ESL. Rehearsing interviews, presentations and conversations is one part of a broader speaking practice. Glide, vocabulary packs and One Minute are training methods, not the entire promise. See the latest founder correction in DECISIONS.md and docs/COFOUNDER-CONTEXT.md.
 
 Renamed Mouthful → SaidClearly on 2026-10-30 (US risk; docs/NAME-CHECK.md), and earlier Cadence → Mouthful. The product name lives in `src/brand.ts` (and app.json's display name and permission strings). The repo, bundle id (`ca.quintonjackson.mouthful`), slug and URL scheme stay "mouthful": RevenueCat, Sentry and EAS are tied to them. Copy must say "heard clearly", never imply a clarity grade (the name sounds like a verdict).
 
@@ -33,12 +33,12 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
   - `steadiness.ts` — pace by stretch of the passage (breaths left out) and a 0–100 steadiness; shown on the Tape as `PaceStrip`, not part of the score
   - `locale.ts` — which English the recogniser listens for (reader's choice in You, else the phone's region)
   - `habits.ts` — habit-word classifier: each like/so/you know/actually/basically/literally/i mean/kind of/sort of/right labelled filler, real or unsure (context rules, bursts, pauses); corpus + holdout in `__tests__/fixtures/habits-*.json`. Not wired into scoring yet
-  - `minute.ts` — One Minute engine: long pauses (> 2.5 s after the first word), Flow slots (kept going, pauses, pace scored; um/uh and habit fillers shown), coaching line, own-history trend (`FLOW_SCORED` is the one switch, `FLOW_VERSION` tags sessions). Screen not wired yet (docs/briefs/one-minute.md)
+  - `minute.ts` — One Minute engine: long pauses (> 2.5 s after the first word), Flow slots (kept going, pauses, pace scored; um/uh and habit fillers shown), coaching line, own-history trend (`FLOW_SCORED` is the one switch, `FLOW_VERSION` tags sessions). Wired into `talk.tsx` (One Minute when tester mode is on; Free talk otherwise), Flow on the Tape (docs/briefs/one-minute.md)
   - `days.ts` — calendar-day maths (`daysBetween`, `calendarDay`), safe across clock changes
 - `src/speech/gate.ts` — when speech counts as on-device (Android only from API 33) and whether a variety is supported
 - `src/speech/useListener.ts` — recogniser wrapper: on-device/consent, restarts, voice level, optional recording, `reset()` for retries
 - `src/store/recordings.ts` — the recordings folder; delete-all sweeps strays from older builds too
-- `src/content/` — passages, Word Packs (6), moments (interview, presentation, raise, meeting), scripts
+- `src/content/` — passages, Word Packs (7, including the free Make your point pack with self-guided speaking prompts), moments (interview, presentation, raise, meeting), scripts
 - `src/app/` — Expo Router screens: `(tabs)/` Today, Library, Progress, You; `session/[id]`, `tape`, `fixit`, `talk`, `moment`, `pack/[id]`, `words`, `scripts/*`, `onboarding/*`, `paywall`, `review` (tester mode only)
 - `src/components/` — `InkCursor` and `VoiceRibbon` (Reanimated), `GlideWord`, `PlanCard`, `MicGate`, `Replay` (expo-audio), `Charts`
 - `src/purchases.native.ts` — RevenueCat (phones). `src/purchases.ts` — web/test stub.
@@ -72,7 +72,7 @@ Today shows the active moment's plan (`PlanCard`): learn the words → say them 
 ## Commands
 
 ```bash
-npm test                  # engine + store tests (518); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
+npm test                  # engine + store tests (584); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)
@@ -92,9 +92,9 @@ npx eas-cli@latest build --profile development --platform ios
 ## Known limits
 
 - The habit classifier's precision (100% dev, 100% holdout, 0 false accusations) is measured only on corpora we wrote; qa's independent set (habits-qa.json) went 86% → 100% after fixes made against it (recall 59%: like 58%, you know 44%), so it's now a regression bar, not an outside estimate. No habit word is scored yet; decide with the beta tally. um/uh never decide a habit label (they're stripped before the rules run). Recommended to score first: like, you know; the rest stay shown-only.
-- One Minute pauses use recogniser result times, not audio, so server bursts may invent pauses; per-minute rates use talk time with a 30 s floor. "Kept going" lets someone think ~45 s then talk 15+ words and still score well (a spec gap, DILEMMAS #15).
+- One Minute pauses use recogniser result times, not audio, so server bursts may invent pauses; per-minute rates use talk time with a 30 s floor. The first 8 s before the first word are free (`FREE_THINK_MS`); thinking time past that counts against kept going, and time to first word is shown and trended (FLOW_VERSION 2).
 - Habit words aren't scored until the classifier is validated (principle 7), so for now someone who says "like" every third word is told so only by the Tape's habit-word line.
-- Numbers: "12%" heard as "twelve percent" and "4.2" as "four point two" go red (only 0–10, & and % are mapped). Common in finance and interview scripts.
+- Numbers: a heard number is respelled the script's way when its value is in the script (integers, years, %, decimals, $£€ with m/k/bn, ordinals, clock times). Homophones ("to" for "2") and ordinals said as cardinals still go red; a re-read can pick the wrong copy when a value is written two ways. Fixture: `__tests__/fixtures/numbers.json`.
 - On-device recognisers often drop "um" and "uh", so filler counts run low. Item 5 above fixes that.
 - First-word lag is a proxy for highlight delay (voice level crossing a threshold → first inked word). It isn't measured on web, which has no voice levels.
 - Very short Free talk sessions inflate fillers per minute.

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { estimateSeconds, formatDuration as duration, PASSAGES, passageOfTheDay } from '../../content/passages';
 import { MOMENTS } from '../../content/moments';
+import { minutePromptOfTheDay } from '../../content/prompts';
 import { loadSessions, SavedSession, streak, thisWeek } from '../../store/sessions';
 import { useProfile } from '../../store/profile';
 import { ahaPaywallRoute, ahaPending, claimAhaPaywall, requirePro } from '../../pro';
@@ -58,7 +59,17 @@ export default function Today() {
   const readIds = new Set(sessions.map((s) => s.passageId));
   const unseen = PASSAGES.find((p) => !readIds.has(p.id) && p.id !== today.id) ?? PASSAGES[(PASSAGES.indexOf(today) + 1) % PASSAGES.length];
 
+  // Tester mode: Free talk is One Minute (beta first, then everyone), showing the day's word.
+  const minute = profile.testerMode === true;
   const tiles = [
+    {
+      key: 'vocabulary',
+      title: 'Vocabulary',
+      sub: 'Find precise words. Make them your own.',
+      icon: 'book-outline' as const,
+      badge: false,
+      onPress: () => router.push('/(tabs)/library'),
+    },
     {
       key: 'scripts',
       title: 'Your scripts',
@@ -70,8 +81,8 @@ export default function Today() {
     },
     {
       key: 'talk',
-      title: 'Free talk',
-      sub: '60 seconds, no script',
+      title: minute ? 'One Minute' : 'Free talk',
+      sub: minute ? `Today: ${minutePromptOfTheDay().text}` : '60 seconds, no script',
       icon: 'chatbubble-ellipses-outline' as const,
       badge: false,
       onPress: () => router.push('/talk'),
@@ -146,7 +157,7 @@ export default function Today() {
         <Text style={[styles.warmGo, { color: colors.signal }]}>{doneToday ? 'Again' : 'Read'}</Text>
       </Pressable>
 
-      {/* Three ways to practise */}
+      <Text style={[styles.section, { color: colors.ink }]}>Ways to practise</Text>
       <View style={styles.tiles}>
         {tiles.map((t) => (
           <Pressable
@@ -160,7 +171,9 @@ export default function Today() {
               {t.badge && <ProBadge />}
             </View>
             <Text style={[styles.tileTitle, { color: colors.ink }]}>{t.title}</Text>
-            <Text style={[styles.tileSub, { color: colors.muted }]}>{t.sub}</Text>
+            <Text style={[styles.tileSub, { color: colors.muted }]}>
+              {t.sub}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -223,8 +236,8 @@ const styles = StyleSheet.create({
   warmEyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 0.9 },
   warmTitle: { fontFamily: fonts.readingBold, fontSize: 18, marginTop: 2 },
   warmGo: { fontSize: 15, fontWeight: '700' },
-  tiles: { flexDirection: 'row', gap: space(1.25) },
-  tile: { flex: 1, borderWidth: 1, borderRadius: 18, padding: space(1.5), gap: 4, minHeight: 124 },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1.25) },
+  tile: { flexBasis: '47%', flexGrow: 1, flexShrink: 1, minWidth: 140, borderWidth: 1, borderRadius: 18, padding: space(1.5), gap: 4, minHeight: 124 },
   tileTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   tileTitle: { fontSize: 15, fontWeight: '700' },
   tileSub: { fontSize: 13, lineHeight: 17 },

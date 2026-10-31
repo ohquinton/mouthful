@@ -1,16 +1,28 @@
 # Strategy (cofounder review, 2026-10-27)
 
+## Current focus · 2026-10-31
+
+Quinton currently has no Apple account available. Focus development on improving existing design, navigation, practice flow and content, using browser checks and automated tests where useful. Keep native speech, permissions and real-device validation explicitly outstanding; do not repeatedly make account setup the next task.
+
+Prioritise a coherent journey from understanding a word to rehearsing it and forming an original thought. Refine hierarchy, readability, recovery and the clarity of each next action before adding modes. Luxury means care and restraint, not decorative complexity. Challenge our decisions as builders while keeping the learner experience supportive.
+
+Future experiments, not commitments: return to a previously practised word in a different situation; express one idea for two different audiences; make an answer shorter without losing its meaning. First try these as small content exercises, without AI scoring, new subscriptions or a new mode. Judge whether people find them useful before expanding them.
+
+The review below is historical. Its revenue estimates, competitor claims and proposed bets are not current validation or automatic build instructions. Dated founder decisions in DECISIONS.md and docs/COFOUNDER-CONTEXT.md take precedence.
+
 Written after a full read of the codebase. Quinton asked for blunt, ambitious feedback. This is the
 "why" behind the roadmap. CLAUDE.md is the "how". If they disagree, raise it with Quinton.
 
 ## What Mouthful is for
 
-Help people, many of them speaking English as a second language, speak better out loud: **clearer
-articulation, fewer filler words, steadier pace, better emphasis, a wider vocabulary in the subjects they
-need**, and knowing what they'll say. Tagline: "Find the words. Say them clearly." The promise is broad
-(interviews, presentations, everyday English practice, vocabulary by subject); the store listing still leads
-with one concrete moment, because a new app wins by being sharper, not broader (ELSA, Stimuler and BoldVoice
-own "improve your English"). Articulation here means clear and fluent,
+**Latest founder correction, 2026-10-30 (Codex):** articulation, quick thinking, precise vocabulary, pacing and delivery are the core. This is not primarily an ESL app; ESL users are welcome alongside fluent speakers. The experience should feel intellectually aspirational and accessible, not remedial or showy. Product usefulness comes before revenue, and the budget is tight. This supersedes the audience emphasis in the historical review below; it does not discard its useful research or privacy rules.
+
+Help people become more articulate: **think on their feet, find precise words, build vocabulary, and improve
+pace, emphasis, delivery and presence**, with fewer filler words, and know what they'll say. ESL speakers are
+welcome alongside fluent speakers, but the product is not an ESL or language-learning app. Tagline: "Find the
+words. Say them clearly." Store subtitle: "Articulation & vocabulary". The promise is broad (interviews,
+presentations and conversations are applications, not the limits); the store listing still leads with one
+concrete moment, because a new app wins by being sharper, not broader. Articulation here means clear and fluent,
 never "sounding native" (principle 1: we measure what the phone heard, not pronunciation). Glide (words ink in as you speak) is the core mechanic and
 the marketing asset: a 7-second screen recording of it explains the app.
 
@@ -115,11 +127,14 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
   6e. mobile-engineer: target length per DILEMMAS #16 (no per-part lights; whole-answer target in the final run-through; paste-time "runs about 3:10" warning; custom target field on scripts).
   6f. main session: rename to SaidClearly in src/brand.ts once brand-namer clears it.
   6g. mobile-engineer: onboarding redesign (docs/briefs/onboarding-redesign.md). The S0 mic-denied trap first, then the date, then the copy.
+  6h. mobile-engineer, One Minute follow-ups (qa-critic, before it replaces Free talk for everyone): (S2) Progress shows the old Free talk `score` for minute sessions while the Tape shows Flow: show Flow there or leave minutes out of score bests (progress.tsx:57, talk.tsx:198); (S2) after Carry on the restart gap is closed in the stamps but the clock only shifts by `away`, so a full minute ends at Kept going ~58: shift the clock by the closed gap (talk.tsx:109, store/minute.ts:41); (S2) test/prompts.test.ts time-zone test is tautological: make it able to fail; (S3) idioms "could have gone either way" (MinuteResult.tsx:121), prompt p26 "Pitch…", p31 "thirty-second update", p33 "on Monday"; trend copy "your last 3 minutes" → "your last 3 One Minute talks" (store/minute.ts:151,153); "(it misses some)" parentheses; check long level-3 prompts on the Today tile at SE size.
   7. product-lead: emphasis coaching brief (third core goal), ready for after the beta gate.
   8. design-ux: onboarding critique and redesign brief (first 60 seconds), then a full visual pass once it runs on the iPhone.
 - **Then:** mobile-engineer suppresses "Pick up from…" and pause counting while re-reading (uses the new field); logs a tapped word later inked by backfill as a correction only once; investigates the pre-existing "A network error occurred." on the web Day 1 screen. Then qa-critic attacks the resync again.
 - **Open decision (name):** docs/NAME-CHECK.md. US risk medium (Foundry One's "Mouthful: Voice to To-Do List", Education, since March 2026). Keep Mouthful for the beta; decide before any branding spend or public launch. Name lives only in src/brand.ts.
 - **Then:** the Mac. Xcode is installed on Quinton's MacBook Air (M2). Check the Xcode/macOS that Expo SDK 58 needs, clone the private repo, `npx expo run:ios --device` with a free Apple ID (7-day signing), rebuild for Sentry's native code. Apple Developer signup still pending.
+
+**Polish list** (after launch-critical work; never block new building on these): Drop mascot pilot in Rive; quiet animations from docs/design/ANIMATION.md; App Store slide fixes (sentence-case pack titles, icon amber vs cursor colour); privacy policy and site text to say SaidClearly; Taste-rule pass over existing screens.
 
 ## Wave 4 backlog (qa-critic, 2026-10-27: no S0/S1; fix the S2s before the phone beta)
 
