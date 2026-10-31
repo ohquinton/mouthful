@@ -40,14 +40,14 @@ export const MINUTE_PROMPTS: readonly Prompt[] = [
 
   // Level 3 is Free talk's original 12, in their original order (promptOfTheDay still uses them).
   { id: 'p25', level: 3, text: 'Explain what you do for work to a ten-year-old.' },
-  { id: 'p26', level: 3, text: 'Pitch your favourite restaurant in sixty seconds.' },
+  { id: 'p26', level: 3, text: 'Tell me why I should try your favourite restaurant.' },
   { id: 'p27', level: 3, text: 'What’s one opinion you hold that most people disagree with?' },
   { id: 'p28', level: 3, text: 'Describe the best meal you’ve ever had.' },
   { id: 'p29', level: 3, text: 'Teach me something you learned this week.' },
   { id: 'p30', level: 3, text: 'What would you do with an extra hour every day?' },
-  { id: 'p31', level: 3, text: 'Give a thirty-second update on a project you’re working on.' },
+  { id: 'p31', level: 3, text: 'Give a short update on a project you’re working on.' },
   { id: 'p32', level: 3, text: 'Tell me about a time a plan went wrong, and what you did.' },
-  { id: 'p33', level: 3, text: 'Introduce yourself as if you’re starting a new job on Monday.' },
+  { id: 'p33', level: 3, text: 'Introduce yourself as if it’s your first day at a new job.' },
   { id: 'p34', level: 3, text: 'Convince me to visit the city you live in.' },
   { id: 'p35', level: 3, text: 'Explain a hobby of yours to someone who has never tried it.' },
   { id: 'p36', level: 3, text: 'What advice would you give yourself five years ago?' },

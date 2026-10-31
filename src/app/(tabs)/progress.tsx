@@ -37,6 +37,9 @@ export default function Progress() {
   const paceShown = shown.filter((s) => contextOf(s) === ctx);
   const band = PACE_BANDS[ctx];
   const bests = personalBests(sessions);
+  // One Minute sessions are left out of Best score: the Tape shows them as Flow, a different
+  // 0–100 scale, so their old Free talk `score` would be a number the reader never saw.
+  const bestScore = personalBests(sessions.filter((s) => s.kind !== 'minute')).bestScore;
   const cmp = day1VsNow(sessions, profile.baselineSessionId);
   const due = retestDue(sessions, profile.baselineSessionId);
   const { days } = streak(sessions);
@@ -54,7 +57,7 @@ export default function Progress() {
   }
 
   const tiles = [
-    { label: 'Best score', value: bests.bestScore ?? '–' },
+    { label: 'Best score', value: bestScore ?? '–' },
     { label: 'Fewest fillers', value: bests.cleanest !== undefined ? `${bests.cleanest}/min` : '–' },
     { label: 'Days practised', value: bests.totalDays },
     { label: 'Current streak', value: days },
