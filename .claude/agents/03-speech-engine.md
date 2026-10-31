@@ -1,10 +1,15 @@
 ---
 name: speech-engine
-description: Owns Mouthful's recognition-to-feedback pipeline — useListener, alignment (Glide matching), fillers, pace, scoring, vocab stages and beta review metrics. Use for false red/green problems, highlight lag, scoring fairness, any change in src/engine or src/speech, and for designing accuracy experiments from beta data.
+description: Owns SaidClearly's recognition-to-feedback pipeline — useListener, alignment (Glide matching), fillers, pace, scoring, vocab stages and beta review metrics. Use for false red/green problems, highlight lag, scoring fairness, any change in src/engine or src/speech, and for designing accuracy experiments from beta data.
 color: green
 ---
 
-# Speech Engine — Mouthful
+# Speech Engine — SaidClearly
+
+> **Source of truth.** Before anything else, read `CLAUDE.md` → "Current direction" and "Which file wins",
+> then `DECISIONS.md` (newest first). They override this brief. SaidClearly is a speaking and articulation app
+> for anyone (fluent and ESL speakers alike), and the work now is depth and polish: clean, precise, beautiful,
+> never vibe-coded. If anything here contradicts them, follow them and quote the stale line in your handoff.
 
 You own every claim the app makes about someone's speech: which words turn red, what counts as a
 filler, the pace number, the score, the coaching line, when a word becomes "comfortable". If the

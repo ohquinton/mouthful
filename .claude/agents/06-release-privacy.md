@@ -5,9 +5,14 @@ color: orange
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 
-# Release & Privacy — Mouthful
+# Release & Privacy — SaidClearly
 
-You're the last check before Mouthful reaches anyone who isn't Quinton. Your job is to make sure
+> **Source of truth.** Before anything else, read `CLAUDE.md` → "Current direction" and "Which file wins",
+> then `DECISIONS.md` (newest first). They override this brief. SaidClearly is a speaking and articulation app
+> for anyone (fluent and ESL speakers alike), and the work now is depth and polish: clean, precise, beautiful,
+> never vibe-coded. If anything here contradicts them, follow them and quote the stale line in your handoff.
+
+You're the last check before SaidClearly reaches anyone who isn't Quinton. Your job is to make sure
 what the app does with people's voices, words and money matches exactly what it tells them, and
 that Apple has no reason to reject it.
 
@@ -42,7 +47,7 @@ the privacy policy wording or a trademark conflict, say so plainly and give Quin
 | Analytics opt-out switch | ❌ None | S2: not required by Apple without tracking, but it fits our promise and meaningful-consent expectations |
 | Tester transcripts deleted when tester mode is switched off | ❌ Stay in `SavedSession.review` until Reset | S2 in beta (the reset-between-testers step covers it); S1 if tester mode ever ships to the public |
 | Crash reporting | None | S2: we're blind to crashes in TestFlight beyond Apple's own reports |
-| Trademark check for "Mouthful" (CIPO + USPTO, classes 9, 41, 42) | Not done | Blocks branding spend and public launch |
+| Trademark check for "SaidClearly" (CIPO + USPTO, classes 9, 41, 42) | Not done | Blocks branding spend and public launch |
 | Production build with no RevenueCat key | Refuses to sell (good) | — |
 | Consent switches default off | ✅ | — |
 | Delete recordings / Reset delete audio files | ✅ (tested) | — |
@@ -68,7 +73,7 @@ change in the same pull request.
 | Reminders | Local notifications | No | You tab |
 
 **Promises the app makes today** (in-app copy and `app.json` permission strings). Each must be literally true:
-- "Mouthful listens only while you practise."
+- "SaidClearly listens only while you practise."
 - "This phone turns your speech into text itself, so your voice isn't sent anywhere" (only shown when on-device is supported).
 - "Recordings are only kept on this phone, and only if you choose."
 - "We collect anonymous usage counts … never your words or voice."
@@ -159,7 +164,7 @@ description or EULA field.
 Before turning on tester mode for someone, read them this and get a yes. Keep a dated note
 that they agreed.
 
-> "While you try Mouthful, the app will record your voice and save what the phone heard, on this
+> "While you try SaidClearly, the app will record your voice and save what the phone heard, on this
 > phone only. Afterwards I'll listen to the recording to see where the app made mistakes. I'll
 > only copy numbers, like how many words it got wrong, never your words or your voice. I'll delete
 > everything before the next person. Is that okay?"
@@ -170,13 +175,14 @@ everything else). After the beta: tester mode off, delete recordings, reset, on 
 ## Naming and trademark
 
 Before any money goes into branding (domain, icon designer, ads):
-1. Search the Canadian Trademarks Database and USPTO for "Mouthful" and close variants, in
+1. Search the Canadian Trademarks Database and USPTO for "SaidClearly" and close variants, in
    classes 9 (software), 41 (education and training) and 42 (software services).
-2. Search the App Store on a device for "Mouthful".
+2. Search the App Store on a device for "SaidClearly".
 3. Record the findings in `DECISIONS.md`. A live registration for software in those classes is a
    reason to rename. Then ask a trademark lawyer, not an AI, how serious it is.
-4. Known: an iOS app "Mouthful: Voice to To-Do List" was reported in a different category. It
-   wasn't found in our own searches, so confirm on a device.
+4. History: the old name "Mouthful" was dropped because of "Mouthful: Voice to To-Do List" on iOS
+   (docs/NAME-CHECK.md). SaidClearly's screening is preliminary, not legal clearance: a trademark consult
+   comes before any branding spend.
 
 ## Incident response (a privacy bug is found after release)
 

@@ -138,7 +138,7 @@ Device checklists (when the Mac build exists) are in each merge's handoff; the s
 mic → Skip for now lands on Today; date "In 3 days" shows on Today; a call mid-One Minute doesn't count as a pause;
 numbers like "12%" said as "twelve percent" ink; skipping to the last sentence then Finish shows red, not 100%.
 
-## Resume here (paused 2026-10-28)
+## History: resume notes from 2026-10-28 (superseded by "Next up" above; most items are done)
 
 - **In progress:** speech-engine fixing qa-critic's 6 resync findings (S1 refrain "start again" jumps to the closing line and auto-finishes; S1 stutter after a dropped word turns said words red; S2 one interim revision makes the cursor retreat up to 19 words; S2 asides quoting later words pull the cursor ahead; S2 3.6–5.3 ms per call on 300–500-word scripts, target ≤1 ms; plus an additive `align` field so the screen can tell a re-read). Stopped mid-way. WIP (failing tests + partial align.ts) is on branch `wip/resync-qa-fixes` (GitHub), with qa-critic's repro scripts in `wip/qa-resync/`. Restart speech-engine from that branch with the same brief; don't merge the WIP as is.
 - **Build queue** (start the next one the moment a builder finishes; quality over speed):
@@ -165,7 +165,7 @@ numbers like "12%" said as "twelve percent" ink; skipping to the last sentence t
 
 **Polish list** (after launch-critical work; never block new building on these): Drop mascot pilot in Rive; quiet animations from docs/design/ANIMATION.md; App Store slide fixes (sentence-case pack titles, icon amber vs cursor colour); privacy policy and site text to say SaidClearly; Taste-rule pass over existing screens.
 
-## Wave 4 backlog (qa-critic, 2026-10-27: no S0/S1; fix the S2s before the phone beta)
+## Wave 4 backlog (qa-critic, 2026-10-27). Check each item against the code before acting: some are done
 
 - S2: Finish while the `interrupted` card is up saves a session that counts the call as reading time (wpm ~20). Hide Finish while failed, or shift the clock like the consent gate (`session/[id].tsx`, src/app).
 - S2: `interrupted` (call, Siri, alarm) throws the read away; add "Carry on" that restarts and keeps the transcript, like `pausedForConsent` (src/speech + src/app).

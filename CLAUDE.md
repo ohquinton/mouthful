@@ -6,6 +6,23 @@ SaidClearly helps people become more articulate: find precise words, think on th
 
 Renamed Mouthful → SaidClearly on 2026-10-30 (US risk; docs/NAME-CHECK.md), and earlier Cadence → Mouthful. The product name lives in `src/brand.ts` (and app.json's display name and permission strings). The repo, bundle id (`ca.quintonjackson.mouthful`), slug and URL scheme stay "mouthful": RevenueCat, Sentry and EAS are tied to them. Copy must say "heard clearly", never imply a clarity grade (the name sounds like a verdict).
 
+## Current direction (read this first; it overrides older text anywhere)
+
+- **What it is:** a speaking and articulation app for anyone who wants to express themselves better. Think on your feet, find precise words, build vocabulary by subject, and speak with clear pace, emphasis, delivery and presence, with fewer fillers. Interviews, presentations and conversations are applications, not the limits.
+- **Who it's for:** fluent and ESL speakers alike. ESL speakers are welcome; ESL does not define the brand, and this is not a language-learning, accent or remedial app. The feel is intellectually aspirational and accessible, never condescending. UI copy stays plain English (no idioms) because many readers use English as a second language.
+- **The work now:** deepen and polish what exists: in-depth features, a coherent journey from understanding a word to rehearsing it to forming an original thought. Clean, precise, beautiful, luxurious. Luxury means restraint and care: typography, space, readability, purposeful motion, dependable behaviour. Never vibe-coded (Taste rule in `.claude/agents/04-design-ux.md`). Build forward, keep a polish list; real bugs and trust breaks are fixed at once. No new modes until the app has been tested on a phone (DECISIONS 2026-10-31).
+- **Name:** SaidClearly. "Mouthful" survives only in code identifiers (bundle id, storage keys `mouthful.*`, product ids `mouthful_pro_*`, repo); never in anything a user sees.
+
+**Which file wins when they disagree** (newest dated decision first):
+1. `DECISIONS.md`: dated founder decisions, newest first. Always wins.
+2. This file, `CLAUDE.md`: current direction, principles, layout, team rules.
+3. `docs/COFOUNDER-CONTEXT.md`: Quinton's vision and how Claude and Codex work together.
+4. `STRATEGY.md`: only "Current focus" and "Next up" are current; the cofounder review below them is history.
+5. Agent briefs in `.claude/agents/`: how each role works. Their product descriptions defer to 1–3.
+6. Everything else in `docs/` (research, briefs, dilemmas): evidence and plans, not orders. A brief marked done is history.
+
+If you find text that contradicts a higher file, follow the higher one and say so in your handoff, quoting the stale line and its file, so the main session fixes it. Never act on the old wording. Only the main session edits this file, `DECISIONS.md`, `STRATEGY.md` and the agent briefs.
+
 Strategy, bets and open decisions: `STRATEGY.md` (read it before planning work). Open product dilemmas: `docs/DILEMMAS.md`. Competitors: `docs/COMPETITORS.md`. What users love, ask for and hate (2,863 reviews): `docs/MARKET-RESEARCH.md`. Feature briefs: `docs/briefs/`.
 Product spec (written under the old name): https://claude.ai/artifact/7y5W1WCUVuHKrXsHjLFAmC
 Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the versioned docs.

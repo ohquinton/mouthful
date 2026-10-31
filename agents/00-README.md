@@ -1,41 +1,30 @@
-# Mouthful build team
+# SaidClearly build team
 
-Six agent briefs for building Mouthful. Each file is a complete instruction set for one role. They
-share one codebase, one set of principles and one handoff format, so work can move between them
-without anything getting lost.
+The agent briefs live in **`.claude/agents/`** (the only copy; Claude Code loads them from there). This file
+holds what they share: the loop, the severity scale, stop-the-line rules and the handoff format.
 
-| File | Agent | Owns | Never does |
+**Source of truth:** `CLAUDE.md` → "Current direction" and "Which file wins", then `DECISIONS.md` (newest
+first). They override every brief and every older doc. If a brief disagrees, follow them and quote the
+stale line in your handoff so the main session fixes it.
+
+| Brief | Agent | Owns | Never does |
 |---|---|---|---|
 | `01-product-lead.md` | product-lead | What gets built, why, and in what order. Briefs and acceptance criteria. Saying no. | Writes production code. Approves its own briefs as "done". |
 | `02-mobile-engineer.md` | mobile-engineer | Screens, navigation, storage, native modules, platform code, performance. | Changes scoring or matching rules without the speech-engine agent. |
 | `03-speech-engine.md` | speech-engine | Recognition, alignment, scoring, vocab stages, the honesty of every number the app shows. | Tunes thresholds without a test and a measured before/after. |
-| `04-design-ux.md` | design-ux | Visual system, motion, copy, accessibility, every screen state. | Adds motion or colour "to make it pop". |
+| `04-design-ux.md` | design-ux | Visual system, motion, copy, accessibility, every screen state, the Taste rule. | Adds motion or colour "to make it pop". |
 | `05-qa-critic.md` | qa-critic | Adversarial review: reproduces, breaks, reports. | Fixes what it finds. Signs off without evidence. |
 | `06-release-privacy.md` | release-privacy | Privacy, App Store compliance, payments, analytics, TestFlight, legal. | Ships with an open S0 or S1. |
-
-## How to use these files
-
-- **Claude Code:** copy the files (not this README) into `.claude/agents/` in the project. Each has
-  frontmatter with a `name` and `description`, so you can say "use the qa-critic agent to review my
-  last change". The qa-critic is limited to read-only tools on purpose.
-- **Cursor, Windsurf and similar tools:** add the file as a project rule, or paste it at the top of the chat.
-- **Codex, ChatGPT and other tools:** paste the file as the system or first message, then give the task.
-- **Always** keep `CLAUDE.md`, `AGENTS.md`, `README.md` and `TESTING.md` in the repo root. Every agent
-  is told to read them first. If one of those files and an agent brief disagree, the root file
-  wins, and the brief needs updating.
+| `07-brand-namer.md` | brand-namer | Name and tagline research and clearance screening. | Gives legal clearance. |
+| `08-marketing-lead.md` | marketing-lead | Positioning, messaging, competitors, App Store listing, launch. | Sets prices. Makes claims the app can't back up. |
 
 ## The phase we're in
 
-**Controlled phone beta. Feature freeze.** Nothing new gets built until the beta numbers in
-`TESTING.md` are in. The only work that's allowed:
-
-1. Fixes for bugs, privacy, compliance and accuracy.
-2. Changes the beta data asks for, such as recognition fixes when false reds are high.
-3. Release blockers (see `06-release-privacy.md`).
-
-Every agent is told to push back on anything else. That isn't stubbornness. The product has
-enough features already. It will win or lose on whether Glide is trustworthy for a real person
-with a real accent on a real phone.
+**Deepen and polish (DECISIONS 2026-10-31).** No Apple developer account yet, so native verification is
+outstanding. Build depth into existing features (the journey from understanding a word to rehearsing it to
+using it in an original thought), design, flow and content: clean, precise, beautiful, never vibe-coded.
+No new modes until the app has run on a phone. Real bugs and trust breaks are fixed at once. Only the main
+session merges into `main` (CLAUDE.md "Running the agent team").
 
 ## The standard loop
 
