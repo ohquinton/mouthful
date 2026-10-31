@@ -109,6 +109,35 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
 
 **Review mining (2026-10-29, docs/MARKET-RESEARCH.md):** billing is the category's #1 pain (621 of 2,863 reviews); memorising to a date is the strongest love signal; only 14 reviews mention interviews (presentations 49, lines 38), so interview demand is unproven: recruit presenters for the beta too and don't lock the headline to "interview".
 
+## Next up (handoff 2026-10-31, Claude paused for a UI switch)
+
+main is at the onboarding merge: 607 tests pass in both time zones, typecheck clean, lint 0 errors. Every
+agent branch is merged; nothing is in flight. Codex's work (vocabulary depth) is merged and reviewed.
+
+Open items, in order (fix, don't add modes; see DECISIONS 2026-10-31):
+1. **[S2] Fix-it Pro gate bypassed from Your words** (`src/app/words.tsx:52-56` and `:108`): "Practise this word"
+   pushes /fixit without `requirePro`, while the Tape and Today gate it. Decide: gate it for words not in a free
+   pack, or decide Your words is free and log it in DECISIONS.md.
+2. **[S2] One Minute follow-ups** (item 6h below): Progress shows the old Free talk score for minutes; Carry on
+   leaves Kept going at ~58; the tautological time-zone test; idioms in MinuteResult and a few prompts.
+3. **Show "You started after N s"** on the One Minute Tape (engine field `timeToFirstWordSeconds`, trend
+   `firstWord`, FLOW_VERSION '2-k40p35w25').
+4. **Target length rework** (DILEMMAS #16, decided): no per-part lights; whole-answer target in the final run-through;
+   paste-time "runs about 3:10" warning; custom target.
+5. **Onboarding leftovers:** the Glide still line "Read out loud at your normal pace. The words turn dark as you say
+   them." in `session/[id].tsx` (disappears without animation); `moment.tsx` date maths uses now + n×24h (use
+   days.ts); "Read it again" keeps an extra baseline in history; `day1Line` in the engine is now unused.
+6. **Small:** pin the resync fuzz count to 4200 (`resync.test.ts:1152`); "Your words" from readings can never become
+   comfortable (no context sentence); syllable format in the precision pack (respellings vs split spelling);
+   "think on your feet" is an idiom in brand.ts promise and CLAUDE.md; em dash in words.tsx:83; Today's 🔥 streak
+   emoji vs the Taste rule; 2×2 tiles at the largest Dynamic Type on an SE.
+7. **Decide:** store subtitle "Articulation & vocabulary" vs DECISIONS' "lead with one concrete moment" (they can
+   coexist: the subtitle is broad, the first screenshot is the concrete moment).
+
+Device checklists (when the Mac build exists) are in each merge's handoff; the short list: fresh install → deny the
+mic → Skip for now lands on Today; date "In 3 days" shows on Today; a call mid-One Minute doesn't count as a pause;
+numbers like "12%" said as "twelve percent" ink; skipping to the last sentence then Finish shows red, not 100%.
+
 ## Resume here (paused 2026-10-28)
 
 - **In progress:** speech-engine fixing qa-critic's 6 resync findings (S1 refrain "start again" jumps to the closing line and auto-finishes; S1 stutter after a dropped word turns said words red; S2 one interim revision makes the cursor retreat up to 19 words; S2 asides quoting later words pull the cursor ahead; S2 3.6–5.3 ms per call on 300–500-word scripts, target ≤1 ms; plus an additive `align` field so the screen can tell a re-read). Stopped mid-way. WIP (failing tests + partial align.ts) is on branch `wip/resync-qa-fixes` (GitHub), with qa-critic's repro scripts in `wip/qa-resync/`. Restart speech-engine from that branch with the same brief; don't merge the WIP as is.
