@@ -12,6 +12,8 @@ He wants a commercially minded collaborator who builds, questions weak assumptio
 
 Latest operating constraint: money is scarce. A genuinely useful product comes before revenue. Reuse existing capabilities, prefer inexpensive experiments, and question unnecessary subscriptions, services and feature scope. Ambition is not permission to spend money or make unsupported outcome claims. Challenge assumptions, including the founder's, with concrete reasoning and a better alternative.
 
+Autonomy mandate (2026-10-31): Quinton does not want to choose every next task or repeatedly ask to continue. Select and execute useful improvements within the existing product direction, report concrete progress, and seek input for material changes of direction, cost or risk. Prefer closing observed gaps over generating an endless feature backlog. This does not imply an unattended background process after a chat turn ends.
+
 Current practical constraint (2026-10-31): Apple account access is unavailable. Focus on existing design and flow, and keep future ideas separate from committed features. Do not make Apple setup a recurring blocker; native verification remains outstanding.
 
 Latest quality direction: continuous improvement with care, luxury and class. Interpret this as restrained hierarchy, excellent readability, purposeful interactions, accessible controls and dependable behavior. Decoration and extra features do not establish quality. Use a bounded cycle: identify friction, make one coherent improvement, verify it, obtain independent critique, and retain the next unresolved issue. Continuous improvement is the operating approach, not an unattended background process.
@@ -82,6 +84,12 @@ Founder clarification: challenge Quinton and our own decisions as builders/co-fo
 Remaining verification: on a phone, complete and skip a prompt-bearing drill; verify microphone indicator ends before reflection, reveal/conceal works, Done exits, and no mastery changes occur from reflection. Repeat with a word without a prompt, recognition errors, and large text. Automated engine tests do not validate this new UI lifecycle. Independent QA reviewed the pack refinements statically without a blocker, but then hit its usage limit; the subsequent drill-completion change has no independent review yet. Content nit queued: clarify whose premise is being questioned in “The point beneath the words”. Evaluate original-thought participation in five observed attempts without claiming learning efficacy.
 
 ## Source coverage
+
+### Practice reliability follow-up · 2026-10-31
+
+Fix-it now resolves content before mounting its listener. Loading, missing/empty content and rejected loads have readable states and exits; rejected loads offer retry. Each route request gets fresh loading/drill/completion state, and abandoned loads cannot update the current screen. The resolver reads a saved session once, supports old sessions, preserves saved-session precedence and custom context, and removes blank/duplicate word entries. Five focused tests cover those data cases. Native microphone and navigation behavior still need device verification.
+
+Today now includes Vocabulary among its practice choices, linking to the existing Library. Practice tiles wrap rather than squeezing three across, and descriptions no longer truncate after three lines. Existing routes, pricing and event preparation remain intact. Check this layout at narrow widths and large text before visual sign-off. The reliability regression run passed 38 suites / 589 tests; it does not test native UI.
 
 ### Optional depth in vocabulary practice · 2026-10-31
 

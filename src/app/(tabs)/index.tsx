@@ -63,6 +63,14 @@ export default function Today() {
   const minute = profile.testerMode === true;
   const tiles = [
     {
+      key: 'vocabulary',
+      title: 'Vocabulary',
+      sub: 'Find precise words. Make them your own.',
+      icon: 'book-outline' as const,
+      badge: false,
+      onPress: () => router.push('/(tabs)/library'),
+    },
+    {
       key: 'scripts',
       title: 'Your scripts',
       sub: 'Paste it, rehearse it',
@@ -149,7 +157,7 @@ export default function Today() {
         <Text style={[styles.warmGo, { color: colors.signal }]}>{doneToday ? 'Again' : 'Read'}</Text>
       </Pressable>
 
-      {/* Three ways to practise */}
+      <Text style={[styles.section, { color: colors.ink }]}>Ways to practise</Text>
       <View style={styles.tiles}>
         {tiles.map((t) => (
           <Pressable
@@ -163,7 +171,7 @@ export default function Today() {
               {t.badge && <ProBadge />}
             </View>
             <Text style={[styles.tileTitle, { color: colors.ink }]}>{t.title}</Text>
-            <Text style={[styles.tileSub, { color: colors.muted }]} numberOfLines={3}>
+            <Text style={[styles.tileSub, { color: colors.muted }]}>
               {t.sub}
             </Text>
           </Pressable>
@@ -228,8 +236,8 @@ const styles = StyleSheet.create({
   warmEyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 0.9 },
   warmTitle: { fontFamily: fonts.readingBold, fontSize: 18, marginTop: 2 },
   warmGo: { fontSize: 15, fontWeight: '700' },
-  tiles: { flexDirection: 'row', gap: space(1.25) },
-  tile: { flex: 1, borderWidth: 1, borderRadius: 18, padding: space(1.5), gap: 4, minHeight: 124 },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1.25) },
+  tile: { flexBasis: '47%', flexGrow: 1, flexShrink: 1, minWidth: 140, borderWidth: 1, borderRadius: 18, padding: space(1.5), gap: 4, minHeight: 124 },
   tileTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   tileTitle: { fontSize: 15, fontWeight: '700' },
   tileSub: { fontSize: 13, lineHeight: 17 },

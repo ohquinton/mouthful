@@ -7,6 +7,8 @@ import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { align, normalise, preparePassage, tokenise, wordsMatch } from '../engine/align';
+import { loadDrillItems, type DrillItem } from '../content/drill';
+import { PrimaryButton, SecondaryButton } from '../components/ui';
 import { DICTIONARY } from '../content/wordpacks';
 import { getSession } from '../store/sessions';
 import { recordWords } from '../store/words';
@@ -21,7 +23,7 @@ import { WordReflection } from '../components/WordReflection';
 import { ListenError } from '../components/ListenError';
 import { fonts, space, useColors } from '../theme';
 
-type Item = { word: string; sentence?: string };
+type Item = DrillItem;
 type Phase = 'alone' | 'sentence';
 type DrillResult = { alone: number; sentence: number };
 
@@ -34,23 +36,40 @@ type DrillResult = { alone: number; sentence: number };
  */
 export default function FixIt() {
   const { words: raw, title, sid, step } = useLocalSearchParams<{ words?: string; title?: string; sid?: string; step?: string }>();
+  // A new request owns fresh loading, drill and completion state, even on a reused route.
+  return <DrillRequest key={JSON.stringify([raw, sid, title, step])} raw={raw} sid={sid} title={title} step={step} />;
+}
+
+function DrillRequest({ raw, sid, title, step }: { raw?: string; sid?: string; title?: string; step?: string }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { profile, update } = useProfile();
   const [items, setItems] = useState<Item[] | null>(null);
   const [result, setResult] = useState<DrillResult | null>(null);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    (async () => {
-      const contexts = sid ? (await getSession(sid))?.stumbledContext ?? {} : {};
-      const list = sid ? Object.keys(contexts).length ? Object.keys(contexts) : (await getSession(sid))?.stumbled ?? [] : (raw ?? '').split(',').filter(Boolean);
-      setItems(
-        list.map((w) => ({ word: w, sentence: DICTIONARY.get(w.toLowerCase())?.example ?? contexts[w] })),
-      );
-    })();
-  }, [raw, sid]);
+    let live = true;
+    loadDrillItems(raw, sid, getSession).then(
+      (loaded) => { if (live) setItems(loaded); },
+      () => { if (live) setError(true); },
+    );
+    return () => { live = false; };
+  }, [raw, sid, attempt]);
 
-  if (!items) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  // Never mount the microphone-owning component for loading, failed or empty content.
+  if (!items || items.length === 0) return (
+    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={[styles.completion, { paddingTop: insets.top + space(3), paddingBottom: insets.bottom + space(3) }]}>
+      <View style={styles.doneWrap}>
+        <Text accessibilityRole="header" style={[styles.doneTitle, { color: colors.ink }]}>{error ? 'Couldn’t load this practice' : items ? 'No words to practise here' : 'Getting your words ready…'}</Text>
+        <Text style={[styles.meaning, { color: colors.muted }]}>{error ? 'Please try again, or choose a word pack from the Library.' : items ? 'Choose a word pack from the Library to start a new practice.' : 'Your practice will open when the words are ready.'}</Text>
+        {error && <PrimaryButton label="Try again" onPress={() => { setError(false); setAttempt(attempt + 1); }} />}
+        {(error || items) && <PrimaryButton label="Go to Library" onPress={() => router.replace('/(tabs)/library')} />}
+        <SecondaryButton label="Back" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/library')} />
+      </View>
+    </ScrollView>
+  );
   // Removing Drill also removes its listener and aborts native recognition before reflection.
   if (result) return <DrillComplete items={items} result={result} />;
   return <Drill items={items} title={title} onFinished={() => markStep(profile, update, step)} onComplete={setResult} insetsBottom={insets.bottom} />;
