@@ -24,10 +24,15 @@ export default function Library() {
   const { profile } = useProfile();
   const today = passageOfTheDay();
   const [book, setBook] = useState<WordBook>({});
+  const [bookReady, setBookReady] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      loadBook().then(setBook);
+      let live = true;
+      loadBook().then((loaded) => {
+        if (live) { setBook(loaded); setBookReady(true); }
+      });
+      return () => { live = false; };
     }, []),
   );
 
@@ -43,7 +48,7 @@ export default function Library() {
       {/* Word Packs */}
       <SectionTitle>Word Packs</SectionTitle>
       <Text style={[styles.blurb, { color: colors.muted }]}>
-        New words for work, what they mean and how to say them out loud.
+        Find the precise word. Learn what it means, then put it into a thought of your own.
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packs}>
         {WORD_PACKS.map((p) => {
@@ -54,6 +59,8 @@ export default function Library() {
           return (
             <Pressable
               key={p.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${p.title}, ${p.words.length} words${bookReady ? `, ${done} comfortable` : ''}${!p.free && !profile.pro ? ', practice requires Pro' : ''}`}
               onPress={() => router.push({ pathname: '/pack/[id]', params: { id: p.id } })}
               style={({ pressed }) => [styles.pack, { backgroundColor: colors.card, opacity: pressed ? 0.85 : 1 }]}
             >
@@ -74,6 +81,7 @@ export default function Library() {
       </ScrollView>
 
       <Pressable
+        accessibilityRole="button"
         onPress={() => router.push('/words')}
         style={({ pressed }) => [styles.wordsRow, { backgroundColor: colors.signalSoft, opacity: pressed ? 0.8 : 1 }]}
       >
@@ -81,7 +89,7 @@ export default function Library() {
         <View style={{ flex: 1 }}>
           <Text style={[styles.wordsTitle, { color: colors.ink }]}>Your words</Text>
           <Text style={[styles.wordsMeta, { color: colors.muted }]}>
-            {learning.length + learned.length === 0 ? 'Words you practise or trip on collect here' : `${learning.length} learning · ${learned.length} comfortable`}
+            {!bookReady ? 'Loading your words…' : learning.length + learned.length === 0 ? 'Words you practise or trip on collect here' : `${learning.length} learning · ${learned.length} comfortable`}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.muted} />

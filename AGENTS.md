@@ -1,5 +1,9 @@
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
+## Product context and coordination
+
+Read `docs/COFOUNDER-CONTEXT.md`, `CLAUDE.md`, and `DECISIONS.md` before planning changes. They preserve the founder's vision and explain how Codex and Claude use separate worktrees. Keep historical proposals separate from settled decisions, and verify the current branch and task ownership before editing.
+
 ## Expo has changed — do not trust your training data
 
 Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:

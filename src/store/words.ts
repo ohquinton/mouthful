@@ -14,19 +14,38 @@ export async function loadBook(): Promise<WordBook> {
   }
 }
 
-export async function recordWords(results: WordResult[]): Promise<void> {
-  if (!results.length) return;
-  const next = applyResults(await loadBook(), results);
-  try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(next));
-  } catch {}
+let writes: Promise<void> = Promise.resolve();
+let resetting = 0;
+
+function updateBook(change: (book: WordBook) => WordBook): Promise<void> {
+  if (resetting) return Promise.resolve();
+  const work = writes.then(async () => {
+    if (resetting) return;
+    const book = await loadBook();
+    if (resetting) return;
+    await AsyncStorage.setItem(KEY, JSON.stringify(change(book)));
+  });
+  writes = work.catch(() => {});
+  return writes;
 }
 
-export async function recordCorrection(word: string): Promise<void> {
-  const next = correctWord(await loadBook(), word);
-  try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(next));
-  } catch {}
+/** Prevent pending vocabulary writes from restoring data during a reset. */
+export async function pauseWordWrites(): Promise<() => void> {
+  resetting += 1;
+  await writes;
+  return () => { resetting -= 1; };
+}
+
+export function recordWords(results: WordResult[]): Promise<void> {
+  if (!results.length) return Promise.resolve();
+  const now = Date.now();
+  const snapshot = results.map((result) => ({ ...result }));
+  return updateBook((book) => applyResults(book, snapshot, now));
+}
+
+export function recordCorrection(word: string): Promise<void> {
+  const now = Date.now();
+  return updateBook((book) => correctWord(book, word, now));
 }
 
 /**

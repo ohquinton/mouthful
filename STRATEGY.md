@@ -1,9 +1,21 @@
 # Strategy (cofounder review, 2026-10-27)
 
+## Current focus · 2026-10-31
+
+Quinton currently has no Apple account available. Focus development on improving existing design, navigation, practice flow and content, using browser checks and automated tests where useful. Keep native speech, permissions and real-device validation explicitly outstanding; do not repeatedly make account setup the next task.
+
+Prioritise a coherent journey from understanding a word to rehearsing it and forming an original thought. Refine hierarchy, readability, recovery and the clarity of each next action before adding modes. Luxury means care and restraint, not decorative complexity. Challenge our decisions as builders while keeping the learner experience supportive.
+
+Future experiments, not commitments: return to a previously practised word in a different situation; express one idea for two different audiences; make an answer shorter without losing its meaning. First try these as small content exercises, without AI scoring, new subscriptions or a new mode. Judge whether people find them useful before expanding them.
+
+The review below is historical. Its revenue estimates, competitor claims and proposed bets are not current validation or automatic build instructions. Dated founder decisions in DECISIONS.md and docs/COFOUNDER-CONTEXT.md take precedence.
+
 Written after a full read of the codebase. Quinton asked for blunt, ambitious feedback. This is the
 "why" behind the roadmap. CLAUDE.md is the "how". If they disagree, raise it with Quinton.
 
 ## What Mouthful is for
+
+**Latest founder correction, 2026-10-30 (Codex):** articulation, quick thinking, precise vocabulary, pacing and delivery are the core. This is not primarily an ESL app; ESL users are welcome alongside fluent speakers. The experience should feel intellectually aspirational and accessible, not remedial or showy. Product usefulness comes before revenue, and the budget is tight. This supersedes the audience emphasis in the historical review below; it does not discard its useful research or privacy rules.
 
 Help people, many of them speaking English as a second language, speak better out loud: **clearer
 articulation, fewer filler words, steadier pace, better emphasis, a wider vocabulary in the subjects they

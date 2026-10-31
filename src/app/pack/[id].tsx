@@ -10,6 +10,7 @@ import { isLearned, stageLabel, WordBook } from '../../engine/vocab';
 import { loadBook } from '../../store/words';
 import { useProfile } from '../../store/profile';
 import { requirePro } from '../../pro';
+import { WordReflection } from '../../components/WordReflection';
 import { Mastery } from '../../components/Mastery';
 import { PrimaryButton, ProBadge } from '../../components/ui';
 import { fonts, space, useColors } from '../../theme';
@@ -21,14 +22,30 @@ export default function PackScreen() {
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
   const [book, setBook] = useState<WordBook>({});
+  const [bookReady, setBookReady] = useState(false);
+  // Recalling a word is practice, not evidence of mastery. This never changes the word book.
+  const [practisingWord, setPractisingWord] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      loadBook().then(setBook);
+      let live = true;
+      loadBook().then((loaded) => {
+        if (live) { setBook(loaded); setBookReady(true); }
+      });
+      return () => { live = false; Speech.stop(); };
     }, []),
   );
 
-  if (!pack) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  if (!pack) return (
+    <ScrollView
+      style={{ backgroundColor: colors.bg }}
+      contentContainerStyle={[styles.empty, { paddingTop: insets.top + space(4), paddingBottom: insets.bottom + space(4) }]}
+    >
+      <Text style={[styles.h1, { color: colors.ink }]}>This pack isn’t available</Text>
+      <Text style={[styles.pitch, { color: colors.muted }]}>Explore the Library to find your next words.</Text>
+      <PrimaryButton label="Go to Library" onPress={() => router.replace('/(tabs)/library')} />
+    </ScrollView>
+  );
 
   const unlocked = pack.free || profile.pro;
   const gate = () => unlocked || requirePro(profile, 'packs');
@@ -40,34 +57,32 @@ export default function PackScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
       <View style={styles.top}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Back">
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/library')} hitSlop={12} accessibilityRole="button" accessibilityLabel="Back" style={styles.back}>
           <Ionicons name="chevron-back" size={26} color={colors.ink} />
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={[styles.wrap, { paddingBottom: insets.bottom + space(4) }]}>
         <View style={styles.titleRow}>
-          <Text style={[styles.eyebrow, { color: colors.signal }]}>WORD PACK · {pack.words.length} WORDS</Text>
+          <Text style={[styles.eyebrow, { color: colors.muted }]}>WORD PACK · {pack.words.length} WORDS</Text>
           {!unlocked && <ProBadge />}
         </View>
         <Text style={[styles.h1, { color: colors.ink }]}>{pack.title}</Text>
         <Text style={[styles.pitch, { color: colors.muted }]}>{pack.pitch}</Text>
 
-        <View style={[styles.progress, { backgroundColor: colors.surface, borderColor: colors.line }]}>
-          <Text style={[styles.progressText, { color: colors.ink }]}>
-            {learned} of {pack.words.length} comfortable
-          </Text>
-          <View style={[styles.bar, { backgroundColor: colors.line }]}>
-            <View style={[styles.barFill, { backgroundColor: colors.good, width: `${(learned / pack.words.length) * 100}%` }]} />
-          </View>
-        </View>
+        <Text style={[styles.sub, { color: colors.muted }]}>
+          {bookReady ? `${learned} of ${pack.words.length} comfortable · Built through practice on different days.` : 'Loading your progress…'}
+        </Text>
 
         <PrimaryButton
-          label="Learn these words · 2 min"
+          label={unlocked ? 'Practise these words' : 'Explore Pro to practise'}
           onPress={() =>
             gate() &&
             router.push({ pathname: '/fixit', params: { words: pack.words.map((w) => w.word).join(','), title: pack.title } })
           }
         />
+        <Text style={[styles.sub, { color: colors.muted }]}>
+          {unlocked ? 'Say each word, then read it in a sentence. Or explore the meanings below at your own pace.' : 'Explore the meanings below. Guided speaking practice is included with Pro.'}
+        </Text>
 
         {pack.words.map((w) => {
           const e = book[w.word.toLowerCase()];
@@ -76,11 +91,12 @@ export default function PackScreen() {
               <View style={styles.cardTop}>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[styles.word, { color: colors.ink }]}>{w.word}</Text>
-                  <Text style={[styles.syll, { color: colors.signal }]}>{w.syllables}</Text>
+                  <Text style={[styles.syll, { color: colors.muted }]}>{w.syllables}</Text>
                 </View>
                 <Pressable
-                  onPress={() => Speech.speak(w.word, { language: 'en-US', rate: 0.85 })}
+                  onPress={() => { Speech.stop(); Speech.speak(w.word, { language: 'en-US', rate: 0.85 }); }}
                   hitSlop={8}
+                  accessibilityRole="button"
                   accessibilityLabel={`Hear how to say ${w.word}`}
                   style={[styles.hear, { backgroundColor: colors.signalSoft }]}
                 >
@@ -88,24 +104,45 @@ export default function PackScreen() {
                 </Pressable>
               </View>
               <Text style={[styles.meaning, { color: colors.ink }]}>{w.meaning}</Text>
-              <Text style={[styles.example, { color: colors.muted }]}>“{w.example}”</Text>
-              <View style={styles.cardBottom}>
+              {w.practice && practisingWord === w.word ? (
+                <View style={[styles.practice, { borderColor: colors.line }]}>
+                  <WordReflection key={w.word} word={w} />
+                </View>
+              ) : (
+                <Text style={[styles.example, { color: colors.muted }]}>“{w.example}”</Text>
+              )}
+              {w.practice && (
+                <Pressable
+                  onPress={() => { Speech.stop(); setPractisingWord(practisingWord === w.word ? null : w.word); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={practisingWord === w.word ? `Close practice for ${w.word}` : `Practise ${w.word} in your own words`}
+                  accessibilityState={{ expanded: practisingWord === w.word }}
+                  style={({ pressed }) => [styles.practiceButton, { opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <Text style={[styles.practiceTitle, { color: colors.signal }]}>
+                    {practisingWord === w.word ? 'Close practice' : 'Use it yourself'}
+                  </Text>
+                </Pressable>
+              )}
+              {bookReady && <View style={styles.cardBottom}>
                 <Mastery days={e?.cleanDays.length ?? 0} colors={colors} />
                 <Text style={[styles.status, { color: colors.muted }]}>
                   {stageLabel(e)}{e?.stumbles ? ` · missed ${e.stumbles}×` : ''}
                 </Text>
-              </View>
+              </View>}
             </View>
           );
         })}
 
         <Text style={[styles.section, { color: colors.ink }]}>Say them in context</Text>
         <Text style={[styles.sub, { color: colors.muted }]}>
-          Short passages that use these words the way people actually say them at work.
+          Short passages that put the words into a complete thought.
         </Text>
         {pack.passages.map((p, n) => (
           <Pressable
             key={p.title}
+            accessibilityRole="button"
+            accessibilityLabel={`${p.title}, ${formatDuration(estimateSeconds(p.text))}${unlocked ? '' : ', requires Pro'}`}
             onPress={() => gate() && router.push({ pathname: '/session/[id]', params: { id: packPassageId(pack.id, n) } })}
             style={({ pressed }) => [styles.passage, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.75 : 1 }]}
           >
@@ -123,16 +160,14 @@ export default function PackScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  empty: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: space(2.5), gap: space(2) },
+  back: { minWidth: 44, minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center' },
   top: { paddingHorizontal: space(2), height: 48, justifyContent: 'center' },
   wrap: { paddingHorizontal: space(2.5), gap: space(1.5) },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: space(1) },
   eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1.1 },
   h1: { fontFamily: fonts.displayBold, fontSize: 32 },
   pitch: { fontSize: 17, lineHeight: 24 },
-  progress: { borderWidth: 1, borderRadius: 16, padding: space(2), gap: space(1) },
-  progressText: { fontSize: 15, fontWeight: '600' },
-  bar: { height: 6, borderRadius: 3 },
-  barFill: { height: 6, borderRadius: 3 },
   card: { borderWidth: 1, borderRadius: 18, padding: space(2), gap: 6 },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: space(1) },
   word: { fontFamily: fonts.readingBold, fontSize: 24 },
@@ -140,6 +175,9 @@ const styles = StyleSheet.create({
   hear: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   meaning: { fontSize: 16, lineHeight: 22, marginTop: 4 },
   example: { fontFamily: fonts.reading, fontSize: 15, lineHeight: 22 },
+  practice: { borderTopWidth: 1, paddingTop: space(1.5), marginTop: space(1), gap: space(1) },
+  practiceTitle: { fontSize: 15, fontWeight: '600' },
+  practiceButton: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingRight: space(2) },
   cardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   status: { fontSize: 13, fontWeight: '600' },
   section: { fontSize: 17, fontWeight: '700', marginTop: space(2) },
