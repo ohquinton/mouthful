@@ -9,7 +9,7 @@ import { paceZone, sessionScore, wordsPerMinute } from '../engine/score';
 import { MIN_MINUTE_WORDS, minuteSummary, stampHeard } from '../engine/minute';
 import { LEVEL_NAME, minutePromptOfTheDay, promptOfTheDay } from '../content/prompts';
 import { saveSession } from '../store/sessions';
-import { minuteCompleteProps, minuteRecord, withoutBreaks, type MinuteBreak } from '../store/minute';
+import { gapAfterBreak, minuteCompleteProps, minuteRecord, withoutBreaks, type MinuteBreak } from '../store/minute';
 import { listenLocale, useListener } from '../speech/useListener';
 import { PrimaryButton } from '../components/ui';
 import { useProfile } from '../store/profile';
@@ -79,10 +79,17 @@ export default function FreeTalk() {
 
   // One Minute: stamp each new word with the time it was first heard. Keyed on the word count,
   // not the 250 ms clock. While the error card is up the clock stands still (pausedAt).
+  // After a Carry on, the first word heard also moves the clock on by the gap across the break
+  // (gapAfterBreak), because withoutBreaks() takes that gap out of the stamps at Finish. Without
+  // this the clock ran out while Kept going still said ~58 s.
   useEffect(() => {
     if (!startedAt) return;
+    const before = heardTimes.current.length;
     heardTimes.current = stampHeard(heardTimes.current, heard.length, pausedAt || Date.now());
-  }, [heard.length, startedAt, pausedAt]);
+    const gap = minute ? gapAfterBreak(heardTimes.current, breaks.current, before) : 0;
+    // Can't loop: the re-run this causes stamps no new word, so the gap is 0.
+    if (gap > 0) setStartedAt((s) => s + gap);
+  }, [heard.length, startedAt, pausedAt, minute]);
 
   // Free talk: a long silence between words counts as a pause. (One Minute uses minuteSummary's
   // count instead, which never counts the thinking time before the first word.)
@@ -180,7 +187,8 @@ export default function FreeTalk() {
 
     const longPauses = summary ? summary.longPauses : pauses.current;
     const fillersPerMin = +(counts.fillerCount / (secs / 60)).toFixed(1);
-    // The score is computed as before (Free talk's formula). Flow is separate and is what a minute shows.
+    // The score is computed as before (Free talk's formula; `score` is a required field). Flow is
+    // separate and is what a minute shows; Progress leaves minutes out of Best score for that reason.
     const stats = { wpm: wordsPerMinute(counts.spoken, secs), fillersPerMin, accuracy: null, midSentencePauses: longPauses, seconds: secs };
     const id = `${Date.now()}`;
     await saveSession({

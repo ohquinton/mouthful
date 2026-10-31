@@ -3,7 +3,7 @@
 import { tokenise } from '../src/engine/align';
 import { FLOW_SCORED, FLOW_VERSION, flowScore, flowSlotsFrom, flowVersionOf, minuteSummary, stampHeard } from '../src/engine/minute';
 import type { SavedSession } from '../src/store/sessions';
-import { fillerChips, habitCode, minuteRecord, overruleFiller, pastMinutes, savedMinuteLine, standingFillers, trendText, withoutBreaks } from '../src/store/minute';
+import { fillerChips, firstWordSeconds, firstWordText, gapAfterBreak, habitCode, minuteRecord, overruleFiller, pastMinutes, savedMinuteLine, standingFillers, trendText, withoutBreaks } from '../src/store/minute';
 
 /** n plain words, one every `stepMs` from `from`. */
 function talk(n: number, from: number, stepMs = 400): { tokens: string[]; times: number[] } {
@@ -78,6 +78,17 @@ describe('withoutBreaks: a call is never a long pause or talking time', () => {
     const m = minuteSummary({ tokens: [...a.tokens, ...b.tokens, ...c.tokens], heardTimes: t.heardTimes, startedAt: 0 })!;
     expect(m.longPauses).toBe(0);
     expect(t.heardTimes[59]).toBeCloseTo(1000 + 59 * 400 - 2 * 400, 0); // continuous, minus the two closed steps
+  });
+
+  it('two breaks with no word between them: both calls come out once, stamps never go backwards', () => {
+    const a = talk(20, 1000); // to 8.6 s
+    const b = talk(20, 9000 + 10_000 + 20_000 + 1000); // card up 10 s, Carry on, card up again 20 s, Carry on
+    const wall2 = [...a.times, ...b.times];
+    const breaks = [{ index: 20, awayMs: 10_000 }, { index: 20, awayMs: 20_000 }];
+    const t = withoutBreaks(wall2, 0, breaks);
+    for (let k = 1; k < t.heardTimes.length; k++) expect(t.heardTimes[k]).toBeGreaterThanOrEqual(t.heardTimes[k - 1]);
+    expect(t.heardTimes[20]).toBe(t.heardTimes[19]);
+    expect(gapAfterBreak(wall2, breaks, 20)).toBe(wall2[20] - wall2[19] - 30_000);
   });
 
   it('does not change the stamps it was given (talk.tsx keeps them for a retry check)', () => {
@@ -221,18 +232,88 @@ describe('"I meant that" (overruleFiller)', () => {
   });
 });
 
+describe('the clock after Carry on matches Kept going (talk.tsx)', () => {
+  // Plays the minute the way talk.tsx runs it: words every 400 ms, a 30 s call, Carry on, the reader
+  // picks up 2 s later and talks until the clock on screen reaches 60. The clock is `now - start`,
+  // where start moves on by the time away at Carry on and, with this fix, by gapAfterBreak() when
+  // the first word after the break is stamped.
+  function playMinute(closeGapOnClock: boolean) {
+    const stepMs = 400;
+    let start = 0;
+    let times: number[] = [];
+    const breaks: { index: number; awayMs: number }[] = [];
+    const clock = (now: number) => (now - start) / 1000;
+    let now = 1000;
+    while (now <= 20_000) times = stampHeard(times, times.length + 1, (now += stepMs));
+    const pausedAt = now + 1000; // call comes in 1 s after the last word
+    const resumedAt = pausedAt + 30_000;
+    breaks.push({ index: times.length, awayMs: resumedAt - pausedAt });
+    start += resumedAt - pausedAt;
+    now = resumedAt + 2000; // the recogniser restarts and the reader finds their place
+    for (;;) {
+      if (clock(now) >= 60) break;
+      const before = times.length;
+      times = stampHeard(times, before + 1, now);
+      if (closeGapOnClock) start += gapAfterBreak(times, breaks, before);
+      now += stepMs;
+    }
+    const t = withoutBreaks(times, 0, breaks);
+    const tokens = times.map(() => 'word');
+    return minuteSummary({ tokens, heardTimes: t.heardTimes, startedAt: t.startedAt })!;
+  }
+
+  it('before the fix, a full minute on the clock ended at Kept going ~57', () => {
+    expect(playMinute(false).talkSeconds).toBeLessThan(58);
+  });
+
+  it('with the clock moved by the closed gap, a full minute is a full minute', () => {
+    expect(playMinute(true).talkSeconds).toBeGreaterThanOrEqual(59.5);
+    expect(playMinute(true).longPauses).toBe(0);
+  });
+
+  it('gapAfterBreak is 0 when there is no break at that word, or the word is not heard yet', () => {
+    expect(gapAfterBreak([0, 400, 800], [{ index: 2, awayMs: 100 }], 1)).toBe(0);
+    expect(gapAfterBreak([0, 400], [{ index: 2, awayMs: 100 }], 2)).toBe(0);
+    expect(gapAfterBreak([0, 400, 900], [{ index: 0, awayMs: 100 }], 0)).toBe(0);
+    expect(gapAfterBreak([0, 400, 900], [{ index: 2, awayMs: 1000 }], 2)).toBe(0); // never negative
+  });
+});
+
+describe('time to first word on the Tape', () => {
+  it('is saved with the minute (savedMinute talks from 2 s)', () => {
+    expect(firstWordSeconds(savedMinute(FILLERS))).toBe(2);
+  });
+
+  it('older minutes without it show nothing', () => {
+    const old = savedMinute(FILLERS);
+    const { timeToFirstWordSeconds: _drop, ...minute } = old.minute as NonNullable<SavedSession['minute']> & { timeToFirstWordSeconds?: number };
+    expect(firstWordSeconds({ minute })).toBeUndefined();
+    expect(firstWordSeconds({ minute: undefined })).toBeUndefined();
+    expect(firstWordText(undefined)).toBeNull();
+  });
+
+  it('whole seconds, singular for 1, straight away under half a second', () => {
+    expect(firstWordText(0.3)).toBe('You started straight away.');
+    expect(firstWordText(1.2)).toBe('You started after 1 second.');
+    expect(firstWordText(6.5)).toBe('You started after 7 seconds.');
+    expect(firstWordText(12)).toBe('You started after 12 seconds.');
+  });
+});
+
 describe('trend line', () => {
   const m = (id: string, flow: number, flowVersion = FLOW_VERSION): SavedSession => ({ ...savedMinute(FILLERS), id, flow, flowVersion });
 
   it('counts down to the first comparison, with a singular', () => {
-    expect(trendText(null, 0)).toBe('After 3 more minutes, you’ll see how you compare with your own recent ones.');
-    expect(trendText(null, 2)).toBe('After 1 more minute, you’ll see how you compare with your own recent ones.');
+    expect(trendText(null, 0)).toBe('After 3 more One Minute talks, you’ll see how this one compares with your recent ones.');
+    expect(trendText(null, 2)).toBe('After 1 more One Minute talk, you’ll see how this one compares with your recent ones.');
   });
 
   it('says above, below or about the same as your usual', () => {
-    expect(trendText({ median: 70, count: 5, delta: 12, direction: 'up' }, 5)).toBe('12 above your usual (70 over your last 5 minutes).');
-    expect(trendText({ median: 70, count: 3, delta: -8, direction: 'down' }, 3)).toBe('8 below your usual (70 over your last 3 minutes).');
-    expect(trendText({ median: 70, count: 4, delta: 2, direction: 'same' }, 4)).toBe('About the same as your usual (70 over your last 4 minutes).');
+    expect(trendText({ median: 70, count: 5, delta: 12, direction: 'up' }, 5)).toBe('12 above your usual. Your usual is 70, from your last 5 One Minute talks.');
+    expect(trendText({ median: 70, count: 3, delta: -8, direction: 'down' }, 3)).toBe('8 below your usual. Your usual is 70, from your last 3 One Minute talks.');
+    expect(trendText({ median: 70, count: 4, delta: 2, direction: 'same' }, 4)).toBe('About the same as your usual. Your usual is 70, from your last 4 One Minute talks.');
+    expect(trendText(null, 0)).not.toMatch(/[()]/);
+    expect(trendText({ median: 70, count: 4, delta: 2, direction: 'same' }, 4)).not.toMatch(/[()]/);
   });
 
   it('compares only earlier minutes of the same Flow version', () => {

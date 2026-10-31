@@ -23,6 +23,11 @@ export type MinuteBreak = {
  * word after it: the recogniser restarting, the reader finding their place) is closed too, the same
  * way thinking time before the very first word never counts. A break before any word was heard just
  * moves the start forward, so the call isn't counted as thinking time either.
+ *
+ * Two breaks with no word between them share an index: their time away is taken out first, then
+ * the one gap across both is closed once (closing it per break would take the second call out twice).
+ * talk.tsx moves its clock by the same amounts (time away at Carry on, gapAfterBreak at the first
+ * word after), so a full minute on the clock is a full minute of Kept going.
  */
 export function withoutBreaks(
   heardTimes: readonly number[],
@@ -32,20 +37,42 @@ export function withoutBreaks(
   const out = heardTimes.slice();
   let start = startedAt;
   for (const b of breaks) {
-    if (b.index <= 0) {
-      start += b.awayMs;
-      continue;
-    }
-    if (b.index >= out.length) continue; // nothing heard after this break
-    for (let j = b.index; j < out.length; j++) out[j] -= b.awayMs;
-    const gap = out[b.index] - out[b.index - 1];
-    if (gap > 0) for (let j = b.index; j < out.length; j++) out[j] -= gap;
+    if (b.index <= 0) start += b.awayMs;
+    else if (b.index < out.length) for (let j = b.index; j < out.length; j++) out[j] -= b.awayMs;
+    // else: nothing heard after this break
+  }
+  for (const index of new Set(breaks.map((b) => b.index))) {
+    if (index <= 0 || index >= out.length) continue;
+    const gap = out[index] - out[index - 1];
+    if (gap > 0) for (let j = index; j < out.length; j++) out[j] -= gap;
   }
   return { heardTimes: out, startedAt: start };
 }
 
-/** What a minute saves beyond the usual session fields. Numbers and habit-word codes only, never what was said. */
-export type MinuteRecord = NonNullable<SavedSession['minute']>;
+/**
+ * The gap withoutBreaks() closes at `index`, in ms: from the last word before a break to the first
+ * word after it, less the time away. 0 when no break sits at `index` or that word isn't heard yet.
+ * talk.tsx calls it as the first word after a Carry on is stamped and moves its clock forward by it,
+ * so the minute on screen and Kept going on the Tape agree (otherwise a full minute ended at ~58 s).
+ * Works on the raw wall-clock stamps, as talk.tsx holds them.
+ */
+export function gapAfterBreak(heardTimes: readonly number[], breaks: readonly MinuteBreak[], index: number): number {
+  if (index <= 0 || index >= heardTimes.length) return 0;
+  const here = breaks.filter((b) => b.index === index);
+  if (!here.length) return 0;
+  const away = here.reduce((sum, b) => sum + b.awayMs, 0);
+  return Math.max(0, heardTimes[index] - heardTimes[index - 1] - away);
+}
+
+/**
+ * What a minute saves beyond the usual session fields. Numbers and habit-word codes only, never what was said.
+ * `timeToFirstWordSeconds` is new (2026-10-31), so it's optional: older minutes don't have it. It lives
+ * here, not in sessions.ts, only because that file wasn't in this change; move it there when it next opens.
+ */
+export type MinuteRecord = NonNullable<SavedSession['minute']> & {
+  /** Seconds from Start to the first heard word, one decimal (engine timeToFirstWordSeconds). */
+  timeToFirstWordSeconds?: number;
+};
 
 /** The `minute` block of a saved session, from minuteSummary(). */
 export function minuteRecord(m: MinuteSummary): MinuteRecord {
@@ -53,6 +80,7 @@ export function minuteRecord(m: MinuteSummary): MinuteRecord {
     longPauses: m.longPauses,
     longestPauseSeconds: m.longestPauseSeconds,
     talkSeconds: m.talkSeconds,
+    timeToFirstWordSeconds: m.timeToFirstWordSeconds,
     wpm: m.wpm,
     words: m.words,
     umCount: m.umCount,
@@ -107,6 +135,23 @@ export function savedMinuteLine(s: SavedSession, slots: FlowSlots = FLOW_SLOTS):
   return minuteLine({ talkSeconds: m.talkSeconds, longPauses: m.longPauses, wpm: m.wpm, habitFillersPerMin: m.input.habitFillersPerMin, topHabit: top }, slots);
 }
 
+/** A saved minute's time to first word, or undefined for a minute saved before it was kept. */
+export function firstWordSeconds(s: Pick<SavedSession, 'minute'>): number | undefined {
+  const t = (s.minute as MinuteRecord | undefined)?.timeToFirstWordSeconds;
+  return typeof t === 'number' && Number.isFinite(t) && t >= 0 ? t : undefined;
+}
+
+/**
+ * "You started after 6 seconds." on the One Minute Tape. Whole seconds, singular for 1, and
+ * "straight away" under half a second. Null when the minute didn't save it (older sessions).
+ */
+export function firstWordText(seconds: number | undefined): string | null {
+  if (seconds === undefined) return null;
+  const n = Math.round(seconds);
+  if (n === 0) return 'You started straight away.';
+  return `You started after ${n} ${n === 1 ? 'second' : 'seconds'}.`;
+}
+
 /** Habit words as analytics codes: "you know" → "you_know" (sanitise drops spaces). */
 export function habitCode(word: HabitWord): string {
   return word.replace(/ /g, '_');
@@ -141,16 +186,22 @@ export function pastMinutes(sessions: readonly SavedSession[], index: number, ve
   return sessions.slice(0, Math.max(0, index)).filter((x) => x.kind === 'minute' && x.flowVersion === version && typeof x.flow === 'number');
 }
 
+/** "1 One Minute talk", "3 One Minute talks": the mode's name, so "minute" is never read as 60 seconds. */
+function talks(n: number): string {
+  return `${n} One Minute ${n === 1 ? 'talk' : 'talks'}`;
+}
+
 /**
  * The Tape's line comparing this minute with your own recent ones (engine minuteTrend). With
- * fewer than 3 to compare against, it says how many more minutes until it can.
+ * fewer than 3 to compare against, it says how many more talks until it can. Plain sentences,
+ * no brackets (plain English for ESL readers).
  */
 export function trendText(t: MinuteTrend | null, pastCount: number): string {
   if (!t || t.delta === undefined) {
     const more = Math.max(1, 3 - pastCount);
-    return `After ${more} more ${more === 1 ? 'minute' : 'minutes'}, you’ll see how you compare with your own recent ones.`;
+    return `After ${more} more One Minute ${more === 1 ? 'talk' : 'talks'}, you’ll see how this one compares with your recent ones.`;
   }
-  const usual = `your usual (${Math.round(t.median)} over your last ${t.count} minutes)`;
-  if (t.direction === 'same') return `About the same as ${usual}.`;
-  return `${Math.round(Math.abs(t.delta))} ${t.direction === 'up' ? 'above' : 'below'} ${usual}.`;
+  const usual = `Your usual is ${Math.round(t.median)}, from your last ${talks(t.count)}.`;
+  if (t.direction === 'same') return `About the same as your usual. ${usual}`;
+  return `${Math.round(Math.abs(t.delta))} ${t.direction === 'up' ? 'above' : 'below'} your usual. ${usual}`;
 }
