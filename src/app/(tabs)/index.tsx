@@ -10,6 +10,7 @@ import { loadSessions, SavedSession, streak, thisWeek } from '../../store/sessio
 import { useProfile } from '../../store/profile';
 import { ahaPaywallRoute, ahaPending, claimAhaPaywall, requirePro } from '../../pro';
 import { PlanCard } from '../../components/PlanCard';
+import { streakPillShown } from '../../onboarding';
 import { ProBadge } from '../../components/ui';
 import { fonts, space, useColors } from '../../theme';
 
@@ -102,9 +103,12 @@ export default function Today() {
           </Text>
           <Text style={[styles.hello, { color: colors.ink }]}>{greeting()}.</Text>
         </View>
-        <View style={[styles.streak, { borderColor: colors.line, backgroundColor: colors.surface }]}>
-          <Text style={[styles.streakText, { color: colors.ember }]}>🔥 {days}</Text>
-        </View>
+        {/* Hidden until day 2: a streak of 1 on the first day says nothing. */}
+        {streakPillShown(days) && (
+          <View style={[styles.streak, { borderColor: colors.line, backgroundColor: colors.surface }]}>
+            <Text style={[styles.streakText, { color: colors.ember }]}>🔥 {days}</Text>
+          </View>
+        )}
       </View>
       {freezeUsed && <Text style={[styles.freeze, { color: colors.muted }]}>Streak freeze used this week. You’re still on {days}.</Text>}
 
