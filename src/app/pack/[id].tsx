@@ -57,20 +57,15 @@ export default function PackScreen() {
       </View>
       <ScrollView contentContainerStyle={[styles.wrap, { paddingBottom: insets.bottom + space(4) }]}>
         <View style={styles.titleRow}>
-          <Text style={[styles.eyebrow, { color: colors.signal }]}>WORD PACK · {pack.words.length} WORDS</Text>
+          <Text style={[styles.eyebrow, { color: colors.muted }]}>WORD PACK · {pack.words.length} WORDS</Text>
           {!unlocked && <ProBadge />}
         </View>
         <Text style={[styles.h1, { color: colors.ink }]}>{pack.title}</Text>
         <Text style={[styles.pitch, { color: colors.muted }]}>{pack.pitch}</Text>
 
-        <View style={[styles.progress, { backgroundColor: colors.surface, borderColor: colors.line }]}>
-          <Text style={[styles.progressText, { color: colors.ink }]}>
-            {learned} of {pack.words.length} comfortable
-          </Text>
-          <View style={[styles.bar, { backgroundColor: colors.line }]}>
-            <View style={[styles.barFill, { backgroundColor: colors.good, width: `${(learned / pack.words.length) * 100}%` }]} />
-          </View>
-        </View>
+        <Text style={[styles.sub, { color: colors.muted }]}>
+          {learned} of {pack.words.length} comfortable · Built through practice on different days.
+        </Text>
 
         <PrimaryButton
           label={unlocked ? 'Practise these words' : 'Explore Pro to practise'}
@@ -79,6 +74,9 @@ export default function PackScreen() {
             router.push({ pathname: '/fixit', params: { words: pack.words.map((w) => w.word).join(','), title: pack.title } })
           }
         />
+        <Text style={[styles.sub, { color: colors.muted }]}>
+          {unlocked ? 'Say each word, then read it in a sentence. Or explore the meanings below at your own pace.' : 'Explore the meanings below. Guided speaking practice is included with Pro.'}
+        </Text>
 
         {pack.words.map((w) => {
           const e = book[w.word.toLowerCase()];
@@ -87,7 +85,7 @@ export default function PackScreen() {
               <View style={styles.cardTop}>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[styles.word, { color: colors.ink }]}>{w.word}</Text>
-                  <Text style={[styles.syll, { color: colors.signal }]}>{w.syllables}</Text>
+                  <Text style={[styles.syll, { color: colors.muted }]}>{w.syllables}</Text>
                 </View>
                 <Pressable
                   onPress={() => Speech.speak(w.word, { language: 'en-US', rate: 0.85 })}
@@ -166,10 +164,6 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1.1 },
   h1: { fontFamily: fonts.displayBold, fontSize: 32 },
   pitch: { fontSize: 17, lineHeight: 24 },
-  progress: { borderWidth: 1, borderRadius: 16, padding: space(2), gap: space(1) },
-  progressText: { fontSize: 15, fontWeight: '600' },
-  bar: { height: 6, borderRadius: 3 },
-  barFill: { height: 6, borderRadius: 3 },
   card: { borderWidth: 1, borderRadius: 18, padding: space(2), gap: 6 },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: space(1) },
   word: { fontFamily: fonts.readingBold, fontSize: 24 },

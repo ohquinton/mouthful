@@ -2,6 +2,8 @@
 
 One line per decision: date, decision, why. Newest first.
 
+- **2026-10-31 · Improve the existing experience while Apple account access is unavailable** (Quinton). Prioritise design, flow and thoughtful future ideas. Continue browser/code validation; keep native verification outstanding rather than treating account setup as the current work. Challenge builder decisions, not users.
+
 - **2026-10-30 · Articulation and overall speaking are the centre, not ESL** (Quinton, direct correction to Codex). Train quick thinking, precise vocabulary, pacing, emphasis and presence. ESL users are included without defining the brand. Aim for intellectual aspiration without condescension; a useful product comes first, with disciplined spending and honest pushback.
 
 - **2026-10-30 · Mascot: the Drop** (flat, no mouth, never sad), piloted on onboarding and empty states. **No glow effects and no new colour:** celebrations use the existing `good` colour; amber means "watch out" only. Design rule: it must never look vibe-coded (Taste section in the design-ux agent).

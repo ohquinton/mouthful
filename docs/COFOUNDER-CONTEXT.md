@@ -12,6 +12,8 @@ He wants a commercially minded collaborator who builds, questions weak assumptio
 
 Latest operating constraint: money is scarce. A genuinely useful product comes before revenue. Reuse existing capabilities, prefer inexpensive experiments, and question unnecessary subscriptions, services and feature scope. Ambition is not permission to spend money or make unsupported outcome claims. Challenge assumptions, including the founder's, with concrete reasoning and a better alternative.
 
+Current practical constraint (2026-10-31): Apple account access is unavailable. Focus on existing design and flow, and keep future ideas separate from committed features. Do not make Apple setup a recurring blocker; native verification remains outstanding.
+
 Latest quality direction: continuous improvement with care, luxury and class. Interpret this as restrained hierarchy, excellent readability, purposeful interactions, accessible controls and dependable behavior. Decoration and extra features do not establish quality. Use a bounded cycle: identify friction, make one coherent improvement, verify it, obtain independent critique, and retain the next unresolved issue. Continuous improvement is the operating approach, not an unattended background process.
 
 He wants visible progress: show believable changes in starting, finishing an answer, and delivery rather than inventing reassuring scores. He has asked to handle Mac setup himself for now; avoid repeatedly interrupting development to ask about Apple enrollment. A hoped-for launch in roughly two weeks is an aspiration, not evidence that release checks have passed.
@@ -71,7 +73,7 @@ Validation: 37 suites / 584 tests passed, including the added passages in the re
 
 ## Quality review follow-up
 
-Product, design and QA roles ran independently after the vocabulary expansion. The current small refinement addresses invalid pack recovery, back navigation without history, accessible control roles/labels, and an honest Pro-versus-practice action. Visual hierarchy remains a follow-up: consider making progress quieter after checking small-screen layouts.
+Product, design and QA roles ran independently after the vocabulary expansion. The current small refinement addresses invalid pack recovery, back navigation without history, accessible control roles/labels, and an honest Pro-versus-practice action. The subsequent hierarchy pass replaces the prominent progress card with quiet text, mutes informational accents, and explains the guided practice action. Small-screen visual validation remains outstanding.
 
 Implemented next slice (2026-10-31): completed drills offer an optional original-thought prompt for the first drilled word with one. Done stays available, examples start concealed, and reveal/conceal is unscored. The completion component has no listener or persistence; replacing Drill unmounts its listener, invoking native abort and stopping speech playback. Completion is guarded against duplicate final advances. Drills without prompts retain their exit. The completion page scrolls and respects safe-area insets. No new dependencies or service costs.
 
