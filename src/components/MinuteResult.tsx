@@ -3,7 +3,7 @@ import { PACE_BANDS, paceZone } from '../engine/score';
 import { LONG_PAUSE_MS } from '../engine/minute';
 import type { HabitWord } from '../engine/habits';
 import type { SavedSession } from '../store/sessions';
-import { fillerChips, savedMinuteLine } from '../store/minute';
+import { fillerChips, firstWordSeconds, firstWordText, savedMinuteLine } from '../store/minute';
 import { Colors, fonts, space } from '../theme';
 
 /** Always under the number (brief, Decision 3). Flow is about keeping going, never about how you sound. */
@@ -11,6 +11,7 @@ export const FLOW_FINE_PRINT = 'Flow is whether you kept talking. It isn’t a g
 
 /**
  * The Tape for a One Minute session: Flow, the fixed line, the trend against your own minutes,
+ * when you started (time to first word),
  * long pauses, pace, um/uh (shown, not scored), likely fillers as chips you can overrule, and one
  * coaching line. Everything comes from the saved numbers; the transcript is never stored.
  */
@@ -36,6 +37,8 @@ export function MinuteResult({
   const chips = fillerChips(s);
   const meant = s.overruled?.length ?? 0;
   const threshold = LONG_PAUSE_MS / 1000;
+  // "You started after 6 seconds." Absent on minutes saved before it was kept.
+  const started = firstWordText(firstWordSeconds(s));
 
   const tiles = [
     {
@@ -54,7 +57,7 @@ export function MinuteResult({
     },
     { label: 'Kept going', value: `${Math.round(m.talkSeconds)}`, unit: 's', note: 'of 60', tone: colors.muted },
     // Shown, not scored: on-device recognisers drop many um/uh, so the number runs low.
-    { label: 'um/uh the phone heard', value: `${m.umCount}`, unit: '', note: 'it misses some', tone: colors.muted },
+    { label: 'um/uh the phone heard', value: `${m.umCount}`, unit: '', note: 'Phones miss some.', tone: colors.muted },
   ];
 
   return (
@@ -65,6 +68,7 @@ export function MinuteResult({
       </View>
       <Text style={[styles.fine, { color: colors.ink }]}>{FLOW_FINE_PRINT}</Text>
       <Text style={[styles.trend, { color: colors.muted }]}>{trend}</Text>
+      {started && <Text style={[styles.started, { color: colors.ink }]}>{started}</Text>}
 
       <View style={styles.grid}>
         {tiles.map((t) => (
@@ -118,8 +122,8 @@ export function MinuteResult({
       {m.habitUnsure > 0 && (
         <Text style={[styles.fine, { color: colors.muted }]}>
           {m.habitUnsure === 1
-            ? 'One more habit word could have gone either way, so it isn’t counted.'
-            : `${m.habitUnsure} more habit words could have gone either way, so they aren’t counted.`}
+            ? 'One more habit word was hard to judge, so it isn’t counted.'
+            : `${m.habitUnsure} more habit words were hard to judge, so they aren’t counted.`}
         </Text>
       )}
 
@@ -134,6 +138,7 @@ const styles = StyleSheet.create({
   outOf: { fontSize: 20, fontWeight: '600', marginBottom: 14 },
   fine: { fontSize: 13, lineHeight: 18 },
   trend: { fontSize: 15, lineHeight: 21, fontWeight: '600' },
+  started: { fontSize: 17, lineHeight: 24 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1.5) },
   tile: { flexBasis: '47%', flexGrow: 1, borderWidth: 1, borderRadius: 14, padding: space(1.75), gap: 2 },
   tileLabel: { fontSize: 13, fontWeight: '500' },
