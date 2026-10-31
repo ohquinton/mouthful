@@ -54,7 +54,10 @@ export function normalise(word: string): string {
   const w = word
     .toLowerCase()
     .replace(/[’‘]/g, "'")
-    .replace(/[^a-z0-9'&%]/g, '')
+    .replace(/[^a-z0-9'&%$£€.:]/g, '')
+    // Numbers keep what makes them a number: "4.2", "9:30", "$40", "40€". Elsewhere these go ("U.S.").
+    .replace(/(?<!\d)[.:]|[.:](?!\d)/g, '')
+    .replace(/[$£€](?!\d)(?<!\d[$£€])/g, '')
     .replace(/^'+|'+$/g, '');
   return NUMBER_WORDS[w] ?? w;
 }
@@ -114,9 +117,359 @@ function editDistanceAtMostOne(a: string, b: string): boolean {
 /** Exact match, or one letter off for longer words (forgives accents and recogniser spelling). */
 export function wordsMatch(heard: string, expected: string): boolean {
   if (heard === expected) return true;
+  // A digit off is a different number ("12000" / "120000"), never a spelling.
+  if (HAS_DIGIT.test(heard) || HAS_DIGIT.test(expected)) return false;
   if (expected.length >= 5 && heard.length >= 4) return editDistanceAtMostOne(heard, expected);
   // "colour" vs "color", "grey" vs "gray" style spellings
   return heard.replace(/u/g, '') === expected.replace(/u/g, '') && expected.length >= 4;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Numbers. A script says "12%", "4.2", "$3.5m", "2026", "1st"; the reader says "twelve percent",
+// "four point two", "three point five million dollars", "twenty twenty six", "first", and the
+// recogniser writes either form. Before matching, each heard number is rewritten into the
+// passage's own spelling of the same value, so the aligner below sees the passage's words:
+//   - Passage-directed. A heard run is only rewritten when its value is a number the passage
+//     contains (spans of up to MAX_NUM_SPAN words, never across a comma or full stop). So "to",
+//     "too", "for" are never numbers, and "twenty twenty six" is 2026 only if the passage has 2026
+//     (else 20 then 26, if it has those).
+//   - Longest heard run first; among passage copies with the same value but different spellings
+//     ("12" and "twelve"), the first one after the last number rewritten, else the nearest behind.
+//   - Equal values only. A currency symbol is optional to say ("$3.5m" read "three point five
+//     million"); the "per cent", the "million" and ordinals are not ("3rd" read "three" stays red).
+//   - Nothing to rewrite (no numbers in the passage, or the reader said them as written): align()
+//     gets the same array, so it behaves exactly as before.
+//   - `spoken` still counts the recogniser's own tokens, so pace isn't changed by the rewrite.
+
+const HAS_DIGIT = /\d/;
+const MAX_NUM_SPAN = 10;
+const UNIT: Record<string, number> = {
+  zero: 0, nought: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+};
+const TEEN: Record<string, number> = {
+  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+};
+const TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+const BIG: Record<string, number> = { thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12 };
+/** Suffixes on a digit token: "3.5m", "$40k", "2bn". */
+const DIGIT_BIG: Record<string, number> = { k: 1e3, m: 1e6, mn: 1e6, b: 1e9, bn: 1e9 };
+/** Ordinal words, as the cardinal word they stand for. */
+const ORDINAL: Record<string, string> = {
+  first: 'one', second: 'two', third: 'three', fourth: 'four', fifth: 'five', sixth: 'six', seventh: 'seven', eighth: 'eight',
+  ninth: 'nine', tenth: 'ten', eleventh: 'eleven', twelfth: 'twelve', thirteenth: 'thirteen', fourteenth: 'fourteen',
+  fifteenth: 'fifteen', sixteenth: 'sixteen', seventeenth: 'seventeen', eighteenth: 'eighteen', nineteenth: 'nineteen',
+  twentieth: 'twenty', thirtieth: 'thirty', fortieth: 'forty', fiftieth: 'fifty', sixtieth: 'sixty', seventieth: 'seventy',
+  eightieth: 'eighty', ninetieth: 'ninety', hundredth: 'hundred', thousandth: 'thousand', millionth: 'million',
+};
+/** "the nineties", "the nineteen nineties". */
+const DECADE: Record<string, string> = {
+  twenties: 'twenty', thirties: 'thirty', forties: 'forty', fifties: 'fifty', sixties: 'sixty', seventies: 'seventy',
+  eighties: 'eighty', nineties: 'ninety',
+};
+const CURRENCY_WORD: Record<string, string> = {
+  dollar: '$', dollars: '$', buck: '$', bucks: '$', pound: '£', pounds: '£', quid: '£', euro: '€', euros: '€',
+};
+/** Words that can sit inside a spoken number. */
+const NUM_WORD = new Set([
+  ...Object.keys(UNIT), ...Object.keys(TEEN), ...Object.keys(TENS), ...Object.keys(BIG), ...Object.keys(ORDINAL),
+  ...Object.keys(DECADE), ...Object.keys(CURRENCY_WORD),
+  'hundred', 'a', 'and', 'point', 'half', 'oh', 'percent', 'per', 'cent', 'am', 'pm', "o'clock",
+]);
+/** Words a spoken number can start with (plus digit tokens, "a hundred", "point five", "half a million"). */
+const NUM_HEAD = new Set([...Object.keys(UNIT), ...Object.keys(TEEN), ...Object.keys(TENS), ...Object.keys(ORDINAL), ...Object.keys(DECADE)]);
+const DIGIT_TOKEN = /^([$£€])?(\d+(?:\.\d+)?)(k|m|mn|bn|b)?([$£€])?(%|st|nd|rd|th|s|am|pm)?$/;
+const TIME_TOKEN = /^(\d{1,2}):(\d{2})(am|pm)?$/;
+
+const numberish = (t: string | undefined) => t !== undefined && (HAS_DIGIT.test(t) || NUM_WORD.has(t));
+function numberHead(t: string, next: string | undefined): boolean {
+  if (HAS_DIGIT.test(t) || NUM_HEAD.has(t)) return true;
+  if (t === 'a') return next === 'hundred' || (next !== undefined && next in BIG);
+  if (t === 'point') return next !== undefined && (next in UNIT || next === 'oh');
+  return t === 'half' && next === 'a';
+}
+
+const fmt = (x: number) => String(Math.round(x * 1e6) / 1e6);
+
+/** 0–99 at ts[i]: "seven", "twelve", "forty", "forty five". [value, next index]. */
+function sub100(ts: readonly string[], i: number): [number, number] | null {
+  const t = ts[i];
+  if (t === undefined) return null;
+  if (t in UNIT) return [UNIT[t], i + 1];
+  if (t in TEEN) return [TEEN[t], i + 1];
+  if (t in TENS) {
+    const u = UNIT[ts[i + 1]];
+    return u ? [TENS[t] + u, i + 2] : [TENS[t], i + 1];
+  }
+  return null;
+}
+
+/** 0–9999 at ts[i] without thousand/million: "a hundred and five", "twelve hundred", "forty". */
+function smallNumber(ts: readonly string[], i: number): [number, number] | null {
+  let h: number;
+  if (ts[i] === 'a' && ts[i + 1] === 'hundred') {
+    h = 1;
+    i += 2;
+  } else {
+    const s = sub100(ts, i);
+    if (!s) return null;
+    if (ts[s[1]] !== 'hundred') return s;
+    if (s[0] === 0) return null;
+    h = s[0];
+    i = s[1] + 1;
+  }
+  const r = sub100(ts, ts[i] === 'and' ? i + 1 : i);
+  return r && r[0] > 0 ? [h * 100 + r[0], r[1]] : [h * 100, i];
+}
+
+/** The whole of ts as a cardinal ("two thousand and twenty six"), or null. */
+function cardinal(ts: readonly string[]): number | null {
+  let i = 0;
+  let total = 0;
+  let lastBig = Infinity;
+  for (;;) {
+    const s: [number, number] | null = ts[i] === 'a' && ts[i + 1] in BIG ? [1, i + 1] : smallNumber(ts, i);
+    if (!s) return null;
+    i = s[1];
+    const big = BIG[ts[i]];
+    if (big === undefined) return i === ts.length && !(lastBig < Infinity && s[0] >= 1000) ? total + s[0] : null;
+    if (big >= lastBig || s[0] >= 1000) return null;
+    total += s[0] * big;
+    lastBig = big;
+    i++;
+    if (i === ts.length) return total;
+    if (ts[i] === 'and') i++;
+  }
+}
+
+/** Multiplies by trailing thousand/million/billion words from ts[j] on; null if anything else follows. */
+function timesBig(n: number, ts: readonly string[], j: number): number | null {
+  for (; j < ts.length; j++) {
+    const b = BIG[ts[j]];
+    if (b === undefined) return null;
+    n *= b;
+  }
+  return n;
+}
+
+/** "four point two", "point five", "three point five million". */
+function decimal(ts: readonly string[]): number | null {
+  const p = ts.indexOf('point');
+  if (p < 0) return null;
+  let whole = 0;
+  if (p > 0 && !(p === 1 && ts[0] === 'oh')) {
+    const c = cardinal(ts.slice(0, p));
+    if (c === null) return null;
+    whole = c;
+  }
+  let j = p + 1;
+  let digits = '';
+  for (; j < ts.length && (ts[j] in UNIT || ts[j] === 'oh'); j++) digits += ts[j] === 'oh' ? '0' : String(UNIT[ts[j]]);
+  return digits ? timesBig(parseFloat(`${whole}.${digits}`), ts, j) : null;
+}
+
+/** "three and a half million", "half a million". */
+function andAHalf(ts: readonly string[]): number | null {
+  const k = ts.indexOf('half');
+  if (k === 0) return ts[1] === 'a' && ts.length === 3 && ts[2] in BIG ? BIG[ts[2]] / 2 : null;
+  if (k < 3 || ts[k - 1] !== 'a' || ts[k - 2] !== 'and') return null;
+  const c = cardinal(ts.slice(0, k - 2));
+  return c === null ? null : timesBig(c + 0.5, ts, k + 1);
+}
+
+/** Two groups said as a year or a clock time: "nineteen ninety nine", "twenty oh five", "nine thirty". */
+function pairReading(ts: readonly string[]): { year?: number; time?: string } | null {
+  const a = sub100(ts, 0);
+  if (!a) return null;
+  const i = a[1];
+  let b: number;
+  if (ts.length === i + 1 && ts[i] === 'hundred') b = -1;
+  else if (ts.length === i + 2 && ts[i] === 'oh' && UNIT[ts[i + 1]] > 0) b = UNIT[ts[i + 1]];
+  else {
+    const r = sub100(ts, i);
+    if (!r || r[1] !== ts.length || r[0] < 10) return null;
+    b = r[0];
+  }
+  const out: { year?: number; time?: string } = {};
+  if (a[0] >= 10) out.year = a[0] * 100 + Math.max(0, b);
+  if (b >= 0 && b <= 59 && a[0] >= 1 && a[0] <= 12) out.time = `${a[0]}:${String(b).padStart(2, '0')}`;
+  return out;
+}
+
+/**
+ * Every value a run of tokens can be read as, as a short code: "12", "12%", "4.2", "$3500000",
+ * "1o" (1st), "1990s", "t9:30", "t10:00am". Empty if the run isn't one number.
+ */
+function numberValues(tokens: readonly string[]): string[] {
+  const out: string[] = [];
+  const ts = tokens.slice();
+  let cur = '';
+  let suf = '';
+  let ampm = '';
+  let clock = false;
+  const last = ts[ts.length - 1];
+  if (last === 'percent') suf = '%';
+  else if (last === 'cent' && ts[ts.length - 2] === 'per') {
+    suf = '%';
+    ts.pop();
+  } else if (last in CURRENCY_WORD) cur = CURRENCY_WORD[last];
+  else if (last === 'am' || last === 'pm') ampm = last;
+  else if (last === "o'clock") clock = true;
+  if (suf || cur || ampm || clock) ts.pop();
+  if (!ts.length) return out;
+
+  if (HAS_DIGIT.test(ts[0])) {
+    const t = TIME_TOKEN.exec(ts[0]);
+    if (t) {
+      if (ts.length === 1 && !cur && !suf && !clock && !(t[3] && ampm) && +t[2] <= 59) out.push(`t${+t[1]}:${t[2]}${t[3] ?? ampm}`);
+      return out;
+    }
+    const d = DIGIT_TOKEN.exec(ts[0]);
+    if (!d || (d[1] && d[4])) return out;
+    const n = timesBig(parseFloat(d[2]) * (d[3] ? DIGIT_BIG[d[3]] : 1), ts, 1);
+    const c = d[1] || d[4] || '';
+    let s = d[5] ?? '';
+    if (n === null || (c && cur && c !== cur) || (s && (suf || ampm || clock))) return out;
+    if (s === 'am' || s === 'pm' || ampm || clock) {
+      if (!c && !cur && ts.length === 1 && Number.isInteger(n) && n >= 1 && n <= 12) out.push(`t${n}:00${s === 'am' || s === 'pm' ? s : ampm}`);
+      return out;
+    }
+    if (s === 'st' || s === 'nd' || s === 'rd' || s === 'th') s = 'o';
+    s = s || suf;
+    const money = c || cur;
+    if (money && s) return out;
+    out.push(money + fmt(n) + s);
+    return out;
+  }
+  for (const t of ts) if (HAS_DIGIT.test(t)) return out;
+
+  if (ampm || clock) {
+    const n = cardinal(ts);
+    if (n !== null && Number.isInteger(n) && n >= 1 && n <= 12) out.push(`t${n}:00${ampm}`);
+    const p = clock ? null : pairReading(ts);
+    if (p?.time) out.push(`t${p.time}${ampm}`);
+    return out;
+  }
+  let mark = suf;
+  const lt = ts[ts.length - 1];
+  if (lt in ORDINAL || lt in DECADE) {
+    if (cur || suf) return out;
+    mark = lt in ORDINAL ? 'o' : 's';
+    ts[ts.length - 1] = ORDINAL[lt] ?? DECADE[lt];
+  }
+  const add = (n: number | null | undefined) => {
+    if (n === null || n === undefined) return;
+    const v = cur + fmt(n) + mark;
+    if (!out.includes(v)) out.push(v);
+  };
+  add(cardinal(ts));
+  if (mark !== 'o' && mark !== 's') {
+    add(decimal(ts));
+    add(andAHalf(ts));
+  }
+  const p = pairReading(ts);
+  if (p && !cur && mark !== 'o') {
+    if (mark !== '%') add(p.year);
+    if (p.time && !mark) out.push(`t${p.time}`);
+  }
+  return out;
+}
+
+/** The amount alone, without currency or a %, ordinal or decade mark: "$40" and "40%" are both "40". */
+const numberCore = (v: string) => (v[0] === 't' ? v : v.replace(/^[$£€]/, '').replace(/[%os]$/, ''));
+
+type NumSpan = { start: number; len: number; keys: string[] };
+/** Passage numbers by value, in passage order. Null: the passage has none. */
+type NumIndex = Map<string, NumSpan[]>;
+const NUMS = new WeakMap<PassageWord[], NumIndex | null>();
+
+function numbersOf(p: PassageWord[]): NumIndex | null {
+  let idx = NUMS.get(p);
+  if (idx !== undefined) return idx;
+  const map: NumIndex = new Map();
+  const add = (v: string, span: NumSpan) => {
+    const list = map.get(v);
+    if (!list) map.set(v, [span]);
+    else if (!list.some((x) => x.start === span.start && x.len === span.len)) list.push(span);
+  };
+  for (let s = 0; s < p.length; s++) {
+    if (!numberHead(p[s].key, p[s + 1]?.key)) continue;
+    const keys: string[] = [];
+    for (let m = 1; m <= MAX_NUM_SPAN && s + m <= p.length; m++) {
+      const w = p[s + m - 1];
+      if (!numberish(w.key)) break;
+      keys.push(w.key);
+      const span = { start: s, len: m, keys: keys.slice() };
+      for (const v of numberValues(keys)) {
+        add(v, span);
+        // "$3.5m" can be read without saying the currency.
+        if (/^[$£€]|\d[$£€]/.test(keys[0]) && /^[$£€]/.test(v)) add(v.slice(1), span);
+      }
+      if (w.breathAfter) break;
+    }
+  }
+  idx = map.size ? map : null;
+  NUMS.set(p, idx);
+  return idx;
+}
+
+/**
+ * The heard tokens with each number the passage contains respelled the passage's way, and where
+ * each original token starts in the result. Null when nothing changes.
+ */
+function respellNumbers(p: PassageWord[], heard: string[]): { heard: string[]; at: Int32Array } | null {
+  const nums = numbersOf(p);
+  if (!nums) return null;
+  const H = heard.length;
+  let out: string[] | null = null;
+  const at = new Int32Array(H + 1);
+  let cursor = 0;
+  for (let i = 0; i < H; ) {
+    let span: NumSpan | undefined;
+    let m = 0;
+    if (numberHead(heard[i], heard[i + 1])) {
+      let max = 1;
+      while (max < MAX_NUM_SPAN && i + max < H && numberish(heard[i + max])) max++;
+      // What the longer runs read as. A shorter run can't cut through a bigger number ("twenty"
+      // out of "twenty seven", "four" out of "four point two"); a word after it that only says
+      // what the number is ("dollars", "percent") is fine.
+      const longer = new Set<string>();
+      for (m = max; m >= 1 && !span; m--) {
+        const vals = numberValues(heard.slice(i, i + m));
+        for (const v of vals) {
+          const c = nums.get(v);
+          if (!c) continue;
+          let cuts = false;
+          for (const x of longer) if (x !== numberCore(v)) cuts = true;
+          if (cuts) break;
+          span = c.find((x) => x.start >= cursor) ?? c[c.length - 1];
+          break;
+        }
+        for (const v of vals) longer.add(numberCore(v));
+      }
+      m++;
+    }
+    if (!span) {
+      at[i] = out ? out.length : i;
+      out?.push(heard[i]);
+      i++;
+      continue;
+    }
+    cursor = span.start + span.len;
+    let same = m === span.len;
+    for (let j = 0; same && j < m; j++) same = heard[i + j] === span.keys[j];
+    if (!same && !out) out = heard.slice(0, i);
+    const q = out ? out.length : i;
+    // A respelled run starts where its first word did (the run is as settled as its first word).
+    for (let j = 0; j < m; j++) at[i + j] = same ? q + j : q;
+    if (out) {
+      if (same) for (let j = 0; j < m; j++) out.push(heard[i + j]);
+      else out.push(...span.keys);
+    }
+    i += m;
+  }
+  if (!out) return null;
+  at[H] = out.length;
+  return { heard: out, at };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -488,6 +841,17 @@ function findAnchor(
  * skipped, so accuracy can't read 100% for a reader who skipped.
  */
 export function align(passage: PassageWord[], heard: string[], settled = heard.length - SETTLE): Alignment {
+  // Numbers said differently from how the passage writes them are respelled first (see Numbers).
+  const re = passage.length ? respellNumbers(passage, heard) : null;
+  if (!re) return alignWords(passage, heard, settled);
+  const H = heard.length;
+  const s = settled <= 0 ? settled : settled >= H ? re.heard.length + (settled - H) : re.at[settled];
+  const out = alignWords(passage, re.heard, s);
+  // Pace counts what the recogniser sent ("twelve percent" is two words, even as one "12%").
+  return { ...out, spoken: Math.max(0, out.spoken + H - re.heard.length) };
+}
+
+function alignWords(passage: PassageWord[], heard: string[], settled: number): Alignment {
   const first = alignOnce(passage, heard, settled, -1);
   if (settled < heard.length || !first.held) return first.out;
   if (!first.held.tie) return alignOnce(passage, heard, settled, first.held.h).out;

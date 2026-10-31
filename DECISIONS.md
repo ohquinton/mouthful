@@ -2,8 +2,14 @@
 
 One line per decision: date, decision, why. Newest first.
 
+- **2026-10-31 · Deepen and polish existing features; defer new modes until manual testing** (Quinton). Focus on flow, responsiveness, UI and thoughtful feature depth. Code checks are not evidence that native performance or visual polish has been validated.
+
+- **2026-10-31 · Improve the existing experience while Apple account access is unavailable** (Quinton). Prioritise design, flow and thoughtful future ideas. Continue browser/code validation; keep native verification outstanding rather than treating account setup as the current work. Challenge builder decisions, not users.
+
+- **2026-10-30 · Articulation and overall speaking are the centre, not ESL** (Quinton, direct correction to Codex). Train quick thinking, precise vocabulary, pacing, emphasis and presence. ESL users are included without defining the brand. Aim for intellectual aspiration without condescension; a useful product comes first, with disciplined spending and honest pushback.
+
 - **2026-10-30 · Mascot: the Drop** (flat, no mouth, never sad), piloted on onboarding and empty states. **No glow effects and no new colour:** celebrations use the existing `good` colour; amber means "watch out" only. Design rule: it must never look vibe-coded (Taste section in the design-ux agent).
-- **2026-10-30 · Tagline: "Find the words. Say them clearly."** Covers vocabulary by subject and articulation, works for interviews, presentations and everyday English, simple for ESL speakers, never grades. Positioning broadened to ESL speaking practice and vocabulary; the store still leads with one concrete moment.
+- **2026-10-30 · Tagline: "Find the words. Say them clearly."** Covers vocabulary by subject and articulation, works for interviews, presentations and everyday English, simple for ESL speakers, never grades. Positioning broadened to speaking practice and vocabulary; the store still leads with one concrete moment. (ESL emphasis superseded the same day: articulation first, ESL included; see the Codex-logged 2026-10-30 entry.)
 - **2026-10-30 · Name: SaidClearly** (Quinton). Clearance and a lawyer consult before branding spend.
 - **2026-10-30 · One Minute: first ~8 s of thinking free; time to first word shown as its own trended number.** Trains starting fast, closes the "silent minute" loophole (DILEMMAS #15).
 - **2026-10-30 · Target length: whole answer in the final run-through only, no per-part lights; paste-time warning; custom targets.** Per-part budgets were our invention, not the reader's moment (DILEMMAS #16).

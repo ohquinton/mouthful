@@ -1109,7 +1109,7 @@ describe('10b. stutters never turn read words red', () => {
   });
 
   it('light noise (drops, mishearings, stutters, habit words, 3-word restarts): never more said words red than before, in any run', () => {
-    // qa-critic's generator: 150 runs per text, 3,900 in all.
+    // qa-critic's generator: 150 runs per text, including newly added passages.
     const rnd = seeded(9);
     const OFFW = ['banana', 'sorry', 'wait', 'um', 'like', 'actually', 'hmm', 'okay', 'well', 'right'];
     let cases = 0;
@@ -1149,7 +1149,7 @@ describe('10b. stutters never turn read words red', () => {
       }
     }
     console.log(`light-noise fuzz: ${cases} runs; more said words red than before in ${worse.length}, fewer in ${better}; false greens ${fgOld} → ${fgNew}`);
-    expect(cases).toBe(3900);
+    expect(cases).toBe(QA_FUZZ_TEXTS.length * 150);
     expect(summary(worse)).toEqual(NONE);
     expect(fgNew).toBeLessThanOrEqual(fgOld);
   });

@@ -40,3 +40,11 @@ qa-critic's second review (resync v2 and the habit classifier, 2026-10-30):
 | One sentence ×50, read twice / shuffled (§10e) | 2 shapes | Slow calls: 3.0 / 2.3 ms in Jest, 24.6 / 2.9 ms under `node --jitless` | y: 0.75 / 1.6 ms jitless; read twice ≈ 1.9× read once (was 13×) |
 | Speed tests on a loaded machine | §8, §10e | Wall-clock "under 1 ms" failed under parallel Jest | y: same-process ratio vs legacyAlign (≤ 4×) plus a 5 ms backstop |
 | `habits-qa.json`: 167 lines by qa-critic (`real.txt`, `fill.txt`) | 210 habit words | False accusations: "you know" + object in a burst, verb/degree stutters ("i like like", "so so much"), "like basically done" | y: 6 → 0 (precision 86% → 100%). Fixes made against this set, so it's a regression bar now, not a holdout |
+
+Numbers in Glide (`numbers.test.ts`, 2026-10-30):
+
+| Fixture | What it is | Failure type | Fixed? | By |
+|---|---|---|---|---|
+| `numbers.json` | 94 lines written for the test (finance, interview, meeting): percents, decimals, integers to 9999, years, money ($ £, m/k/bn, "and a half"), ordinals, clock times, several numbers per line, both directions (digits in the script and spoken, or spelled in the script and digits heard). 28 adversarial: "to"/"too" for "2", "two" for "to", "one" the pronoun, a number one higher, one digit off, percent or million not said, ordinal said as cardinal, "twenty" cut out of "twenty seven", a skipped number before a said one. Typed by hand, no tester data | False red on every spoken number (only 0–10, & and % were mapped); false green from one-digit-off matches ("12,000" inking "120,000") and "$4" keyed as "four" | y: false red 67 → 0, false green 4 → 0 (94 cases) | Number respelling before matching (`align.ts`, Numbers) |
+| (generated) every clean line with its numbers left out / said one higher | 66 / 30+ | False green from the rewrite | y: 0 inked | same |
+

@@ -1,13 +1,15 @@
 import type { Passage } from './passages';
 
-// Word Packs: the words people use at work and trip on out loud.
-// Each pack teaches meaning + how to say it, then you read the words in context with Glide.
+// Word Packs: useful vocabulary for clearer thoughts and better delivery.
+// Learn meaning, read in context, then try a word in your own thought where a prompt is provided.
 
 export type PackWord = {
   word: string;
   syllables: string; // "rec·on·cil·i·a·tion", stressed syllable in capitals
   meaning: string; // one plain line
   example: string; // how people actually say it at work
+  refinement?: string; // optional second attempt: deepen the thought, never grade it
+  practice?: string; // an unscripted speaking prompt; never automatically graded
 };
 
 export type WordPack = {
@@ -20,6 +22,32 @@ export type WordPack = {
 };
 
 export const WORD_PACKS: WordPack[] = [
+  {
+    id: 'precision',
+    title: 'Make your point',
+    pitch: 'A sharper thought. The right word. Eight ways to say exactly what you mean.',
+    free: true,
+    words: [
+      { word: 'nuance', syllables: 'NOO·ahns', meaning: 'A subtle difference that changes how you understand something.', example: 'There’s a nuance here: I liked the idea, but not the timing.', practice: 'Think of an opinion you mostly agree with. Use “nuance” to explain the part you see differently.', refinement: 'Say it again with one concrete example that makes the subtle difference clear.' },
+      { word: 'concise', syllables: 'con·CISE', meaning: 'Brief, but with the important meaning intact.', example: 'Give me the concise version: what changed, and why does it matter?', practice: 'Describe your day in one sentence. Start with “The concise version is…” and keep the detail that matters most.', refinement: 'Say it again without the opening phrase. Keep the meaning while removing any words you do not need.' },
+      { word: 'candid', syllables: 'CAN·did', meaning: 'Honest and direct about what you think.', example: 'To be candid, I agreed before I understood the commitment.', practice: 'Name something you changed your mind about. Start with “To be candid…” and explain why.', refinement: 'Keep the honesty, but phrase it as you would to someone you respect who disagrees.' },
+      { word: 'coherent', syllables: 'co·HEER·ent', meaning: 'Clear because the parts connect and make sense together.', example: 'The ideas are interesting, but we need a coherent argument.', practice: 'Think of a plan that did or didn’t make sense. Use “coherent” and give one reason.', refinement: 'Connect your reason to your conclusion. Make it clear why one leads to the other.' },
+      { word: 'premise', syllables: 'PREM·iss', meaning: 'An idea an argument starts from and relies on.', example: 'That advice rests on the premise that everyone has spare time.', practice: 'Choose a common piece of advice. Say “The premise is…” and name what it assumes.', refinement: 'What would make that assumption untrue? Add one situation where the advice would not hold.' },
+      { word: 'perspective', syllables: 'per·SPEC·tive', meaning: 'A way of seeing something, shaped by experience or position.', example: 'From her perspective, the delay gave us time to prepare.', practice: 'Describe a small disagreement from the other person’s perspective. Use the word without saying who was right.', refinement: 'Now explain your own view while acknowledging what matters to the other person.' },
+      { word: 'distinction', syllables: 'dis·TINC·tion', meaning: 'A difference worth noticing between two things.', example: 'There’s a distinction between being busy and making progress.', practice: 'Name two things people often confuse. Use “distinction” to explain the difference in one sentence.', refinement: 'Give one everyday example that makes the difference easy to recognise.' },
+      { word: 'implication', syllables: 'im·pli·CA·tion', meaning: 'A possible consequence, or something suggested without being stated directly.', example: 'One implication of a shorter week is that meetings need to be more focused.', practice: 'Propose one change to your routine. Use “implication” to describe what else might change as a result.', refinement: 'Is that consequence certain or only possible? Say it again with language that reflects your confidence.' },
+    ],
+    passages: [
+      {
+        title: 'A useful disagreement',
+        text: 'To be candid, I do not think we disagree about the goal. The distinction is in how we get there. From your perspective, moving quickly gives us more chances to learn. From mine, a little preparation saves us from repeating the same mistake. There is a nuance worth keeping: a careful plan does not have to be a slow one. We can choose a small first step and learn from what happens.',
+      },
+      {
+        title: 'The point beneath the words',
+        text: 'Here is the concise version of my argument. The premise is that having more choices always makes life better. That sounds reasonable, but it leaves something out: choosing takes time and attention. One implication is that a shorter list can sometimes be more useful than a longer one. A coherent answer needs both sides of that idea. More choice can help, but only when we can make sense of the options.',
+      },
+    ],
+  },
   {
     id: 'meetings',
     title: 'Run the Meeting',

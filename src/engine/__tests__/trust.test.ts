@@ -126,8 +126,10 @@ describe('moments', () => {
     expect(nextStep(steps, steps.map((s) => s.id))).toBeUndefined();
   });
 
-  it('has six packs with every word used in its passages', () => {
-    expect(WORD_PACKS).toHaveLength(6);
+  it('keeps both introductory vocabulary packs free', () => {
+    expect(getPack('meetings')?.free).toBe(true);
+    expect(getPack('precision')?.free).toBe(true);
+    expect(new Set(WORD_PACKS.map((pack) => pack.id)).size).toBe(WORD_PACKS.length);
   });
 });
 

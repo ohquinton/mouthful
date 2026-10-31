@@ -54,6 +54,8 @@ describe('word packs content', () => {
     expect(packPassage('w.finance.0')?.title).toBe('Morning Update · Finance Floor');
     expect(packPassage('w.finance.9')).toBeUndefined();
     expect(DICTIONARY.get('fiduciary')?.packId).toBe('finance');
-    expect(DICTIONARY.size).toBe(48);
+    expect(DICTIONARY.size).toBe(56);
+    expect(packPassage('w.precision.0')?.title).toBe('A useful disagreement · Make your point');
+    expect(DICTIONARY.get('premise')?.packId).toBe('precision');
   });
 });
