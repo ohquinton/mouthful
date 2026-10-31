@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { applyResults, correctWord, WordBook, WordResult } from '../engine/vocab';
+import { applyResults, correctWord, readingResults, WordBook, WordResult } from '../engine/vocab';
 import { DICTIONARY } from '../content/wordpacks';
 import type { Alignment, PassageWord } from '../engine/align';
 
@@ -52,14 +52,7 @@ export function recordCorrection(word: string): Promise<void> {
  * From a finished session: every pack word you reached (clean or skipped), plus any
  * longer word you skipped, which becomes one of "your words" to practise.
  */
+/** What a finished reading tells the word book. The rules live in the engine (`readingResults`). */
 export function resultsFromSession(words: PassageWord[], a: Alignment): WordResult[] {
-  const out: WordResult[] = [];
-  words.forEach((w, i) => {
-    const status = a.status[i];
-    if (status === 'pending') return;
-    const clean = w.display.replace(/[^A-Za-z'’-]/g, '');
-    if (DICTIONARY.has(w.key)) out.push({ word: clean, clean: status === 'read' });
-    else if (status === 'skipped' && clean.length >= 6) out.push({ word: clean, clean: false });
-  });
-  return out;
+  return readingResults(words, a.status, (k) => DICTIONARY.has(k));
 }

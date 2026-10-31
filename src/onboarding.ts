@@ -81,8 +81,7 @@ export function clock(seconds: number): string {
 }
 
 /**
- * The line under the pace on the starting point. Our own copy (engine/score.ts day1Line belongs to
- * speech-engine and still talks about Day 7/30 and fillers). A range, never a target (principle 4).
+ * The line under the pace on the starting point. A range, never a target (principle 4).
  */
 export function paceRangeLine(wpm: number, [lo, hi]: [number, number]): string {
   if (wpm > hi) return `A comfortable range for reading aloud is ${lo}–${hi}. Try a little slower next time.`;
