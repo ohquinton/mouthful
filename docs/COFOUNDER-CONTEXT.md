@@ -85,6 +85,10 @@ Remaining verification: on a phone, complete and skip a prompt-bearing drill; ve
 
 ## Source coverage
 
+### Your words return loop · 2026-10-31
+
+Saved words can now be practised individually, including comfortable words; prompt-bearing words offer the shared optional reflection in place. Empty collections link directly to word packs, loading no longer flashes an empty collection, and a collection with no due words says so. Definitions are not truncated. Playback is stopped on leaving the screen or starting practice/reflection. Existing due selection, recognition stages and persistence are unchanged. Lint/typecheck and 12 focused vocabulary/resolver tests passed; visual, screen-reader and native audio checks remain outstanding. Unknown words still have no saved sentence in this route and therefore use the existing single-word drill, not a fabricated context.
+
 ### Practice reliability follow-up · 2026-10-31
 
 Fix-it now resolves content before mounting its listener. Loading, missing/empty content and rejected loads have readable states and exits; rejected loads offer retry. Each route request gets fresh loading/drill/completion state, and abandoned loads cannot update the current screen. The resolver reads a saved session once, supports old sessions, preserves saved-session precedence and custom context, and removes blank/duplicate word entries. Five focused tests cover those data cases. Native microphone and navigation behavior still need device verification.
