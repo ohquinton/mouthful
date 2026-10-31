@@ -228,3 +228,23 @@ export function packPassage(id: string): Passage | undefined {
 export const DICTIONARY: Map<string, PackWord & { packId: string }> = new Map(
   WORD_PACKS.flatMap((pack) => pack.words.map((w) => [w.word.toLowerCase(), { ...w, packId: pack.id }] as const)),
 );
+
+/**
+ * Is this word in a free pack? Your words lets you practise any saved word, but practising is
+ * Fix-it, which is Pro (the Tape and Today gate it too). Words from a free pack stay free, since
+ * the pack page already lets a free reader drill them. Checked against every pack, not DICTIONARY,
+ * because a word in both a free and a Pro pack keeps only one entry there.
+ */
+export function inFreePack(word: string): boolean {
+  const w = word.trim().toLowerCase();
+  return WORD_PACKS.some((p) => p.free && p.words.some((x) => x.word.toLowerCase() === w));
+}
+
+/**
+ * The words a reader can practise right now without the Pro wall: all of them for Pro, otherwise
+ * only the free-pack ones (order kept). Your words' "Practise today's words" uses this, so a free
+ * reader with a mix of due words still gets to drill the free ones.
+ */
+export function practisableWords(words: readonly string[], pro: boolean): string[] {
+  return pro ? [...words] : words.filter(inFreePack);
+}

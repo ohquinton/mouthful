@@ -4,17 +4,20 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Speech from 'expo-speech';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { DICTIONARY } from '../content/wordpacks';
+import { DICTIONARY, inFreePack, practisableWords } from '../content/wordpacks';
 import { dueWords, stageLabel, summarise, WordBook, WordEntry } from '../engine/vocab';
 import { loadBook } from '../store/words';
 import { Mastery } from '../components/Mastery';
 import { PrimaryButton } from '../components/ui';
+import { requirePro } from '../pro';
+import { useProfile } from '../store/profile';
 import { WordReflection } from '../components/WordReflection';
 import { fonts, space, useColors } from '../theme';
 
 export default function YourWords() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { profile } = useProfile();
   const [book, setBook] = useState<WordBook>({});
   const [ready, setReady] = useState(false);
   const [reflecting, setReflecting] = useState<string | null>(null);
@@ -31,6 +34,14 @@ export default function YourWords() {
 
   const { learning, learned } = summarise(book);
   const due = dueWords(book);
+  // Practising is Fix-it, which is Pro, except words from a free pack (content/wordpacks.ts).
+  // A free reader with a mix of due words drills the free ones; with none, the button opens the wall.
+  const dueNow = practisableWords(due, profile.pro);
+  const dueCount = dueNow.length || due.length;
+  const practiseDue = () => {
+    if (!dueNow.length && !requirePro(profile, 'fixit')) return;
+    router.push({ pathname: '/fixit', params: { words: (dueNow.length ? dueNow : due).join(','), title: 'Your words' } });
+  };
 
   const row = (e: WordEntry) => {
     const info = DICTIONARY.get(e.word);
@@ -52,6 +63,7 @@ export default function YourWords() {
           <View style={styles.actions}>
             <Pressable accessibilityRole="button" accessibilityLabel={`Practise ${e.word}`} onPress={() => {
               Speech.stop();
+              if (!inFreePack(e.word) && !requirePro(profile, 'fixit')) return;
               router.push({ pathname: '/fixit', params: { words: e.word, title: 'Your words' } });
             }} style={styles.action}>
               <Text style={[styles.actionText, { color: colors.signal }]}>Practise this word</Text>
@@ -88,7 +100,7 @@ export default function YourWords() {
       <ScrollView contentContainerStyle={[styles.wrap, { paddingBottom: insets.bottom + space(4) }]}>
         <Text style={[styles.h1, { color: colors.ink }]}>Your words</Text>
         <Text style={[styles.lead, { color: colors.muted }]}>
-          Return to a word, practise it, then try using it in a thought of your own. Comfortable means heard in context on three different days—not a test of spontaneous use.
+          Return to a word, practise it, then try using it in a thought of your own. Comfortable means heard in context on three different days. It doesn’t test whether you can use it without a script.
         </Text>
 
         {ready && learning.length + learned.length > 0 && <View style={styles.stats}>
@@ -104,8 +116,8 @@ export default function YourWords() {
 
         {due.length > 0 && (
           <PrimaryButton
-            label={`Practise today’s ${due.length} ${due.length === 1 ? 'word' : 'words'}`}
-            onPress={() => router.push({ pathname: '/fixit', params: { words: due.join(','), title: 'Your words' } })}
+            label={`Practise today’s ${dueCount} ${dueCount === 1 ? 'word' : 'words'}`}
+            onPress={practiseDue}
           />
         )}
 
