@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
@@ -22,6 +22,7 @@ import { fonts, space, useColors } from '../theme';
 
 type Item = { word: string; sentence?: string };
 type Phase = 'alone' | 'sentence';
+type DrillResult = { alone: number; sentence: number };
 
 /**
  * Two steps per word:
@@ -36,6 +37,7 @@ export default function FixIt() {
   const insets = useSafeAreaInsets();
   const { profile, update } = useProfile();
   const [items, setItems] = useState<Item[] | null>(null);
+  const [result, setResult] = useState<DrillResult | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -48,10 +50,12 @@ export default function FixIt() {
   }, [raw, sid]);
 
   if (!items) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
-  return <Drill items={items} title={title} onFinished={() => markStep(profile, update, step)} insetsBottom={insets.bottom} />;
+  // Removing Drill also removes its listener and aborts native recognition before reflection.
+  if (result) return <DrillComplete items={items} result={result} />;
+  return <Drill items={items} title={title} onFinished={() => markStep(profile, update, step)} onComplete={setResult} insetsBottom={insets.bottom} />;
 }
 
-function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; title?: string; onFinished: () => void; insetsBottom: number }) {
+function Drill({ items, title, onFinished, onComplete, insetsBottom }: { items: Item[]; title?: string; onFinished: () => void; onComplete: (result: DrillResult) => void; insetsBottom: number }) {
   const colors = useColors();
   const { profile } = useProfile();
   const { level, onLevel } = useVoiceLevel();
@@ -63,8 +67,7 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
   const [cleared, setCleared] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const score = useRef({ alone: 0, sentence: 0 });
-  // Set when the drill ends: a copy of the score for the done screen (render can't read the ref).
-  const [result, setResult] = useState<{ alone: number; sentence: number } | null>(null);
+  const finished = useRef(false);
 
   useEffect(() => {
     listener.start();
@@ -86,6 +89,7 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
   const sentenceClean = sentenceHit && (targetIdx < 0 || sentenceAlign.status[targetIdx] === 'read');
 
   const advance = () => {
+    if (finished.current) return;
     setCleared(false);
     setHeardFrom(tokenise(listener.transcript).length);
     if (phase === 'alone' && item?.sentence) {
@@ -94,10 +98,11 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
     }
     setPhase('alone');
     if (i + 1 >= items.length) {
+      finished.current = true;
       listener.stop();
-      setResult({ ...score.current });
       track('drill_complete', { words: items.length, alone: score.current.alone, sentence: score.current.sentence });
       onFinished();
+      onComplete({ ...score.current });
     } else setI(i + 1);
   };
 
@@ -172,35 +177,6 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
 
   if (gateStates.includes(listener.state)) {
     return <MicGate state={listener.state} onAllowed={() => listener.start({ allowServer: true })} />;
-  }
-
-  if (result) {
-    const withSentence = items.filter((x) => x.sentence).length;
-    return (
-      <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-        <Animated.View entering={FadeInDown.duration(300)} style={styles.doneWrap}>
-          <Ionicons name="checkmark-circle" size={56} color={colors.good} />
-          <Text style={[styles.doneTitle, { color: colors.ink }]}>
-            {result.alone} of {items.length} heard clearly
-          </Text>
-          {withSentence > 0 && (
-            <Text style={[styles.doneSub, { color: colors.ink }]}>
-              {result.sentence} of {withSentence} said cleanly in a sentence
-            </Text>
-          )}
-          <Text style={[styles.hint, { color: colors.muted, textAlign: 'center' }]}>
-            Say a word cleanly in a sentence on three different days and it becomes comfortable.
-          </Text>
-          <Text style={[styles.fine, { color: colors.muted }]}>
-            Checked with speech recognition. It shows whether your phone heard the word clearly. It isn’t a
-            pronunciation grade.
-          </Text>
-          <Pressable onPress={close} style={[styles.doneBtn, { backgroundColor: colors.button }]}>
-            <Text style={styles.doneBtnText}>Done</Text>
-          </Pressable>
-        </Animated.View>
-      </View>
-    );
   }
 
   if (!item) return null;
@@ -292,7 +268,52 @@ function Drill({ items, title, onFinished, insetsBottom }: { items: Item[]; titl
   );
 }
 
+/** No listener, recording or persistence in this optional reflection. */
+function DrillComplete({ items, result }: { items: Item[]; result: DrillResult }) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const [reflecting, setReflecting] = useState(false);
+  const [showExample, setShowExample] = useState(false);
+  const word = items.map((item) => DICTIONARY.get(item.word.toLowerCase())).find((entry) => entry?.practice);
+  const withSentence = items.filter((item) => item.sentence).length;
+  const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
+
+  return (
+    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={[styles.completion, { paddingTop: insets.top + space(3), paddingBottom: insets.bottom + space(3) }]}>
+      <View style={styles.doneWrap}>
+        {reflecting && word ? (
+          <>
+            <Text style={[styles.doneSub, { color: colors.muted }]}>In your own words</Text>
+            <Text style={[styles.word, { color: colors.ink }]}>{word.word}</Text>
+            <Text style={[styles.meaning, { color: colors.ink }]}>{word.practice}</Text>
+            <Text style={[styles.fine, { color: colors.muted }]}>Take a moment, then say your thought out loud. This is self-guided practice. It isn’t recorded or scored.</Text>
+            {showExample && <Text style={[styles.meaning, { color: colors.ink }]}>“{word.example}”</Text>}
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: showExample }} onPress={() => setShowExample(!showExample)} style={styles.reflectionButton}>
+              <Text style={[styles.hearText, { color: colors.signal }]}>{showExample ? 'Hide example' : 'Show example'}</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Text style={[styles.doneTitle, { color: colors.ink }]}>{result.alone} of {items.length} heard clearly</Text>
+            {withSentence > 0 && <Text style={[styles.doneSub, { color: colors.ink }]}>{result.sentence} of {withSentence} heard in a sentence</Text>}
+            <Text style={[styles.hint, { color: colors.muted, textAlign: 'center' }]}>A word becomes comfortable after it’s heard in context on three different days.</Text>
+            <Text style={[styles.fine, { color: colors.muted }]}>Checked with speech recognition. This isn’t a pronunciation grade or a measure of using the word spontaneously.</Text>
+            {word && <Pressable accessibilityRole="button" onPress={() => setReflecting(true)} style={styles.reflectionButton}>
+              <Text style={[styles.hearText, { color: colors.signal }]}>Use it yourself</Text>
+            </Pressable>}
+          </>
+        )}
+        <Pressable accessibilityRole="button" onPress={close} style={[styles.doneBtn, { backgroundColor: colors.button }]}>
+          <Text style={styles.doneBtnText}>Done</Text>
+        </Pressable>
+      </View>
+    </ScrollView>
+  );
+}
+
 const styles = StyleSheet.create({
+  completion: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: space(3) },
+  reflectionButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: space(2) },
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space(3), gap: space(2.5) },
   step: { fontSize: 15 },
   card: { alignItems: 'center', gap: space(1), maxWidth: 360 },

@@ -54,6 +54,8 @@ export default function Library() {
           return (
             <Pressable
               key={p.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${p.title}, ${p.words.length} words, ${done} comfortable${!p.free && !profile.pro ? ', practice requires Pro' : ''}`}
               onPress={() => router.push({ pathname: '/pack/[id]', params: { id: p.id } })}
               style={({ pressed }) => [styles.pack, { backgroundColor: colors.card, opacity: pressed ? 0.85 : 1 }]}
             >
@@ -74,6 +76,7 @@ export default function Library() {
       </ScrollView>
 
       <Pressable
+        accessibilityRole="button"
         onPress={() => router.push('/words')}
         style={({ pressed }) => [styles.wordsRow, { backgroundColor: colors.signalSoft, opacity: pressed ? 0.8 : 1 }]}
       >

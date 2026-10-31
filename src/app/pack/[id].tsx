@@ -30,7 +30,16 @@ export default function PackScreen() {
     }, []),
   );
 
-  if (!pack) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  if (!pack) return (
+    <ScrollView
+      style={{ backgroundColor: colors.bg }}
+      contentContainerStyle={[styles.empty, { paddingTop: insets.top + space(4), paddingBottom: insets.bottom + space(4) }]}
+    >
+      <Text style={[styles.h1, { color: colors.ink }]}>This pack isn’t available</Text>
+      <Text style={[styles.pitch, { color: colors.muted }]}>Explore the Library to find your next words.</Text>
+      <PrimaryButton label="Go to Library" onPress={() => router.replace('/(tabs)/library')} />
+    </ScrollView>
+  );
 
   const unlocked = pack.free || profile.pro;
   const gate = () => unlocked || requirePro(profile, 'packs');
@@ -42,7 +51,7 @@ export default function PackScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
       <View style={styles.top}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Back">
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/library')} hitSlop={12} accessibilityRole="button" accessibilityLabel="Back" style={styles.back}>
           <Ionicons name="chevron-back" size={26} color={colors.ink} />
         </Pressable>
       </View>
@@ -64,7 +73,7 @@ export default function PackScreen() {
         </View>
 
         <PrimaryButton
-          label="Learn these words · 2 min"
+          label={unlocked ? 'Practise these words' : 'Explore Pro to practise'}
           onPress={() =>
             gate() &&
             router.push({ pathname: '/fixit', params: { words: pack.words.map((w) => w.word).join(','), title: pack.title } })
@@ -83,6 +92,7 @@ export default function PackScreen() {
                 <Pressable
                   onPress={() => Speech.speak(w.word, { language: 'en-US', rate: 0.85 })}
                   hitSlop={8}
+                  accessibilityRole="button"
                   accessibilityLabel={`Hear how to say ${w.word}`}
                   style={[styles.hear, { backgroundColor: colors.signalSoft }]}
                 >
@@ -129,6 +139,8 @@ export default function PackScreen() {
         {pack.passages.map((p, n) => (
           <Pressable
             key={p.title}
+            accessibilityRole="button"
+            accessibilityLabel={`${p.title}, ${formatDuration(estimateSeconds(p.text))}${unlocked ? '' : ', requires Pro'}`}
             onPress={() => gate() && router.push({ pathname: '/session/[id]', params: { id: packPassageId(pack.id, n) } })}
             style={({ pressed }) => [styles.passage, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.75 : 1 }]}
           >
@@ -146,6 +158,8 @@ export default function PackScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  empty: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: space(2.5), gap: space(2) },
+  back: { minWidth: 44, minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center' },
   top: { paddingHorizontal: space(2), height: 48, justifyContent: 'center' },
   wrap: { paddingHorizontal: space(2.5), gap: space(1.5) },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: space(1) },

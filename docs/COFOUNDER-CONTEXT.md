@@ -12,6 +12,8 @@ He wants a commercially minded collaborator who builds, questions weak assumptio
 
 Latest operating constraint: money is scarce. A genuinely useful product comes before revenue. Reuse existing capabilities, prefer inexpensive experiments, and question unnecessary subscriptions, services and feature scope. Ambition is not permission to spend money or make unsupported outcome claims. Challenge assumptions, including the founder's, with concrete reasoning and a better alternative.
 
+Latest quality direction: continuous improvement with care, luxury and class. Interpret this as restrained hierarchy, excellent readability, purposeful interactions, accessible controls and dependable behavior. Decoration and extra features do not establish quality. Use a bounded cycle: identify friction, make one coherent improvement, verify it, obtain independent critique, and retain the next unresolved issue. Continuous improvement is the operating approach, not an unattended background process.
+
 He wants visible progress: show believable changes in starting, finishing an answer, and delivery rather than inventing reassuring scores. He has asked to handle Mac setup himself for now; avoid repeatedly interrupting development to ask about Apple enrollment. A hoped-for launch in roughly two weeks is an aspiration, not evidence that release checks have passed.
 
 The pasted conversations reinforce two preferences: the core following/matching experience must feel dependable, and competitors are an opportunity to learn rather than a reason to abandon the market. Improve successful patterns and add a coherent experience of our own. Do not use novelty as the sole test of product value.
@@ -61,13 +63,21 @@ At inspection, separate Claude branches still contained work such as the mic-den
 
 All eight local Codex roles have been prepared from the committed Claude role briefs: product-lead, mobile-engineer, speech-engine, design-ux, qa-critic, release-privacy, brand-namer, marketing-lead. They read this context first. The local `.codex/` directory remains ignored by Git; valid files do not prove that a running session has reloaded the new roles.
 
-## Sources and scope
-
 ## First vocabulary expansion after the founder correction
 
 Added the free Make your point pack: eight precise, broadly useful words, two contextual passages, and self-guided prompts that hide the example while the learner forms their own thought. These prompts do not record, score, or change mastery. No service or dependency was added. Brand and library copy now reflect the broader speaking ambition. Existing pack IDs remain stable.
 
 Validation: 37 suites / 584 tests passed, including the added passages in the recognition stress corpus. A fixed corpus-count assertion now derives its expected count from the corpus size; accuracy assertions remain unchanged. TypeScript passed; lint has zero errors and 13 existing warnings. Browser verification confirmed prompt/example toggling and unchanged displayed mastery. Native phone testing and independent review remain outstanding. Jest reported an open-handle warning before exiting successfully.
+
+## Quality review follow-up
+
+Product, design and QA roles ran independently after the vocabulary expansion. The current small refinement addresses invalid pack recovery, back navigation without history, accessible control roles/labels, and an honest Pro-versus-practice action. Visual hierarchy remains a follow-up: consider making progress quieter after checking small-screen layouts.
+
+Implemented next slice (2026-10-31): completed drills offer an optional original-thought prompt for the first drilled word with one. Done stays available, examples start concealed, and reveal/conceal is unscored. The completion component has no listener or persistence; replacing Drill unmounts its listener, invoking native abort and stopping speech playback. Completion is guarded against duplicate final advances. Drills without prompts retain their exit. The completion page scrolls and respects safe-area insets. No new dependencies or service costs.
+
+Founder clarification: challenge Quinton and our own decisions as builders/co-founders—strategy, priorities and assumptions. Do not interpret this as making the user experience confrontational.
+
+Remaining verification: on a phone, complete and skip a prompt-bearing drill; verify microphone indicator ends before reflection, reveal/conceal works, Done exits, and no mastery changes occur from reflection. Repeat with a word without a prompt, recognition errors, and large text. Automated engine tests do not validate this new UI lifecycle. Independent QA reviewed the pack refinements statically without a blocker, but then hit its usage limit; the subsequent drill-completion change has no independent review yet. Content nit queued: clarify whose premise is being questioned in “The point beneath the words”. Evaluate original-thought participation in five observed attempts without claiming learning efficacy.
 
 ## Source coverage
 
