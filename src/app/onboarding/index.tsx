@@ -110,7 +110,8 @@ export default function Onboarding() {
               })}
             </Text>
             <Text style={[styles.lead, { color: colors.muted }]}>
-              Learn the words you need, then say them out loud. They ink in as you say them.
+              {/* Positioning lives in brand.ts; the second sentence says what Glide does. */}
+              {BRAND.promise} The words ink in as you say them.
             </Text>
           </View>
           <View style={styles.foot}>
