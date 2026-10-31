@@ -2,6 +2,8 @@
 
 One line per decision: date, decision, why. Newest first.
 
+- **2026-10-31 · Deepen and polish existing features; defer new modes until manual testing** (Quinton). Focus on flow, responsiveness, UI and thoughtful feature depth. Code checks are not evidence that native performance or visual polish has been validated.
+
 - **2026-10-31 · Improve the existing experience while Apple account access is unavailable** (Quinton). Prioritise design, flow and thoughtful future ideas. Continue browser/code validation; keep native verification outstanding rather than treating account setup as the current work. Challenge builder decisions, not users.
 
 - **2026-10-30 · Articulation and overall speaking are the centre, not ESL** (Quinton, direct correction to Codex). Train quick thinking, precise vocabulary, pacing, emphasis and presence. ESL users are included without defining the brand. Aim for intellectual aspiration without condescension; a useful product comes first, with disciplined spending and honest pushback.

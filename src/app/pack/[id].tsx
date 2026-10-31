@@ -22,12 +22,17 @@ export default function PackScreen() {
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
   const [book, setBook] = useState<WordBook>({});
+  const [bookReady, setBookReady] = useState(false);
   // Recalling a word is practice, not evidence of mastery. This never changes the word book.
   const [practisingWord, setPractisingWord] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      loadBook().then(setBook);
+      let live = true;
+      loadBook().then((loaded) => {
+        if (live) { setBook(loaded); setBookReady(true); }
+      });
+      return () => { live = false; Speech.stop(); };
     }, []),
   );
 
@@ -65,7 +70,7 @@ export default function PackScreen() {
         <Text style={[styles.pitch, { color: colors.muted }]}>{pack.pitch}</Text>
 
         <Text style={[styles.sub, { color: colors.muted }]}>
-          {learned} of {pack.words.length} comfortable · Built through practice on different days.
+          {bookReady ? `${learned} of ${pack.words.length} comfortable · Built through practice on different days.` : 'Loading your progress…'}
         </Text>
 
         <PrimaryButton
@@ -89,7 +94,7 @@ export default function PackScreen() {
                   <Text style={[styles.syll, { color: colors.muted }]}>{w.syllables}</Text>
                 </View>
                 <Pressable
-                  onPress={() => Speech.speak(w.word, { language: 'en-US', rate: 0.85 })}
+                  onPress={() => { Speech.stop(); Speech.speak(w.word, { language: 'en-US', rate: 0.85 }); }}
                   hitSlop={8}
                   accessibilityRole="button"
                   accessibilityLabel={`Hear how to say ${w.word}`}
@@ -108,7 +113,7 @@ export default function PackScreen() {
               )}
               {w.practice && (
                 <Pressable
-                  onPress={() => setPractisingWord(practisingWord === w.word ? null : w.word)}
+                  onPress={() => { Speech.stop(); setPractisingWord(practisingWord === w.word ? null : w.word); }}
                   accessibilityRole="button"
                   accessibilityLabel={practisingWord === w.word ? `Close practice for ${w.word}` : `Practise ${w.word} in your own words`}
                   accessibilityState={{ expanded: practisingWord === w.word }}
@@ -119,12 +124,12 @@ export default function PackScreen() {
                   </Text>
                 </Pressable>
               )}
-              <View style={styles.cardBottom}>
+              {bookReady && <View style={styles.cardBottom}>
                 <Mastery days={e?.cleanDays.length ?? 0} colors={colors} />
                 <Text style={[styles.status, { color: colors.muted }]}>
                   {stageLabel(e)}{e?.stumbles ? ` · missed ${e.stumbles}×` : ''}
                 </Text>
-              </View>
+              </View>}
             </View>
           );
         })}
