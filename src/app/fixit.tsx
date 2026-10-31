@@ -17,6 +17,7 @@ import { noteRoughPatch } from '../rating';
 import { listenLocale, useListener } from '../speech/useListener';
 import { useVoiceLevel, VoiceRibbon } from '../components/VoiceRibbon';
 import { MicGate, gateStates } from '../components/MicGate';
+import { WordReflection } from '../components/WordReflection';
 import { ListenError } from '../components/ListenError';
 import { fonts, space, useColors } from '../theme';
 
@@ -273,8 +274,10 @@ function DrillComplete({ items, result }: { items: Item[]; result: DrillResult }
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [reflecting, setReflecting] = useState(false);
-  const [showExample, setShowExample] = useState(false);
-  const word = items.map((item) => DICTIONARY.get(item.word.toLowerCase())).find((entry) => entry?.practice);
+  const [wordIndex, setWordIndex] = useState(0);
+  const words = [...new Set(items.map((item) => item.word.toLowerCase()))]
+    .map((word) => DICTIONARY.get(word)).filter((entry) => !!entry?.practice);
+  const word = words[wordIndex];
   const withSentence = items.filter((item) => item.sentence).length;
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
@@ -283,14 +286,11 @@ function DrillComplete({ items, result }: { items: Item[]; result: DrillResult }
       <View style={styles.doneWrap}>
         {reflecting && word ? (
           <>
-            <Text style={[styles.doneSub, { color: colors.muted }]}>In your own words</Text>
             <Text style={[styles.word, { color: colors.ink }]}>{word.word}</Text>
-            <Text style={[styles.meaning, { color: colors.ink }]}>{word.practice}</Text>
-            <Text style={[styles.fine, { color: colors.muted }]}>Take a moment, then say your thought out loud. This is self-guided practice. It isn’t recorded or scored.</Text>
-            {showExample && <Text style={[styles.meaning, { color: colors.ink }]}>“{word.example}”</Text>}
-            <Pressable accessibilityRole="button" accessibilityState={{ expanded: showExample }} onPress={() => setShowExample(!showExample)} style={styles.reflectionButton}>
-              <Text style={[styles.hearText, { color: colors.signal }]}>{showExample ? 'Hide example' : 'Show example'}</Text>
-            </Pressable>
+            <WordReflection key={word.word} word={word} />
+            {words.length > 1 && <Pressable accessibilityRole="button" onPress={() => setWordIndex((wordIndex + 1) % words.length)} style={styles.reflectionButton}>
+              <Text style={[styles.hearText, { color: colors.signal }]}>Try another word</Text>
+            </Pressable>}
           </>
         ) : (
           <>

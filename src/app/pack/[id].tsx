@@ -10,6 +10,7 @@ import { isLearned, stageLabel, WordBook } from '../../engine/vocab';
 import { loadBook } from '../../store/words';
 import { useProfile } from '../../store/profile';
 import { requirePro } from '../../pro';
+import { WordReflection } from '../../components/WordReflection';
 import { Mastery } from '../../components/Mastery';
 import { PrimaryButton, ProBadge } from '../../components/ui';
 import { fonts, space, useColors } from '../../theme';
@@ -100,9 +101,7 @@ export default function PackScreen() {
               <Text style={[styles.meaning, { color: colors.ink }]}>{w.meaning}</Text>
               {w.practice && practisingWord === w.word ? (
                 <View style={[styles.practice, { borderColor: colors.line }]}>
-                  <Text style={[styles.practiceTitle, { color: colors.ink }]}>In your own words</Text>
-                  <Text style={[styles.meaning, { color: colors.ink }]}>{w.practice}</Text>
-                  <Text style={[styles.sub, { color: colors.muted }]}>Say it out loud. Take a moment to think. This exercise isn’t recorded or scored.</Text>
+                  <WordReflection key={w.word} word={w} />
                 </View>
               ) : (
                 <Text style={[styles.example, { color: colors.muted }]}>“{w.example}”</Text>
@@ -111,12 +110,12 @@ export default function PackScreen() {
                 <Pressable
                   onPress={() => setPractisingWord(practisingWord === w.word ? null : w.word)}
                   accessibilityRole="button"
-                  accessibilityLabel={practisingWord === w.word ? `Show the example for ${w.word}` : `Practise ${w.word} in your own words`}
+                  accessibilityLabel={practisingWord === w.word ? `Close practice for ${w.word}` : `Practise ${w.word} in your own words`}
                   accessibilityState={{ expanded: practisingWord === w.word }}
                   style={({ pressed }) => [styles.practiceButton, { opacity: pressed ? 0.7 : 1 }]}
                 >
                   <Text style={[styles.practiceTitle, { color: colors.signal }]}>
-                    {practisingWord === w.word ? 'Show example' : 'Use it yourself'}
+                    {practisingWord === w.word ? 'Close practice' : 'Use it yourself'}
                   </Text>
                 </Pressable>
               )}
