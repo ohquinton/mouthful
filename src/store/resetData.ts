@@ -1,3 +1,4 @@
+import { pauseWordWrites } from './words';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadSessions, recordingUris } from './sessions';
 import { deleteAllRecordings } from './recordings';
@@ -23,17 +24,20 @@ export function keptAfterReset(p: { analyticsOptOut?: boolean }): { analyticsOpt
  * starts over under a new anonymous id. Best effort: a failed step never stops the next one.
  */
 export async function wipeAllData(profileKey: string, keptProfile: object | null): Promise<void> {
-  // Audio files first: once the database is cleared we'd no longer know where they are.
+  const resumeWords = await pauseWordWrites();
   try {
-    deleteAllRecordings(recordingUris(await loadSessions()));
-  } catch {}
-  try {
-    await AsyncStorage.clear();
-  } catch {}
-  if (keptProfile) {
+    // Audio files first: once the database is cleared we'd no longer know where they are.
     try {
-      await AsyncStorage.setItem(profileKey, JSON.stringify(keptProfile));
+      deleteAllRecordings(recordingUris(await loadSessions()));
     } catch {}
-  }
-  await resetAnalytics();
+    try {
+      await AsyncStorage.clear();
+    } catch {}
+    if (keptProfile) {
+      try {
+        await AsyncStorage.setItem(profileKey, JSON.stringify(keptProfile));
+      } catch {}
+    }
+    await resetAnalytics();
+  } finally { resumeWords(); }
 }
