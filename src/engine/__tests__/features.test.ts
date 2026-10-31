@@ -1,6 +1,5 @@
 import { chunkScript, titleFrom, wordCount } from '../../content/scripts';
 import { day1VsNow, heatStrip, personalBests, retestDue, SessionLike } from '../progress';
-import { day1Line } from '../score';
 import { streak, SavedSession } from '../../store/sessions';
 
 const DAY = 86_400_000;
@@ -104,13 +103,5 @@ describe('progress', () => {
     expect(retestDue([s('day1', 3, { passageId: 'baseline' })], 'day1', NOW)).toBeUndefined();
     expect(retestDue([base, s('r', 0, { passageId: 'baseline' })], 'day1', NOW)).toBeUndefined();
     expect(retestDue([s('day1', 31, { passageId: 'baseline' })], 'day1', NOW)).toBe(30);
-  });
-});
-
-describe('day1Line', () => {
-  it('sets the first job from the baseline pace', () => {
-    expect(day1Line(190)).toMatch(/slowing down/);
-    expect(day1Line(110)).toMatch(/steadier/);
-    expect(day1Line(150)).toMatch(/range/);
   });
 });

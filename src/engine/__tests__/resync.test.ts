@@ -1109,7 +1109,12 @@ describe('10b. stutters never turn read words red', () => {
   });
 
   it('light noise (drops, mishearings, stutters, habit words, 3-word restarts): never more said words red than before, in any run', () => {
-    // qa-critic's generator: 150 runs per text, including newly added passages.
+    // qa-critic's generator, pinned to exactly 4200 runs with seed 9 so the run can never silently
+    // shrink. Runs are spread evenly over every text, including newly added passages (28 texts today,
+    // so 150 each: the same case set as before the pin). More texts means fewer runs per text, never fewer runs.
+    const FUZZ_CASES = 4200;
+    expect(QA_FUZZ_TEXTS.length).toBeGreaterThanOrEqual(28); // removing a passage is a visible decision
+    const perText = Math.ceil(FUZZ_CASES / QA_FUZZ_TEXTS.length);
     const rnd = seeded(9);
     const OFFW = ['banana', 'sorry', 'wait', 'um', 'like', 'actually', 'hmm', 'okay', 'well', 'right'];
     let cases = 0;
@@ -1120,7 +1125,7 @@ describe('10b. stutters never turn read words red', () => {
     for (const t of QA_FUZZ_TEXTS) {
       const q = preparePassage(t.text);
       const keys = keysOf(q);
-      for (let rep = 0; rep < 150; rep++) {
+      for (let rep = 0; rep < perText && cases < FUZZ_CASES; rep++) {
         const heard: string[] = [];
         const said = keys.map(() => false);
         for (let k = 0; k < keys.length; k++) {
@@ -1149,7 +1154,7 @@ describe('10b. stutters never turn read words red', () => {
       }
     }
     console.log(`light-noise fuzz: ${cases} runs; more said words red than before in ${worse.length}, fewer in ${better}; false greens ${fgOld} → ${fgNew}`);
-    expect(cases).toBe(QA_FUZZ_TEXTS.length * 150);
+    expect(cases).toBe(4200);
     expect(summary(worse)).toEqual(NONE);
     expect(fgNew).toBeLessThanOrEqual(fgOld);
   });

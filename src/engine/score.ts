@@ -94,11 +94,3 @@ export function correctedAccuracy(read: number, skipped: number): number {
   const attempted = read + skipped;
   return attempted ? Math.round((read / attempted) * 100) : 0;
 }
-
-/** What a Day 1 number means, in one plain sentence. */
-export function day1Line(wpm: number): string {
-  const [lo, hi] = TARGET_WPM;
-  if (wpm > hi) return `You read at ${wpm} words a minute. A comfortable range for reading aloud is about ${lo} to ${hi}, so the first job is slowing down.`;
-  if (wpm < lo) return `You read at ${wpm} words a minute. A comfortable range for reading aloud is about ${lo} to ${hi}, so we’ll build a steadier flow.`;
-  return `You read at ${wpm} words a minute, inside the ${lo}–${hi} range that’s comfortable for listeners. Now we work on fillers and tricky words.`;
-}
