@@ -47,7 +47,7 @@ export function MicGate({ state, onAllowed }: { state: ListenerState; onAllowed:
   };
   const later = onboarding ? (
     <Text style={[styles.note, { color: colors.muted }]}>
-      {profile.moment ? 'Your plan is saved. ' : ''}You can do this read later from Today.
+      {profile.line ? 'Your line is saved. ' : ''}You can do your first talk later from Home.
     </Text>
   ) : null;
 
@@ -58,7 +58,7 @@ export function MicGate({ state, onAllowed }: { state: ListenerState; onAllowed:
         <Ionicons name="cloud-outline" size={44} color={colors.signal} />
         <Text style={[styles.h2, { color: colors.ink }]}>This phone needs help to follow you</Text>
         <Text style={[styles.body, { color: colors.muted }]}>
-          To follow your reading, {BRAND.name} can use {service}. Your voice is sent to that service to be turned
+          To hear your talk, {BRAND.name} can use {service}. Your voice is sent to that service to be turned
           into text while you read. {BRAND.name} doesn’t keep it, and nothing is sent until you say yes.
         </Text>
         {later}
@@ -91,7 +91,7 @@ export function MicGate({ state, onAllowed }: { state: ListenerState; onAllowed:
         <Ionicons name="mic-off-outline" size={44} color={colors.muted} />
         <Text style={[styles.h2, { color: colors.ink }]}>{BRAND.name} can’t hear you yet</Text>
         <Text style={[styles.body, { color: colors.muted }]}>
-          It needs the microphone to follow your reading. Turn on Microphone and Speech Recognition in Settings.
+          It needs the microphone to hear you. Turn on Microphone and Speech Recognition in Settings.
         </Text>
         {later}
         <PrimaryButton label="Open Settings" style={{ alignSelf: 'stretch' }} onPress={openSettings} />

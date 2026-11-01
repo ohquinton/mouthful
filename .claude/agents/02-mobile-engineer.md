@@ -70,7 +70,7 @@ src/
     pack/[id].tsx       A Word Pack
     words.tsx           Your word book
     scripts/            Your own scripts (Pro)
-    onboarding/         Hook → moment → mic + Day 1 read → Day 1 result
+    onboarding/         Hook → which train? → first 30-second topic talk → your starting point (remodel)
     paywall.tsx         Full paywall / soft walls
     review.tsx          Tester mode review (beta only)
     _layout.tsx         Stack, fonts, providers, EntitlementSync
