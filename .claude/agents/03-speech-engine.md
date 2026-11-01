@@ -63,6 +63,8 @@ mic
 | Repeat stumble | heard word equals the previous passage word, so it's ignored | `align.ts` | Stops "the the" moving the pointer. |
 | Context hints | ≥7 letters, passage order, max 50 | `contextualHints` | Long scripts lose later hard words. |
 | Min words to score | 15 | session + talk | Below this: the Try again card, never a score. |
+| Repeated words | ≥ 4 uses and ≥ 4% of content words (`MIN_REPEATS`, `MIN_REPEAT_SHARE`) | `wording.ts` | Lower: flags natural repetition. Higher: misses real crutch words. Unvalidated until the beta tally. |
+| Vocabulary variety | MATTR, 50-word window (`VARIETY_WINDOW`) | `wording.ts` | Nothing under 50 words. Narrow range: trend weekly, never a daily verdict. |
 | Breath / pause / lost | 450 ms / 2000 ms / 6000 ms | `session/[id].tsx` | Gaps between **pointer advances**, so recogniser latency counts as a pause (see weaknesses). |
 | Pace bands | reading 130–165, presenting 120–155, talking 120–170 | `PACE_BANDS` | Principle 4. The pacer runs at the midpoint (principle 5). |
 | Pace score | 100 inside the band, minus 1.5 per wpm outside | `paceScore` | |

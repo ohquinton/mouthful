@@ -53,6 +53,7 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
   - `progress.ts` — heat strip, bests, Day 1 vs now, re-test timing, pace by context
   - `review.ts` — beta review metrics (false red/green per 100 words, uncaught errors)
   - `steadiness.ts` — pace by stretch of the passage (breaths left out) and a 0–100 steadiness; shown on the Tape as `PaceStrip`, not part of the score
+  - `wording.ts` — One Minute's repeated words (content words only; prompt words, hesitations and habit words never counted) and vocabulary variety (MATTR over 50-word windows, `per50`). Shown, not scored; Flow unchanged
   - `locale.ts` — which English the recogniser listens for (reader's choice in You, else the phone's region)
   - `habits.ts` — habit-word classifier: each like/so/you know/actually/basically/literally/i mean/kind of/sort of/right labelled filler, real or unsure (context rules, bursts, pauses); corpus + holdout in `__tests__/fixtures/habits-*.json`. Not wired into scoring yet
   - `minute.ts` — One Minute engine: long pauses (> 2.5 s after the first word), Flow slots (kept going, pauses, pace scored; um/uh and habit fillers shown), coaching line, own-history trend (`FLOW_SCORED` is the one switch, `FLOW_VERSION` tags sessions). Wired into `talk.tsx` (One Minute when tester mode is on; Free talk otherwise), Flow on the Tape (docs/briefs/one-minute.md)
@@ -94,7 +95,7 @@ Today currently shows the active moment's plan (`PlanCard`): learn the words →
 ## Commands
 
 ```bash
-npm test                  # engine + store tests (607); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
+npm test                  # engine + store tests (657); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)
@@ -112,6 +113,8 @@ npx eas-cli@latest build --profile development --platform ios
 7. More moments (sales call, client update) and more Word Packs.
 
 ## Known limits
+
+- Repeated words and vocabulary variety (`wording.ts`) are unvalidated: thresholds `MIN_REPEATS` 4 and `MIN_REPEAT_SHARE` 0.04 come from our own fixtures, and variety's range is narrow (about 36–45 per 50), so show it as a weekly trend, not a daily verdict. Topic synonyms (bike for bicycle) can be flagged. "Precise words" is built but hidden until a licensed everyday-word list is bundled (candidate: NGSL 1.2, CC BY-SA 4.0, needs attribution and a licence check).
 
 - The habit classifier's precision (100% dev, 100% holdout, 0 false accusations) is measured only on corpora we wrote; qa's independent set (habits-qa.json) went 86% → 100% after fixes made against it (recall 59%: like 58%, you know 44%), so it's now a regression bar, not an outside estimate. No habit word is scored yet; decide with the beta tally. um/uh never decide a habit label (they're stripped before the rules run). Recommended to score first: like, you know; the rest stay shown-only.
 - One Minute pauses use recogniser result times, not audio, so server bursts may invent pauses; per-minute rates use talk time with a 30 s floor. The first 8 s before the first word are free (`FREE_THINK_MS`); thinking time past that counts against kept going, and time to first word is shown and trended (FLOW_VERSION 2).
