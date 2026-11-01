@@ -307,7 +307,7 @@ export default function FreeTalk() {
                     { color: zone === 'good' ? colors.good : zone === 'fast' ? colors.stumble : zone === 'slow' ? colors.ember : colors.muted },
                   ]}
                 >
-                  {zone === 'good' ? 'Right in the pocket' : zone === 'fast' ? 'Slow down' : zone === 'slow' ? 'A little slow' : ''}
+                  {zone === 'good' ? 'In a good range' : zone === 'fast' ? 'Slow down' : zone === 'slow' ? 'A little slow' : ''}
                 </Text>
               </View>
               <View style={styles.ribbonRow}>

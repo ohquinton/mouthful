@@ -42,7 +42,7 @@ Wellspoken and ELSA all have trial/cancel complaints.
 
 ## Positioning
 
-"Rehearse what you'll say at work, out loud, and be ready by the day it counts."
+"Rehearse what you'll say at work, out loud, and be ready by the day it counts." (History: superseded by the 2026-11-01 remodel, identity first; see docs/briefs/remodel-2026-11.md.)
 
 Proof points: your words ink in as you say them, and you can overrule any red word; a plan to your date; it
 listens on your phone when your phone can, and asks before any audio leaves. No result claims until beta data.

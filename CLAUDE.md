@@ -87,9 +87,9 @@ Hidden: tap the version line on the You tab 7 times, or build with `EXPO_PUBLIC_
 
 `baseline` (Day 1 + re-tests) · built-in ids (`night-shift`…) · `w.<pack>.<n>` (Word Pack passages) · `s.<scriptId>.<part>` (your scripts) · `talk` (Free talk sessions)
 
-## Moments (the main flow)
+## Moments (optional destinations since the remodel; not the main flow)
 
-Today shows the active moment's plan (`PlanCard`): learn the words → say them in context → add your real words → rehearse it (first run free, then Pro) → final run-through (cold read). Steps are marked done via `markStep` when the screen they launch finishes (`step` route param).
+Today currently shows the active moment's plan (`PlanCard`): learn the words → say them in context → add your real words → rehearse it (first run free, then Pro) → final run-through (cold read). Steps are marked done via `markStep` when the screen they launch finishes (`step` route param).
 
 ## Commands
 
