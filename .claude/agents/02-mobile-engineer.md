@@ -61,7 +61,7 @@ Expo API from your environment, `EXPO_OFFLINE=1 npx expo install <pkg>` resolves
 ```
 src/
   app/                  Screens (Expo Router). Every file is a route.
-    (tabs)/             Today (index), Library, Progress, You
+    (tabs)/             Home (index: the two-line train map), Library, Progress, You
     session/[id].tsx    Glide reading session: the heart of the app
     tape.tsx            Results after any session
     fixit.tsx           Two-step drill: word alone, then in its sentence

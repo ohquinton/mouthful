@@ -61,9 +61,10 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
 - `src/speech/gate.ts` — when speech counts as on-device (Android only from API 33) and whether a variety is supported
 - `src/speech/useListener.ts` — recogniser wrapper: on-device/consent, restarts, voice level, optional recording, `reset()` for retries
 - `src/store/recordings.ts` — the recordings folder; delete-all sweeps strays from older builds too
+- `src/content/lines.ts` — the two lines as 14 ordered stops each (ids `sharp-01`… and `clear-01`…, never rename), one stop a day, each an optional lesson then a topic talk; pure helpers for current stop, done today, start route
 - `src/content/` — passages, Word Packs (7, including the free Make your point pack with self-guided speaking prompts), moments (interview, presentation, raise, meeting), scripts
-- `src/app/` — Expo Router screens: `(tabs)/` Today, Library, Progress, You; `session/[id]`, `tape`, `fixit`, `talk`, `moment`, `pack/[id]`, `words`, `scripts/*`, `onboarding/*`, `paywall`, `review` (tester mode only)
-- `src/components/` — `InkCursor` and `VoiceRibbon` (Reanimated), `GlideWord`, `PlanCard`, `MicGate`, `Replay` (expo-audio), `Charts`
+- `src/app/` — Expo Router screens: `(tabs)/` Home (the two-line train map), Library, Progress, You; `session/[id]`, `tape`, `fixit`, `talk`, `moment`, `pack/[id]`, `words`, `scripts/*`, `onboarding/*`, `paywall`, `review` (tester mode only)
+- `src/components/` — `HomeMap` (the line, stops, the Drop hopping) and `Drop` (the flat mascot; two more copies live in `onboarding/index.tsx` and `MinuteResult.tsx` until they're merged), `InkCursor` and `VoiceRibbon` (Reanimated), `GlideWord`, `PlanCard`, `MicGate`, `Replay` (expo-audio), `Charts`
 - `src/purchases.native.ts` — RevenueCat (phones). `src/purchases.ts` — web/test stub.
 - `src/analytics.ts` — PostHog batch client. Event names, numbers and allowlisted short codes only; free text is dropped before sending.
 
@@ -90,7 +91,7 @@ Hidden: tap the version line on the You tab 7 times, or build with `EXPO_PUBLIC_
 
 ## Moments (optional destinations since the remodel; not the main flow)
 
-Today currently shows the active moment's plan (`PlanCard`): learn the words → say them in context → add your real words → rehearse it (first run free, then Pro) → final run-through (cold read). Steps are marked done via `markStep` when the screen they launch finishes (`step` route param).
+Home shows an active moment only as a compact `PlanCard` row under the map ("Got something coming up? Plan for it" otherwise). The plan's steps: learn the words → say them in context → add your real words → rehearse it (first run free, then Pro) → final run-through (cold read). Steps are marked done via `markStep` when the screen they launch finishes (`step` route param).
 
 ## Commands
 
