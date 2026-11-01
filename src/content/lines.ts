@@ -88,6 +88,25 @@ export function promptFor(stop: Stop): Prompt | undefined {
 
 type HasStop = { stopId?: string; at: number };
 
+type MaybeFirstTalk = HasStop & { kind?: string; promptId?: string; flowVersion?: string; minute?: unknown };
+
+/**
+ * Onboarding's first talk (30 seconds on Coffee, src/onboarding.ts firstTalkRoute) is stop 1 of
+ * the line you picked, but it's saved without a stopId. Give the earliest such talk that stop, so
+ * Home starts you on stop 2 rather than asking for Coffee again. A copy; storage is untouched.
+ * Harmless once onboarding passes `stop` itself: a line that already has stop 1 is left alone.
+ */
+export function withFirstTalk<T extends MaybeFirstTalk>(sessions: readonly T[], line: LineId): T[] {
+  const first = LINES[line][0];
+  if (sessions.some((s) => s.stopId === first.id)) return [...sessions];
+  const thirty = (s: T) => (s.minute as { limitSeconds?: number } | undefined)?.limitSeconds === 30 || (s.flowVersion ?? '').endsWith('-s30');
+  let pick: T | undefined;
+  for (const s of sessions) {
+    if (!s.stopId && s.kind === 'minute' && s.promptId === first.promptId && thirty(s) && (!pick || s.at < pick.at)) pick = s;
+  }
+  return sessions.map((s) => (s === pick ? { ...s, stopId: first.id } : s));
+}
+
 /** Ids of every stop a saved session completed. */
 export function doneStopIds(sessions: readonly HasStop[]): Set<string> {
   return new Set(sessions.flatMap((s) => (s.stopId ? [s.stopId] : [])));

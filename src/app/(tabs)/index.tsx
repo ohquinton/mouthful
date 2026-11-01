@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ScrollViewInstance } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -23,6 +23,7 @@ import {
   Stop,
   stopDoneToday,
   stopKind,
+  withFirstTalk,
 } from '../../content/lines';
 import { minutePromptOfTheDay, Prompt } from '../../content/prompts';
 import { FLOW_VERSION } from '../../engine/minute';
@@ -48,7 +49,7 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const { profile, ready, update } = useProfile();
-  const [sessions, setSessions] = useState<SavedSession[]>([]);
+  const [saved, setSaved] = useState<SavedSession[]>([]);
   const [book, setBook] = useState<WordBook>({});
   const [loaded, setLoaded] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -60,7 +61,7 @@ export default function Home() {
       let live = true;
       Promise.all([loadSessions(), loadBook()]).then(([s, b]) => {
         if (!live) return;
-        setSessions(s);
+        setSaved(s);
         setBook(b);
         setNow(new Date()); // the day may have changed while the app sat in the background
         setLoaded(true);
@@ -92,6 +93,8 @@ export default function Home() {
   );
 
   const chosen = lineOf(profile.line);
+  // Onboarding's first talk is stop 1 of the line you picked (it's saved without a stopId).
+  const sessions = useMemo(() => withFirstTalk(saved, chosen), [saved, chosen]);
   const line = shownLine ?? chosen;
   const other: LineId = line === 'sharp' ? 'clear' : 'sharp';
   // The Drop and the progress colour live on your line, and on the other one once you've started it.

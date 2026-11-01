@@ -19,6 +19,7 @@ import {
   startRoute,
   stopDoneToday,
   talkSeconds,
+  withFirstTalk,
 } from '../src/content/lines';
 import { MINUTE_PROMPTS } from '../src/content/prompts';
 import { getPack } from '../src/content/wordpacks';
@@ -208,5 +209,42 @@ describe('labels', () => {
     expect(headerTitle([{ at: at(10, 27) }], 6, now)).toBe('6 days in a row');
     expect(headerTitle([{ at: at(10, 20) }], 0, now)).toBe('Welcome back');
     expect(headerTitle([{ at: at(10, 1) }, { at: at(11, 1) }], 1, now)).toBe('Welcome back');
+  });
+});
+
+describe('onboarding’s first talk', () => {
+  const firstTalk = (t: number, extra: Record<string, unknown> = {}) => ({
+    at: t,
+    passageId: 'talk',
+    kind: 'minute',
+    promptId: 'p01',
+    flowVersion: '2-k40p35w25-s30',
+    flow: 74,
+    ...extra,
+  });
+
+  it('counts as stop 1 of the chosen line, so Home starts on stop 2', () => {
+    const s = withFirstTalk([firstTalk(at(10, 31))], 'clear');
+    expect(s[0]).toMatchObject({ stopId: 'clear-01', flow: 74 });
+    expect(currentStopIndex('clear', s)).toBe(1);
+    expect(currentStopIndex('sharp', s)).toBe(0);
+    expect(lineStarted('sharp', s)).toBe(false);
+  });
+
+  it('is found by its 30-second length too, and only the earliest one counts', () => {
+    const s = withFirstTalk([firstTalk(at(10, 31), { flowVersion: 'x', minute: { limitSeconds: 30 } }), firstTalk(at(11, 1))], 'sharp');
+    expect(s.map((x) => (x as { stopId?: string }).stopId)).toEqual(['sharp-01', undefined]);
+  });
+
+  it('leaves full minutes, other prompts and stops already saved alone', () => {
+    expect(withFirstTalk([firstTalk(at(10, 31), { flowVersion: '2-k40p35w25' })], 'sharp')[0]).not.toHaveProperty('stopId');
+    expect(withFirstTalk([firstTalk(at(10, 31), { promptId: 'p02' })], 'sharp')[0]).not.toHaveProperty('stopId');
+    const saved = [{ ...firstTalk(at(10, 30)), stopId: 'sharp-01' }, firstTalk(at(10, 31))];
+    expect(withFirstTalk(saved, 'sharp')[1]).not.toHaveProperty('stopId');
+  });
+
+  it('makes today’s stop done on day 1 after onboarding', () => {
+    const now = at(11, 1, 18);
+    expect(stopDoneToday('sharp', withFirstTalk([firstTalk(at(11, 1, 9))], 'sharp'), now)).toBe(true);
   });
 });
