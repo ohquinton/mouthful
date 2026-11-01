@@ -48,6 +48,38 @@ describe('session_complete for a minute', () => {
     expect(out).not.toHaveProperty('word');
   });
 
+  it('carries nothing from repeated words or variety, which look like short codes and would pass sanitise', () => {
+    // A repeated word ("window") or a precise word ("sunflowers") is a valid CODE, so sanitise alone
+    // would keep it on an allowlisted key. minuteCompleteProps must never read them at all.
+    const tokens = tokenise(
+      'the window in my room is old the window faces the garden where sunflowers grow and the window lets in the ' +
+        'morning light so i open the window every day and watch the sunflowers move in the wind',
+    );
+    const m = minuteSummary({ tokens, heardTimes: tokens.map((_, k) => 1500 + k * 450), startedAt: 0, common: new Set(['the', 'old']) })!;
+    expect(m.repeated?.[0]?.word).toBe('window'); // the summary does carry them...
+    expect(m.variety).toBeUndefined(); // (under 50 words: give it a record by hand below)
+    const withWording: typeof m = {
+      ...m,
+      repeated: [{ word: 'sunflowers', count: 9, forms: ['sunflowers', 'sunflower'] }],
+      variety: { mattr: 0.777, windows: 13, window: 50, words: 62, precise: { count: 2, words: ['sunflowers', 'garden'] } },
+    };
+    const without: typeof m = { ...m, repeated: undefined, variety: undefined };
+    const a = minuteCompleteProps(withWording, MINUTE_PROMPTS[6], 60.4);
+    // ...the props are identical with or without them: nothing from either can reach track()...
+    expect(a).toEqual(minuteCompleteProps(without, MINUTE_PROMPTS[6], 60.4));
+    expect(a).toEqual(minuteCompleteProps(m, MINUTE_PROMPTS[6], 60.4));
+    // ...and no word, count or variety value appears in what would be sent.
+    const sent = JSON.stringify(sanitise(a));
+    for (const w of ['window', 'sunflowers', 'sunflower', 'garden', '0.777']) expect(sent).not.toContain(w);
+  });
+
+  it('keeps exactly its current keys (a new key needs a privacy review and this test changed)', () => {
+    expect(Object.keys(props())).toEqual([
+      'kind', 'pace', 'which', 'level', 'flow', 'long_pauses', 'longest_pause_s', 'talk_seconds', 'wpm',
+      'fillers_per_min', 'habit_fillers', 'habit_unsure', 'habit_overruled', 'flow_version', 'seconds',
+    ]);
+  });
+
   it('keeps flow_version, which is a short code', () => {
     expect(sanitise({ flow_version: '1-k40p35w25' })).toEqual({ flow_version: '1-k40p35w25' });
     expect(sanitise({ flow_version: 'kept going for a minute' })).toEqual({});

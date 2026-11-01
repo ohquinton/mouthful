@@ -328,8 +328,10 @@ export type MinuteInput = {
   /** Token indices (HabitResult.index) the reader marked "I meant that". */
   overruled?: readonly number[];
   slots?: FlowSlots;
-  /** The prompt's text ("Coffee"). Its content words are never flagged as repeated or counted as precise. */
+  /** The prompt's text ("Coffee"). Its word family is never flagged as repeated, counted as precise or in variety. */
   prompt?: string;
+  /** Extra words in the prompt's family from content (bike for "A bicycle"); wording.ts promptFamily. */
+  related?: readonly string[];
   /** Everyday words for "precise words" (wording.ts). Left out until the app bundles a licensed list. */
   common?: ReadonlySet<string>;
 };
@@ -370,7 +372,10 @@ export type MinuteSummary = {
    * Optional so a summary or record from before 2026-11-01 still loads.
    */
   repeated?: RepeatedWord[];
-  /** Shown, never scored: MATTR vocabulary variety. Absent under 50 words, and in older summaries. */
+  /**
+   * This talk's MATTR record (wording.ts), absent under 50 words and in older summaries. Not a number
+   * to show on its own: pool several with pooledVariety() and show that, as a weekly trend.
+   */
   variety?: VocabularyVariety;
 };
 
@@ -437,7 +442,7 @@ export function minuteSummary(m: MinuteInput): MinuteSummary | null {
       slots,
     ),
     // After Flow, from the tokens only: neither can move Flow, its version or the line.
-    repeated: repeatedWords(m.tokens, { prompt: m.prompt }),
-    variety: vocabularyVariety(m.tokens, { prompt: m.prompt, common: m.common }),
+    repeated: repeatedWords(m.tokens, { prompt: m.prompt, related: m.related }),
+    variety: vocabularyVariety(m.tokens, { prompt: m.prompt, related: m.related, common: m.common }),
   };
 }
