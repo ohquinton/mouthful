@@ -64,7 +64,7 @@ export default function TopicTalk() {
   const insets = useSafeAreaInsets();
   const still = useReducedMotion();
   const params = useLocalSearchParams<{ prompt?: string; stop?: string; seconds?: string; from?: string }>();
-  const { profile } = useProfile();
+  const { profile, update } = useProfile();
   // Read once per screen, so nothing can change halfway through a talk.
   const [limit] = useState(() => talkLength(params.seconds));
   const [stopId] = useState(() => stopParam(params.stop));
@@ -254,8 +254,19 @@ export default function TopicTalk() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, seconds]);
 
-  /** Onboarding's way out of a too-short or failed first talk: back to where it came from. */
-  const skip = () => {
+  /**
+   * Onboarding's way out of a too-short or failed first talk. It finishes onboarding and goes Home,
+   * like MicGate's "Skip for now": going back would land on the same talk step, and if the
+   * recogniser keeps failing there'd be no way out (principle 8). The first talk waits as stop 1.
+   */
+  const skip = async () => {
+    if (fromOnboarding) {
+      await update({ onboarded: true });
+      track('onboarding_complete', { skipped: true, reason: 'talk' });
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/');
+      return;
+    }
     if (router.canGoBack()) router.back();
     else router.replace('/');
   };

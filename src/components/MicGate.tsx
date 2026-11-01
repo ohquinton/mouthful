@@ -59,7 +59,7 @@ export function MicGate({ state, onAllowed }: { state: ListenerState; onAllowed:
         <Text style={[styles.h2, { color: colors.ink }]}>This phone needs help to follow you</Text>
         <Text style={[styles.body, { color: colors.muted }]}>
           To hear your talk, {BRAND.name} can use {service}. Your voice is sent to that service to be turned
-          into text while you read. {BRAND.name} doesn’t keep it, and nothing is sent until you say yes.
+          into text while you talk. {BRAND.name} doesn’t keep it, and nothing is sent until you say yes.
         </Text>
         {later}
         <PrimaryButton
