@@ -300,8 +300,8 @@ function TodayCard({
   if (!active) {
     // The other line, never started. Its progress never takes from yours.
     eyebrow = 'STOP 1';
-    kind = 'Start';
-    name = `${LINE_NAME[line]} here.`;
+    kind = '';
+    name = LINE_NAME[line];
     sub = `Your ${LINE_NAME[chosen]} progress stays where it is.`;
   } else if (!stop) {
     eyebrow = todayDone ? 'TOMORROW' : 'TODAY';
@@ -333,16 +333,22 @@ function TodayCard({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${eyebrow.toLowerCase()}, ${kind}: ${name}. ${sub}`}
+      accessibilityLabel={`${eyebrow.toLowerCase()}, ${kind ? `${kind}: ${name}` : `Start ${name} here`}. ${sub}`}
       style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.85 : 1 }]}
     >
       <View style={styles.eyebrowRow}>
         <Text style={[styles.eyebrow, { color: colors.muted }]}>{eyebrow}</Text>
         {proBadge && <ProBadge />}
       </View>
-      <Text style={[styles.cardTitle, { color: colors.ink }]}>
-        {kind}: <Text style={styles.cardName}>{name}</Text>
-      </Text>
+      {kind ? (
+        <Text style={[styles.cardTitle, { color: colors.ink }]}>
+          {kind}: <Text style={styles.cardName}>{name}</Text>
+        </Text>
+      ) : (
+        <Text style={[styles.cardTitle, { color: colors.ink }]}>
+          Start <Text style={styles.cardName}>{name}</Text> here.
+        </Text>
+      )}
       <Text style={[styles.cardSub, { color: colors.muted }]}>{sub}</Text>
     </Pressable>
   );

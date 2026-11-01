@@ -150,9 +150,9 @@ export function HomeMap(props: HomeMapProps) {
     const timer = setTimeout(() => {
       const target = dropAt(currentIndex, rowsRef.current, CURRENT_R);
       if (!target) return;
-      lift.value = withSequence(withTiming(-22, { duration: 170 }), withSpring(0, { damping: 9, stiffness: 180 }));
-      dx.value = withSpring(target.x, { damping: 16, stiffness: 120 });
-      dy.value = withSpring(target.y, { damping: 16, stiffness: 120 });
+      lift.value = withSequence(withTiming(-22, { duration: 170 }), withSpring(0, { damping: 13, stiffness: 180 }));
+      dx.value = withSpring(target.x, { damping: 18, stiffness: 120 });
+      dy.value = withSpring(target.y, { damping: 18, stiffness: 120 });
       hopFrom.current = null;
       // A soft tick when it lands. Haptics don't exist on web.
       if (Platform.OS !== 'web') setTimeout(() => Haptics.selectionAsync().catch(() => {}), 420);
@@ -270,7 +270,9 @@ export function HomeMap(props: HomeMapProps) {
                 </View>
               </View>
               <View style={[styles.label, side === 'R' && styles.labelR]}>
-                <Text style={[styles.labelTitle, { color: colors.ink }, side === 'R' && styles.textR]}>{title}</Text>
+                <Text style={[styles.labelTitle, { color: colors.ink }, side === 'R' && styles.textR]} numberOfLines={2}>
+                  {title}
+                </Text>
                 <Text style={[styles.labelSub, { color: colors.muted }, side === 'R' && styles.textR]}>{sub}</Text>
               </View>
             </Pressable>
