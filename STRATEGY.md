@@ -19,6 +19,10 @@ Everything below this section, down to "Next up", is the 2026-10-27 review: hist
 2. **Remodel step 3: engine,** repeated words and vocabulary variety for One Minute, with tests.
 3. **Remodel step 4: brief + mockups** (product-lead, design-ux): "which train?" onboarding, the two-line home
    map, One Minute out of tester mode, Progress as articulation skills. Quinton approves before rebuilding.
+3b. **Before any screen shows repeated words or variety** (qa-critic on `wording.ts`, 2026-11-01; speech-engine fixing):
+   prompt word families flagged (lucky for Luck, buses for The bus); kinda/sorta double counted; variety noisy at one
+   minute and ~9 points lower for realistic ESL speech; doubled phrases at restart seams; names and number words;
+   news→new; a privacy test on `minuteCompleteProps`. Wiring: pass `prompt` in `talk.tsx` and save the fields in `minuteRecord`.
 4. Carried over (still open): wire the first-word trend on the Tape (`tape.tsx:36-39`, pass `firstWordSeconds`);
    `/fixit?words=` deep links ungated; target-length rework (DILEMMAS #16); Glide still line in
    `session/[id].tsx`; `moment.tsx` date maths (use days.ts); "Read it again" keeps an extra baseline;
