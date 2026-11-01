@@ -25,6 +25,7 @@
 import { countFreeTalk } from './align';
 import { classifyHabits, type HabitResult, type HabitWord } from './habits';
 import { paceScore, wordsPerMinute } from './score';
+import { repeatedWords, vocabularyVariety, type RepeatedWord, type VocabularyVariety } from './wording';
 
 // ---------------------------------------------------------------------------------------------
 // Parameters (change only with evidence; see the brief's gates)
@@ -327,6 +328,10 @@ export type MinuteInput = {
   /** Token indices (HabitResult.index) the reader marked "I meant that". */
   overruled?: readonly number[];
   slots?: FlowSlots;
+  /** The prompt's text ("Coffee"). Its content words are never flagged as repeated or counted as precise. */
+  prompt?: string;
+  /** Everyday words for "precise words" (wording.ts). Left out until the app bundles a licensed list. */
+  common?: ReadonlySet<string>;
 };
 
 export type HabitCounts = { filler: number; unsure: number; real: number };
@@ -360,6 +365,13 @@ export type MinuteSummary = {
   /** What Flow was computed from. */
   input: FlowInput;
   line: string;
+  /**
+   * Shown, never scored (DECISIONS 2026-11-01): content words leaned on, most used first (wording.ts).
+   * Optional so a summary or record from before 2026-11-01 still loads.
+   */
+  repeated?: RepeatedWord[];
+  /** Shown, never scored: MATTR vocabulary variety. Absent under 50 words, and in older summaries. */
+  variety?: VocabularyVariety;
 };
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
@@ -424,5 +436,8 @@ export function minuteSummary(m: MinuteInput): MinuteSummary | null {
       { talkSeconds, longPauses: pauses.count, wpm, habitFillersPerMin: input.habitFillersPerMin, topHabit: top, timeToFirstWordSeconds },
       slots,
     ),
+    // After Flow, from the tokens only: neither can move Flow, its version or the line.
+    repeated: repeatedWords(m.tokens, { prompt: m.prompt }),
+    variety: vocabularyVariety(m.tokens, { prompt: m.prompt, common: m.common }),
   };
 }

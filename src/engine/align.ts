@@ -35,12 +35,12 @@ export type Alignment = {
 const LOOKAHEAD = 5;
 
 // Hesitation sounds are never real words, so they always count.
-const HESITATIONS = new Set(['um', 'umm', 'uh', 'uhh', 'uhm', 'erm', 'er', 'ah', 'hmm', 'mm']);
+export const HESITATIONS: ReadonlySet<string> = new Set(['um', 'umm', 'uh', 'uhh', 'uhm', 'erm', 'er', 'ah', 'hmm', 'mm']);
 // Habit words are real words with real uses ("so that", "I like it", "right now"). An off-script
 // one might be a habit, or a reader rephrasing, or the recogniser mishearing. We can't tell which,
 // so they're reported on the Tape and never scored, while reading or in free talk.
-const HABIT_WORDS = new Set(['like', 'basically', 'actually', 'literally', 'so', 'right', 'okay', 'anyway']);
-const HABIT_PHRASES = new Set(['you know', 'i mean', 'kind of', 'sort of', 'you see']);
+export const HABIT_WORDS: ReadonlySet<string> = new Set(['like', 'basically', 'actually', 'literally', 'so', 'right', 'okay', 'anyway']);
+export const HABIT_PHRASES: ReadonlySet<string> = new Set(['you know', 'i mean', 'kind of', 'sort of', 'you see']);
 const PHRASE_START = new Set([...HABIT_PHRASES].map((p) => p.split(' ')[0]));
 
 // Some words the recogniser writes as digits or symbols. Map the common ones back.
