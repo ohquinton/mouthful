@@ -1,7 +1,7 @@
 // Habit-word classifier (DECISIONS.md 2026-10-29). Per-rule tests first, then the labelled corpus,
 // then speed. Tables print with `npx jest habits`.
 
-import { classifyHabits, habitSummary, type HabitWord, type HeardToken } from '../habits';
+import { HABIT_PAIR_FORMS, HABIT_SINGLE_FORMS, classifyHabits, habitSummary, type HabitWord, type HeardToken } from '../habits';
 import { tokenise } from '../align';
 import { PASSAGES } from '../../content/passages';
 import { WORD_PACKS } from '../../content/wordpacks';
@@ -165,6 +165,29 @@ describe('you know', () => {
     is('it was hard you know', 'you know', 'unsure');
     is('you know i think we should wait', 'you know', 'unsure');
     is('it was a long day you know we had no budget', 'you know', 'unsure');
+  });
+  it('reads "ya know" (how recognisers often write it) as "you know", with the same rules', () => {
+    is('the ya know budget meeting', 'you know', 'filler');
+    is('it was hard ya know', 'you know', 'unsure');
+    is('do ya know the answer', 'you know', 'real');
+    expect(classifyHabits(tokenise('ya know')).map((r) => r.span)).toEqual([2]);
+  });
+});
+
+describe('HABIT_SINGLE_FORMS and HABIT_PAIR_FORMS (what other counters leave out)', () => {
+  it('lists every form the classifier labels, and nothing else', () => {
+    // Each listed form is labelled when said alone or in a plain sentence...
+    for (const f of HABIT_SINGLE_FORMS) expect([f, classifyHabits(tokenise(`it was ${f} fine`)).length]).toEqual([f, 1]);
+    for (const p of HABIT_PAIR_FORMS) expect([p, classifyHabits(tokenise(`it was ${p} fine`)).map((r) => r.span)]).toEqual([p, [2]]);
+    // ...and every token the classifier ever labels, across all three corpora, is a listed form.
+    const items = [...load('./fixtures/habits-corpus.json'), ...load('./fixtures/habits-holdout.json'), ...load('./fixtures/habits-qa.json')];
+    for (const it of items) {
+      const words = it.tokens.map((t) => (typeof t === 'string' ? t : t.word));
+      for (const r of classifyHabits(it.tokens)) {
+        const form = words.slice(r.index, r.index + r.span).join(' ');
+        expect(r.span === 1 ? HABIT_SINGLE_FORMS.has(form) : HABIT_PAIR_FORMS.has(form)).toBe(true);
+      }
+    }
   });
 });
 

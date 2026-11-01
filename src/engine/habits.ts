@@ -75,7 +75,18 @@ const set = (s: string) => new Set(s.split(/\s+/).filter(Boolean));
 
 /** Same list as align.ts HESITATIONS (unify at integration). */
 const HES = set('um umm uh uhh uhm erm er ah hmm mm');
-const HABIT_PAIRS = set('you|know i|mean kind|of sort|of');
+/**
+ * Every one-word form classifyHabits labels ("kinda" is labelled "kind of", "sorta" "sort of").
+ * Exported so other counters (wording.ts repeated words and variety) leave exactly these out and
+ * nothing is counted twice. The classifier's switch must match it (habits.test.ts checks both ways).
+ */
+export const HABIT_SINGLE_FORMS: ReadonlySet<string> = set('like so actually basically literally right kinda sorta');
+/**
+ * Every two-word form it labels, as "first second". "ya know" is "you know" as recognisers often
+ * write it; it gets the same rules and the same label.
+ */
+export const HABIT_PAIR_FORMS: ReadonlySet<string> = new Set(['you know', 'ya know', 'i mean', 'kind of', 'sort of']);
+const HABIT_PAIRS = new Set([...HABIT_PAIR_FORMS].map((p) => p.replace(' ', '|')));
 
 const BE = set(
   "is was were are am be been being it's that's he's she's there's what's here's who's i'm we're they're you're isn't wasn't weren't aren't",
@@ -521,7 +532,7 @@ export function classifyHabits(tokens: readonly HeardToken[], opts: HabitOptions
         // Two-word habits must be said together: "you um know" is not "you know".
         if (k + 1 < sn && !ha[k] && HABIT_PAIRS.has(`${x}|${w[k + 1]}`)) {
           span = 2;
-          if (x === 'you') {
+          if (x === 'you' || x === 'ya') {
             word = 'you know';
             v = ruleYouKnow(c, k);
           } else if (x === 'i') {
