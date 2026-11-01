@@ -14,6 +14,13 @@ const light = {
   good: '#12936B',
   ember: '#C27A00',
   stumble: '#D23B3B',
+  // The two train lines on the home map (remodel). Line colours pass 4.7:1 on bg and surface; the soft tints
+  // are decoration only (the track ahead), so every stop state also has a fill, check, ring or label.
+  sharp: '#C2185B',
+  sharpSoft: '#F2C9D9',
+  clear: '#00788A',
+  clearSoft: '#C4E3E7',
+  onLine: '#FFFFFF', // text and icons on a filled line colour
   card: '#14161F', // the dark hero card
   cardInk: '#F3F4F7',
   cardMuted: '#9298AA',
@@ -32,6 +39,11 @@ const dark: typeof light = {
   good: '#3CC79A',
   ember: '#E3A33A',
   stumble: '#FF6B6B',
+  sharp: '#F06292',
+  sharpSoft: '#4A2235',
+  clear: '#3BB8C4',
+  clearSoft: '#173C43',
+  onLine: '#0E1017', // white on #F06292 is only 3.06:1
   card: '#1E2230',
   cardInk: '#ECEEF5',
   cardMuted: '#9298AA',

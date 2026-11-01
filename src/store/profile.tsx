@@ -17,6 +17,8 @@ export type Profile = {
   keepRecordings?: boolean;
   /** Supervised beta only: record every reading session and keep what the phone heard, for review. */
   testerMode?: boolean;
+  /** Which train line the home map shows first: 'sharp' (Sharp Talk) or 'clear' (Clear English). Unset until onboarding asks. */
+  line?: 'sharp' | 'clear';
   /** Which English the recogniser listens for, e.g. "en-IN". Unset: the phone's region (engine/locale.ts). */
   speechLang?: string;
   /** The reader turned off anonymous usage counts in You. Unset means sharing is on. */
