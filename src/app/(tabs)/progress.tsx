@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PACE_BANDS } from '../../engine/score';
@@ -9,6 +9,7 @@ import { useProfile } from '../../store/profile';
 import { requirePro } from '../../pro';
 import { FillerBars, HeatStrip, PaceChart } from '../../components/Charts';
 import { PrimaryButton, ProBadge } from '../../components/ui';
+import { TalkProgress } from '../../components/TalkProgress';
 import { ReplayButton } from '../../components/Replay';
 import { fonts, space, useColors } from '../../theme';
 
@@ -22,36 +23,45 @@ export default function Progress() {
   const { width } = useWindowDimensions();
   const { profile } = useProfile();
   const [sessions, setSessions] = useState<SavedSession[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [showReading, setShowReading] = useState(false);
   const [paceCtx, setPaceCtx] = useState<SpeakingContext | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      loadSessions().then(setSessions);
+      let active = true;
+      loadSessions().then((all) => {
+        if (active) { setSessions(all); setLoaded(true); }
+      });
+      return () => { active = false; };
     }, []),
   );
 
   const chartW = Math.min(width, 560) - space(2.5) * 2 - space(2) * 2;
-  const shown = recent(sessions, profile.pro ? 30 : FREE_HISTORY);
+  const readings = sessions.filter((s) => s.kind !== 'minute');
+  const shown = recent(readings, profile.pro ? 30 : FREE_HISTORY);
   const { available: contexts, initial } = paceContexts(shown);
   const ctx = paceCtx && contexts.includes(paceCtx) ? paceCtx : initial;
   const paceShown = shown.filter((s) => contextOf(s) === ctx);
   const band = PACE_BANDS[ctx];
-  const bests = personalBests(sessions);
+  const bests = personalBests(readings);
   // One Minute sessions are left out of Best score: the Tape shows them as Flow, a different
   // 0–100 scale, so their old Free talk `score` would be a number the reader never saw.
   const bestScore = personalBests(sessions.filter((s) => s.kind !== 'minute')).bestScore;
   const cmp = day1VsNow(sessions, profile.baselineSessionId);
   const due = retestDue(sessions, profile.baselineSessionId);
-  const { days } = streak(sessions);
+  const { days } = streak(readings);
   const day1Audio = (cmp?.day1 as SavedSession | undefined)?.recordings ?? [];
   const latestAudio = cmp && cmp.latest.passageId === cmp.day1.passageId ? (cmp.latest as SavedSession).recordings ?? [] : [];
+
+  if (!loaded) return <View style={[styles.empty, { backgroundColor: colors.bg }]}><ActivityIndicator color={colors.signal} accessibilityLabel="Loading your progress" /></View>;
 
   if (sessions.length === 0) {
     return (
       <View style={[styles.empty, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
         <Text style={[styles.h1, { color: colors.ink }]}>Progress</Text>
-        <Text style={[styles.lead, { color: colors.muted }]}>Nothing here yet. Your first read takes about a minute.</Text>
-        <PrimaryButton label="Do today’s read" onPress={() => router.navigate('/')} />
+        <Text style={[styles.lead, { color: colors.muted }]}>Your voice has a starting point. One topic, one minute, then something to build on.</Text>
+        <PrimaryButton label="Start today’s stop" onPress={() => router.navigate('/')} />
       </View>
     );
   }
@@ -60,7 +70,7 @@ export default function Progress() {
     { label: 'Best score', value: bestScore ?? '–' },
     { label: 'Fewest fillers', value: bests.cleanest !== undefined ? `${bests.cleanest}/min` : '–' },
     { label: 'Days practised', value: bests.totalDays },
-    { label: 'Current streak', value: days },
+    { label: 'Other-practice streak', value: days },
   ];
 
   return (
@@ -70,6 +80,12 @@ export default function Progress() {
     >
       <Text style={[styles.h1, { color: colors.ink }]}>Progress</Text>
 
+      <TalkProgress sessions={sessions} limit={profile.pro ? 30 : FREE_HISTORY} />
+      {readings.length > 0 && <Pressable accessibilityRole="button" accessibilityState={{ expanded: showReading }} onPress={() => setShowReading((v) => !v)} style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+        <Text style={[styles.panelTitle, { color: colors.ink }]}>{showReading ? 'Hide' : 'Show'} other practice</Text>
+        <Text style={[styles.panelSub, { color: colors.muted }]}>Reading, rehearsal and earlier free talks, kept separate from topic talks.</Text>
+      </Pressable>}
+      {showReading && readings.length > 0 && <>
       {due && (
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <Text style={[styles.eyebrow, { color: colors.cardMuted }]}>DAY {due} RE-TEST</Text>
@@ -154,21 +170,23 @@ export default function Progress() {
           </View>
           <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.line }]}>
             <Text style={[styles.panelTitle, { color: colors.ink }]}>Fillers per minute</Text>
-            <Text style={[styles.panelSub, { color: colors.muted }]}>Lower is better.</Text>
-            <FillerBars values={shown.map((s) => s.fillersPerMin)} width={chartW} colors={colors} />
+            <Text style={[styles.panelSub, { color: colors.muted }]}>Um and uh heard while {CONTEXT_PHRASE[ctx]}. Phones miss some, so counts run low.</Text>
+            <FillerBars values={paceShown.map((s) => s.fillersPerMin)} width={chartW} colors={colors} />
           </View>
         </>
       ) : (
         <Text style={[styles.lead, { color: colors.muted }]}>Do one more session and your charts appear here.</Text>
       )}
 
-      {!profile.pro && sessions.length > FREE_HISTORY && (
+      </>}
+      {!profile.pro && (readings.length > FREE_HISTORY || sessions.filter((s) => s.kind === 'minute').length > FREE_HISTORY) && (
         <Pressable
+          accessibilityRole="button"
           onPress={() => requirePro(profile, 'history')}
           style={[styles.upsell, { backgroundColor: colors.signalSoft }]}
         >
           <Text style={[styles.upsellText, { color: colors.ink }]}>
-            Showing your last {FREE_HISTORY} sessions. See all {sessions.length}.
+            Showing up to {FREE_HISTORY} recent sessions per practice type. See more history.
           </Text>
           <ProBadge />
         </Pressable>
@@ -209,6 +227,6 @@ const styles = StyleSheet.create({
   upsell: { flexDirection: 'row', alignItems: 'center', gap: space(1), borderRadius: 16, padding: space(2) },
   upsellText: { flex: 1, fontSize: 15, fontWeight: '500' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1), marginTop: space(0.5) },
-  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: space(1.5), paddingVertical: 6, minHeight: 34, justifyContent: 'center' },
+  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: space(1.5), paddingVertical: 6, minHeight: 44, justifyContent: 'center' },
   chipText: { fontSize: 14, fontWeight: '600' },
 });
