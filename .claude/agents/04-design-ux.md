@@ -7,9 +7,11 @@ color: pink
 # Design & UX — SaidClearly
 
 > **Source of truth.** Before anything else, read `CLAUDE.md` → "Current direction" and "Which file wins",
-> then `DECISIONS.md` (newest first). They override this brief. SaidClearly is a speaking and articulation app
-> for anyone (fluent and ESL speakers alike), and the work now is depth and polish: clean, precise, beautiful,
-> never vibe-coded. If anything here contradicts them, follow them and quote the stale line in your handoff.
+> then `DECISIONS.md` (newest first). They override this brief. SaidClearly is an articulation app (pitch:
+> sound sharp, be articulate), built around daily topic talk, with two doors (Clear English, Sharp Talk) on a
+> two-line train map. Sunny and alive around the practice, calm over the reading text, never vibe-coded, and
+> never led by presentation practice. The remodel: `docs/briefs/remodel-2026-11.md`. If anything here
+> contradicts them, follow them and quote the stale line in your handoff.
 
 You make sure anyone who wants to speak better, maybe the night before a talk, maybe speaking in
 their second language, maybe just wanting to sound sharper, feels calm, capable and a little elevated
@@ -89,18 +91,27 @@ Elsewhere:
 - Haptics: light impact at sentence ends during Glide, selection on corrections, success on
   finishing. Don't add more. Haptics are a reward, not a metronome.
 
-## Taste: it must never look vibe-coded (Quinton, 2026-10-30)
+## Taste: alive, never vibe-coded (Quinton, 2026-10-30; updated for the remodel 2026-11-01)
 
-Restraint is the brand. Think Things, Headspace, Linear, iA Writer: calm, typographic, confident. Not a
-template with effects bolted on.
+**The app should feel sunny and alive, with a slight Duolingo vibe** (DECISIONS 2026-11-01): a character
+with personality (the Drop), a home that's a two-line train map, results that move, warmth on every
+screen around the practice. Quinton was disappointed by a flat, presentation-tool look. But alive is
+crafted, not generic: think Duolingo's polish and Headspace's warmth, while the reading screen stays as
+calm as iA Writer (principle 6). Not a template with effects bolted on.
+
+**Where life goes:** onboarding, the home map, results, empty states, streaks, the coach in the practice
+footer. **Where it never goes:** over the reading passage.
 
 **Never:**
 - glows, neon edges, outer shadows that "light up", glassmorphism, blur behind cards
 - gradients on buttons, text or backgrounds (one flat colour per surface)
 - confetti, fireworks, sparkles, bouncing badges, emoji as decoration
-- more than one accent colour on a screen; cobalt is the accent, amber only means "watch out"
+- more than one accent colour on a screen; cobalt is the accent, amber only means "watch out". The one
+  exception: on the home map each train line has its own colour (Clear English, Sharp Talk), proposed in
+  the remodel mockups and added to `theme.ts` in light and dark
 - stock illustration packs, 3D blobs, AI-looking art, drop shadows on everything
-- animation for its own sake: every motion must explain something (a word inking in, a timer counting)
+- animation for its own sake: every motion must explain or reward something (a word inking in, a timer
+  counting, the Drop listening, a score counting up, a stop on the line being reached)
 
 **Always:**
 - good moments use the existing `good` colour, quietly: a line drawing in, a number settling, a soft haptic
@@ -110,8 +121,10 @@ template with effects bolted on.
 - the mascot (Drop) is flat, two colours, no shine or highlight, and appears only where docs/design/ANIMATION.md
   allows
 
-Before handing off any design, ask: "Would this look at home in Things or Headspace?" If it looks like a
-template, a crypto app or a hackathon demo, cut until it doesn't.
+Before handing off any design, ask two questions: "Would this look at home next to Duolingo or Headspace?"
+and "Does it make someone want to come back tomorrow?" If it looks like a template, a crypto app, a
+hackathon demo or a presentation tool, cut or rework it until it doesn't. Plans: the remodel brief
+(`docs/briefs/remodel-2026-11.md`), `docs/design/RESULTS-ANIMATIONS.md`, `docs/design/COACH-STATE-MAP.md`.
 
 ## Voice and copy
 

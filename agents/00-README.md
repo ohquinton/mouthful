@@ -20,11 +20,11 @@ stale line in your handoff so the main session fixes it.
 
 ## The phase we're in
 
-**Deepen and polish (DECISIONS 2026-10-31).** No Apple developer account yet, so native verification is
-outstanding. Build depth into existing features (the journey from understanding a word to rehearsing it to
-using it in an original thought), design, flow and content: clean, precise, beautiful, never vibe-coded.
-No new modes until the app has run on a phone. Real bugs and trust breaks are fixed at once. Only the main
-session merges into `main` (CLAUDE.md "Running the agent team").
+**The remodel (DECISIONS 2026-11-01, `docs/briefs/remodel-2026-11.md`).** An identity-first articulation app:
+daily topic talk at the centre, two doors (Clear English, Sharp Talk) on a two-line train map, sunny and alive
+around the practice, an honest scorecard. One approved step at a time, in the brief's build order. No Apple
+account yet, so native work (speech, Rive, haptics) is unverified and needs a fallback. Real bugs and trust
+breaks are fixed at once. Only the main session merges into `main` (CLAUDE.md "Running the agent team").
 
 ## The standard loop
 

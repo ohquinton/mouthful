@@ -1,17 +1,31 @@
 # Strategy (cofounder review, 2026-10-27)
 
-## Current focus · 2026-10-31
+## Current focus · 2026-11-01: the remodel
 
-Quinton currently has no Apple account available. Focus development on improving existing design, navigation, practice flow and content, using browser checks and automated tests where useful. Keep native speech, permissions and real-device validation explicitly outstanding; do not repeatedly make account setup the next task.
+Quinton saw the app in the browser and was disappointed: the layout leads with presentations, interview
+plans and an ESL feel. The direction is now the remodel (DECISIONS 2026-11-01, `docs/briefs/remodel-2026-11.md`):
+an identity-first articulation app; topic talk as the daily loop; two doors (Clear English, Sharp Talk) on a
+two-line train map; sunny and alive outside the reading text; an honest scorecard with repeated words and
+vocabulary variety. Build order and approval gates are in the brief.
 
-Prioritise a coherent journey from understanding a word to rehearsing it and forming an original thought. Refine hierarchy, readability, recovery and the clarity of each next action before adding modes. Luxury means care and restraint, not decorative complexity. Challenge our decisions as builders while keeping the learner experience supportive.
+Still true: no Apple account yet, so native verification (speech, haptics, Rive) stays outstanding; everything
+native needs a fallback. Money is tight: no paid services without asking.
 
-Future experiments, not commitments: return to a previously practised word in a different situation; express one idea for two different audiences; make an answer shorter without losing its meaning. First try these as small content exercises, without AI scoring, new subscriptions or a new mode. Judge whether people find them useful before expanding them.
+Everything below this section, down to "Next up", is the 2026-10-27 review: history and evidence, not orders.
 
-The review below is historical. Its revenue estimates, competitor claims and proposed bets are not current validation or automatic build instructions. Dated founder decisions in DECISIONS.md and docs/COFOUNDER-CONTEXT.md take precedence.
+## Next up · 2026-11-01
 
-Written after a full read of the codebase. Quinton asked for blunt, ambitious feedback. This is the
-"why" behind the roadmap. CLAUDE.md is the "how". If they disagree, raise it with Quinton.
+1. **Remodel step 2: results animations** (`docs/design/RESULTS-ANIMATIONS.md`), no new package. Awaiting go.
+2. **Remodel step 3: engine,** repeated words and vocabulary variety for One Minute, with tests.
+3. **Remodel step 4: brief + mockups** (product-lead, design-ux): "which train?" onboarding, the two-line home
+   map, One Minute out of tester mode, Progress as articulation skills. Quinton approves before rebuilding.
+4. Carried over (still open): wire the first-word trend on the Tape (`tape.tsx:36-39`, pass `firstWordSeconds`);
+   `/fixit?words=` deep links ungated; target-length rework (DILEMMAS #16); Glide still line in
+   `session/[id].tsx`; `moment.tsx` date maths (use days.ts); "Read it again" keeps an extra baseline;
+   syllable format in packs (respellings vs split spelling, every pack mixes both); "think on your feet" idiom in
+   brand.ts; Today's 🔥 emoji vs the Taste rule; 2×2 tiles at the largest Dynamic Type on an SE.
+5. Done 2026-10-31: Fix-it gate on Your words; One Minute single score, Carry on clock, plain copy, "You started
+   after N seconds"; Your words from readings can become comfortable; resync fuzz pinned to 4200; `day1Line` removed.
 
 ## What Mouthful is for
 
@@ -109,7 +123,7 @@ the Phase 1 gate and starts as two levels (full text → keywords). Both are in 
 
 **Review mining (2026-10-29, docs/MARKET-RESEARCH.md):** billing is the category's #1 pain (621 of 2,863 reviews); memorising to a date is the strongest love signal; only 14 reviews mention interviews (presentations 49, lines 38), so interview demand is unproven: recruit presenters for the beta too and don't lock the headline to "interview".
 
-## Next up (handoff 2026-10-31, Claude paused for a UI switch)
+## History: handoff 2026-10-31 (items 1–3 and parts of 6 done; see "Next up · 2026-11-01" at the top)
 
 main is at the onboarding merge: 607 tests pass in both time zones, typecheck clean, lint 0 errors. Every
 agent branch is merged; nothing is in flight. Codex's work (vocabulary depth) is merged and reviewed.

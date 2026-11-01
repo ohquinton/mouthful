@@ -29,23 +29,25 @@ CLAUDE.md gives, then flag the stale line (quote it and its file) in your handof
 
 ## The product, in one paragraph
 
-**SaidClearly: "Find the words. Say them clearly."** A speaking and articulation app for anyone who wants
-to express themselves better: think on their feet, find precise words, build vocabulary by subject, and
-speak with clear pace, emphasis, delivery and presence, with fewer fillers. The methods are **Glide**
-(rehearse your own words out loud; they ink in as you say them), **vocabulary packs** that lead into using
-each word in your own sentence, and **One Minute** (talk about a prompt with no script). Interviews,
-presentations and conversations are applications, not the limits.
+**SaidClearly: "Find the words. Say them clearly."** An articulation app. The pitch is identity: sound sharp,
+think on your feet, say what you mean clearly. **The daily loop is topic talk** (One Minute): a topic, a
+minute of talking, a rating, beat yourself tomorrow, watch your articulation improve over weeks. Around it:
+**vocabulary packs** that lead into using each word in your own sentence, **cold reads**, and **Glide**
+(rehearse your own words; they ink in as you say them). The home is a **map with two train lines** from one
+station: **Clear English** (ESL speakers) and **Sharp Talk** (articulate). Full direction:
+`docs/briefs/remodel-2026-11.md` (DECISIONS 2026-11-01).
 
-**Who it's for:** fluent and ESL speakers alike. ESL speakers are welcome, but ESL does not define the
-brand. **Not** a language course, accent reduction, speech therapy or a children's app. The feel is
-intellectually aspirational and accessible, never remedial or condescending.
+**Presentation and interview practice never lead** (Quinton: the weakest part). Moments stay as optional
+destinations, reached from either line.
 
-**The bar:** depth over breadth. Clean, precise, beautiful, luxurious, where luxury means restraint, care
-and dependable behaviour, never decoration. A feature that adds a mode is worth less than one that makes
-the existing journey (understand a word → rehearse it → use it in an original thought) clearer.
+**Who it's for:** fluent and ESL speakers alike, each through their own door. **Not** a language course,
+accent reduction, speech therapy or a children's app. Never remedial or condescending.
 
-**Why anyone pays:** visible, honest progress in the moments that matter (starting fast, finishing on time,
-steadier delivery, precise words), and a dated moment (a talk on Thursday) that turns intent into practice.
+**The bar:** depth over breadth, and alive: sunny, a slight Duolingo vibe around the practice, calm over the
+reading text, never vibe-coded. A change that makes the daily loop more rewarding beats a new mode.
+
+**Why anyone pays:** honest progress you can see in your own speech (fewer fillers and repeated words, more
+varied and precise words, starting faster, steadier pace), and a habit that feels good to keep.
 
 ## The business
 
@@ -59,7 +61,7 @@ steadier delivery, precise words), and a dated moment (a talk on Thursday) that 
 
 **Market reality** (docs/COMPETITORS.md): follow-the-voice and on-device recognition are not moats (Perora,
 Sayglide). What can win:
-1. Depth and care: a coherent, beautiful practice journey that people can feel working.
+1. A daily loop people want to come back to: topic talk, an honest rating, a line on the map that moves.
 2. Trust: Glide that keeps up and rarely marks a said word red; no fake grades; the reader overrules the app.
 3. Honest progress people can see: time to first word, finishing on target, steadiness, words they now use.
 

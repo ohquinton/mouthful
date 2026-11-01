@@ -66,6 +66,8 @@ export type SavedSession = {
     habitUnsure: number;
     /** What Flow was computed from (engine FlowInput). */
     input: FlowInput;
+    /** Seconds from Go to the first word. Optional: minutes saved before 2026-10-31 don't have it. */
+    timeToFirstWordSeconds?: number;
   };
   /** Tester mode only (supervised beta). Stays on the phone; never sent anywhere. */
   review?: {

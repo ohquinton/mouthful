@@ -2,6 +2,15 @@
 
 One line per decision: date, decision, why. Newest first.
 
+- **2026-11-01 · The remodel** (Quinton, after seeing the app in the browser: "way too focused" on presentations and ESL). Full brief: `docs/briefs/remodel-2026-11.md`. Supersedes the presentation/interview-led layout and the "lead with one concrete moment" store line.
+  - **Pitch is identity:** sound sharp, think on your feet, be articulate. Presentation practice is the weakest part and never leads, in the app or in marketing.
+  - **Core daily loop is topic talk:** a topic, a minute of talking, a rating, beat yourself, track it over weeks. One Minute leaves tester mode and becomes the front door; Glide rehearsal and moments become stops and destinations.
+  - **Two doors, one app:** a home map with two train lines from one station, "Clear English" (ESL) and "Sharp Talk" (articulate). Pick once in onboarding; the other is one tap away. One store listing, one subscription, one engine. Concept approved; screens wait for approved mockups.
+  - **Scorecard adds repeated words and vocabulary variety.** Grammar and creativity are practised, not measured; we never claim to grade creativity. Pronunciation is never graded (principle 1): we show words the phone didn't hear clearly, with Hear it.
+  - **The feel is sunny and alive, a slight Duolingo vibe,** with characters and motion on onboarding, the home map, results and empty states. The reading passage stays calm (principle 6). The Taste rule still bans glows, gradients, confetti and AI-looking art: alive is not vibe-coded.
+  - **Rive is approved in principle for the Drop as a living coach** (`docs/design/COACH-STATE-MAP.md`), after the results animations (`docs/design/RESULTS-ANIMATIONS.md`) and behind a static fallback, because it needs a development build we can't verify yet. The Drop keeps no mouth.
+  - **Each build step stops for Quinton's approval.**
+
 - **2026-10-31 · Deepen and polish existing features; defer new modes until manual testing** (Quinton). Focus on flow, responsiveness, UI and thoughtful feature depth. Code checks are not evidence that native performance or visual polish has been validated.
 
 - **2026-10-31 · Improve the existing experience while Apple account access is unavailable** (Quinton). Prioritise design, flow and thoughtful future ideas. Continue browser/code validation; keep native verification outstanding rather than treating account setup as the current work. Challenge builder decisions, not users.
