@@ -2,7 +2,8 @@
 // on the Tape. Pure functions (no React, no storage), tested in test/minute.test.ts.
 // The maths itself is engine/minute.ts; this file only feeds it and stores what it says.
 
-import { FLOW_SLOTS, FLOW_VERSION, flowScore, MIN_RATE_SECONDS, minuteLine, type FlowSlots, type MinuteSummary, type MinuteTrend } from '../engine/minute';
+import { FLOW_SLOTS, FLOW_VERSION, flowScore, MIN_RATE_SECONDS, minuteLine, minuteTrend, type FlowSlots, type MinuteSummary, type MinuteTrend } from '../engine/minute';
+import type { RepeatedWord, VocabularyVariety } from '../engine/wording';
 import type { HabitWord } from '../engine/habits';
 import type { SavedSession } from './sessions';
 
@@ -65,13 +66,16 @@ export function gapAfterBreak(heardTimes: readonly number[], breaks: readonly Mi
 }
 
 /**
- * What a minute saves beyond the usual session fields. Numbers and habit-word codes only, never what was said.
- * `timeToFirstWordSeconds` is new (2026-10-31), so it's optional: older minutes don't have it. It lives
- * here, not in sessions.ts, only because that file wasn't in this change; move it there when it next opens.
+ * Optional derived detail beyond the original minute shape. Repeated words stay on the phone;
+ * the transcript and surrounding sentences are never saved. Analytics uses a separate allowlist.
  */
 export type MinuteRecord = NonNullable<SavedSession['minute']> & {
   /** Seconds from Start to the first heard word, one decimal (engine timeToFirstWordSeconds). */
   timeToFirstWordSeconds?: number;
+  /** Derived word counts stay on this phone; no transcript or surrounding sentences. */
+  repeated?: RepeatedWord[];
+  /** Stored for a pooled weekly view only, never shown as a per-talk grade. */
+  variety?: VocabularyVariety;
 };
 
 /** The `minute` block of a saved session, from minuteSummary(). */
@@ -81,6 +85,8 @@ export function minuteRecord(m: MinuteSummary): MinuteRecord {
     longestPauseSeconds: m.longestPauseSeconds,
     talkSeconds: m.talkSeconds,
     timeToFirstWordSeconds: m.timeToFirstWordSeconds,
+    repeated: m.repeated,
+    variety: m.variety,
     wpm: m.wpm,
     words: m.words,
     umCount: m.umCount,
@@ -132,7 +138,22 @@ export function savedMinuteLine(s: SavedSession, slots: FlowSlots = FLOW_SLOTS):
   const m = s.minute;
   if (!m) return '';
   const top = fillerChips(s)[0]?.word;
-  return minuteLine({ talkSeconds: m.talkSeconds, longPauses: m.longPauses, wpm: m.wpm, habitFillersPerMin: m.input.habitFillersPerMin, topHabit: top }, slots);
+  return minuteLine({ talkSeconds: m.talkSeconds, longPauses: m.longPauses, wpm: m.wpm, habitFillersPerMin: m.input.habitFillersPerMin, topHabit: top, timeToFirstWordSeconds: firstWordSeconds(s) }, slots);
+}
+
+/** Route input is untrusted. Only a real calendar day on a known railway can mark a stop. */
+export function talkStopId(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !/^(sharp|clear):\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const day = value.slice(value.indexOf(':') + 1);
+  const date = new Date(`${day}T12:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === day ? value : undefined;
+}
+
+/** Unwrap the stored first-word times before asking the engine for the same-version trend. */
+export function savedMinuteTrend(s: SavedSession, all: readonly SavedSession[]): MinuteTrend | null {
+  const version = s.flowVersion ?? '';
+  const past = pastMinutes(all, all.findIndex((x) => x.id === s.id), version);
+  return minuteTrend(past.map((x) => ({ flow: x.flow, flowVersion: x.flowVersion, timeToFirstWordSeconds: firstWordSeconds(x) })), version, s.flow, firstWordSeconds(s));
 }
 
 /** A saved minute's time to first word, or undefined for a minute saved before it was kept. */

@@ -4,6 +4,7 @@ import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useReducedMotion } from 'react-native-reanimated';
 import { coachingLine, PACE_BANDS, paceZone } from '../engine/score';
 import { correctSessionWord, loadSessions, SavedSession, streak, updateSession } from '../store/sessions';
 import { recordCorrection } from '../store/words';
@@ -18,9 +19,9 @@ import { ahaPaywallDue, ahaPaywallRoute, claimAhaPaywall, requirePro } from '../
 import { track } from '../analytics';
 import { clock, lengthZone, spokenClock } from '../content/targets';
 import { maybeAskForRating } from '../rating';
-import { minuteTrend } from '../engine/minute';
 import type { HabitWord } from '../engine/habits';
-import { habitCode, overruleFiller, pastMinutes, trendText } from '../store/minute';
+import { habitCode, overruleFiller, pastMinutes, savedMinuteTrend, trendText } from '../store/minute';
+import { PrimaryButton } from '../components/ui';
 import { MinuteResult } from '../components/MinuteResult';
 import { fonts, space, useColors } from '../theme';
 
@@ -36,15 +37,17 @@ const headline = (x: SavedSession) => (isMinuteSession(x) ? x.flow! : x.score);
 function minuteTrendText(s: SavedSession, all: SavedSession[]): string {
   const version = s.flowVersion ?? '';
   const past = pastMinutes(all, all.findIndex((x) => x.id === s.id), version);
-  return trendText(minuteTrend(past, version, s.flow), past.length);
+  return trendText(savedMinuteTrend(s, all), past.length);
 }
 
 export default function Tape() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
+  const reducedMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const { profile, update } = useProfile();
   const [s, setS] = useState<SavedSession>();
+  const [loaded, setLoaded] = useState(false);
   const [all, setAll] = useState<SavedSession[]>([]);
   const [prev, setPrev] = useState<SavedSession>();
   const [days, setDays] = useState(0);
@@ -53,20 +56,29 @@ export default function Tape() {
   const [count] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
+    let live = true;
     loadSessions().then((all) => {
+      if (!live) return;
       const i = all.findIndex((x) => x.id === id);
-      if (i < 0) return;
+      setLoaded(true);
+      if (i < 0) { setS(undefined); return; }
       setAll(all);
       setS(all[i]);
-      if (all[i].segments) resolvePassage(all[i].passageId).then((p) => p && setPassageWords(preparePassage(p.text)));
+      if (all[i].segments) resolvePassage(all[i].passageId).then((p) => live && p && setPassageWords(preparePassage(p.text))).catch(() => {});
       setPrev(all.slice(0, i).reverse().find((x) => x.passageId === all[i].passageId) ?? all[i - 1]);
       setDays(streak(all).days);
       // The one celebratory moment: the score (or a minute's Flow) counts up over 600ms.
-      count.addListener(({ value }) => setShown(Math.round(value)));
-      Animated.timing(count, { toValue: headline(all[i]), duration: 600, useNativeDriver: false }).start();
+      if (reducedMotion || (isMinuteSession(all[i]) && all[i].minute!.talkSeconds < 45)) {
+        count.setValue(headline(all[i]));
+        setShown(headline(all[i]));
+      } else {
+        count.setValue(0);
+        count.addListener(({ value }) => setShown(Math.round(value)));
+        Animated.timing(count, { toValue: headline(all[i]), duration: 600, useNativeDriver: false }).start();
+      }
     });
-    return () => count.removeAllListeners();
-  }, [id, count]);
+    return () => { live = false; count.stopAnimation(); count.removeAllListeners(); };
+  }, [id, count, reducedMotion]);
 
   // ---- The full paywall after the free run (docs/briefs/aha-before-paywall.md) ----
   // Never on top of the Tape: they see their result and can tap "I said it" first. It opens as
@@ -141,7 +153,12 @@ export default function Tape() {
     track('recognition_correction', { where: 'tape', kind: 'habit', which: habitCode(word) });
   };
 
-  if (!s) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  if (!s) return (
+    <View style={[styles.empty, { backgroundColor: colors.bg, paddingTop: insets.top + space(3), paddingBottom: insets.bottom + space(3) }]}>
+      <Text style={[styles.coach, { color: colors.ink }]}>{loaded ? 'This result is no longer on this phone.' : 'Opening your result…'}</Text>
+      {loaded && <PrimaryButton label="Back to Home" onPress={() => router.dismissTo('/')} />}
+    </View>
+  );
 
   const isMinute = isMinuteSession(s);
 
@@ -204,13 +221,13 @@ export default function Tape() {
     >
       <View style={styles.row}>
         <Text style={[styles.eyebrow, { color: colors.muted }]} numberOfLines={1}>
-          THE TAPE · {s.title.toUpperCase()}
+          {isMinute ? 'TOPIC TALK' : 'THE TAPE'} · {s.title.toUpperCase()}
         </Text>
-        <Text style={[styles.streak, { color: colors.ember, borderColor: colors.line }]}>🔥 {days}</Text>
+        {days > 1 && <Text style={[styles.streak, { color: colors.muted, borderColor: colors.line }]}>{days} days</Text>}
       </View>
 
       {isMinute ? (
-        <MinuteResult s={s} shown={shown} trend={minuteTrendText(s, all)} onMeant={meant} colors={colors} />
+        <MinuteResult s={s} shown={shown} trend={minuteTrendText(s, all)} firstWordUsual={savedMinuteTrend(s, all)?.firstWord?.median} onMeant={meant} colors={colors} />
       ) : (
       <>
       <View style={styles.scoreRow}>
@@ -291,7 +308,7 @@ export default function Tape() {
         </View>
       )}
 
-      {moment && (
+      {moment && !isMinute && (
         <Pressable
           onPress={done}
           style={({ pressed }) => [styles.planRow, { backgroundColor: colors.signalSoft, opacity: pressed ? 0.8 : 1 }]}
@@ -302,10 +319,12 @@ export default function Tape() {
         </Pressable>
       )}
 
-      <Pressable style={[styles.secondary, { borderColor: colors.line }]} onPress={done}>
-        <Text style={[styles.secondaryText, { color: colors.ink }]}>Done</Text>
-      </Pressable>
-      <Pressable onPress={again}>
+      {isMinute ? <PrimaryButton label="Back to the map" onPress={done} /> : (
+        <Pressable accessibilityRole="button" style={[styles.secondary, { borderColor: colors.line }]} onPress={done}>
+          <Text style={[styles.secondaryText, { color: colors.ink }]}>Done</Text>
+        </Pressable>
+      )}
+      <Pressable accessibilityRole="button" onPress={again}>
         <Text style={[styles.again, { color: colors.muted }]}>{isMinute ? 'Another minute' : s.passageId === 'talk' ? 'Try another prompt' : 'Read it again'}</Text>
       </Pressable>
     </ScrollView>
@@ -313,6 +332,7 @@ export default function Tape() {
 }
 
 const styles = StyleSheet.create({
+  empty: { flex: 1, justifyContent: 'center', paddingHorizontal: space(3), gap: space(3) },
   wrap: { paddingHorizontal: space(3), gap: space(2) },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   eyebrow: { fontSize: 12, fontWeight: '600', letterSpacing: 1, flexShrink: 1, marginRight: 8 },

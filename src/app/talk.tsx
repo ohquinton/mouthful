@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { countFreeTalk, tokenise } from '../engine/align';
-import { paceZone, sessionScore, wordsPerMinute } from '../engine/score';
+import { sessionScore, wordsPerMinute } from '../engine/score';
 import { MIN_MINUTE_WORDS, minuteSummary, stampHeard } from '../engine/minute';
-import { LEVEL_NAME, minutePromptOfTheDay, promptOfTheDay } from '../content/prompts';
+import { LEVEL_NAME, minutePromptOfTheDay } from '../content/prompts';
 import { saveSession } from '../store/sessions';
-import { gapAfterBreak, minuteCompleteProps, minuteRecord, withoutBreaks, type MinuteBreak } from '../store/minute';
+import { gapAfterBreak, minuteCompleteProps, minuteRecord, talkStopId, withoutBreaks, type MinuteBreak } from '../store/minute';
 import { listenLocale, useListener } from '../speech/useListener';
 import { PrimaryButton } from '../components/ui';
 import { useProfile } from '../store/profile';
@@ -21,20 +21,14 @@ import { ListenError } from '../components/ListenError';
 import { fonts, space, useColors } from '../theme';
 
 const LIMIT_S = 60;
-const PAUSE_MS = 2500;
-const MIN_WORDS = 15;
-
-/**
- * Free talk, and (in tester mode, for the beta) One Minute, which replaces it once the pause counts
- * hold up against recordings (DILEMMAS #4 and "Decided"). Same route, same minute, same Try again.
- * One Minute adds the three prompt levels and a Flow rating (engine/minute.ts) on the Tape.
- */
-export default function FreeTalk() {
+/** Daily topic talk. Recognition timing and consent stay shared with the existing listener. */
+export default function TopicTalk() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
-  // Tester mode only for now. Read once per screen, so a minute can't change mode halfway.
-  const [minute] = useState(() => profile.testerMode === true);
+  const params = useLocalSearchParams<{ stopId?: string }>();
+  // Freeze the originating stop for this attempt, including a talk that crosses midnight.
+  const [stopId] = useState(() => talkStopId(params.stopId));
   // The day this screen opened, so the prompt can't change at midnight mid-talk.
   const [today] = useState(() => new Date());
   const { level, onLevel } = useVoiceLevel();
@@ -46,23 +40,19 @@ export default function FreeTalk() {
   const [pausedAt, setPausedAt] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [notice, setNotice] = useState<string | null>(null);
-  const pauses = useRef(0);
-  const prevHeard = useRef(0);
+  const [finishing, setFinishing] = useState(false);
   const done = useRef(false);
   // One Minute's timing, all reset in begin(): when each word was first heard (wall clock), when
   // listening started (never shifted), and the breaks (error card up, then Carry on) to take out.
   const heardTimes = useRef<number[]>([]);
   const startWall = useRef(0);
   const breaks = useRef<MinuteBreak[]>([]);
-  const prompt = promptOfTheDay(today, shuffle);
   const minutePrompt = minutePromptOfTheDay(today, shuffle);
 
   const heard = useMemo(() => tokenise(listener.transcript), [listener.transcript]);
   const counts = useMemo(() => countFreeTalk(heard), [heard]);
   const running = startedAt > 0 && listener.state === 'listening';
   const seconds = startedAt ? ((pausedAt || now) - startedAt) / 1000 : 0;
-  const wpm = wordsPerMinute(counts.spoken, seconds);
-  const zoneNow = paceZone(wpm, 'talking');
   const left = Math.max(0, Math.ceil(LIMIT_S - seconds));
   // The recogniser stopped for good (e.g. it can't listen for this English). A routine error
   // while it's still listening restarts by itself, so it shows nothing.
@@ -86,26 +76,16 @@ export default function FreeTalk() {
     if (!startedAt) return;
     const before = heardTimes.current.length;
     heardTimes.current = stampHeard(heardTimes.current, heard.length, pausedAt || Date.now());
-    const gap = minute ? gapAfterBreak(heardTimes.current, breaks.current, before) : 0;
+    const gap = gapAfterBreak(heardTimes.current, breaks.current, before);
     // Can't loop: the re-run this causes stamps no new word, so the gap is 0.
     if (gap > 0) setStartedAt((s) => s + gap);
-  }, [heard.length, startedAt, pausedAt, minute]);
-
-  // Free talk: a long silence between words counts as a pause. (One Minute uses minuteSummary's
-  // count instead, which never counts the thinking time before the first word.)
-  useEffect(() => {
-    if (!startedAt || !listener.lastHeardAt) return;
-    if (prevHeard.current && listener.lastHeardAt - prevHeard.current > PAUSE_MS) pauses.current++;
-    prevHeard.current = listener.lastHeardAt;
-  }, [listener.lastHeardAt, startedAt]);
+  }, [heard.length, startedAt, pausedAt]);
 
   // Stop the minute when the recogniser stops for good. If listening resumes with the transcript
   // kept (Carry on), move the start forward by the time away, so the call doesn't use up the
   // minute or drag pace down. Try again goes through begin(), which clears the stamp.
   useEffect(() => {
     if (listener.state === 'error') {
-      // Forget the last word's time, so the gap across the call isn't counted as a pause.
-      prevHeard.current = 0;
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to the recogniser stopping (outside React); guarded so it stamps once
       if (startedAt && !pausedAt) setPausedAt(Date.now());
     } else if (listener.state === 'listening' && pausedAt) {
@@ -125,11 +105,10 @@ export default function FreeTalk() {
    * consent screen in the middle of it, and the timer, pauses and transcript all reset together.
    */
   const begin = async (override?: { allowServer?: boolean }) => {
+    if (finishing || listener.state === 'asking') return;
     // Words already heard means this replaces an attempt (e.g. after a mid-talk consent ask).
     const isRetry = notice !== null || failed || heard.length > 0;
     listener.reset();
-    pauses.current = 0;
-    prevHeard.current = 0;
     heardTimes.current = [];
     breaks.current = [];
     startWall.current = 0;
@@ -137,11 +116,12 @@ export default function FreeTalk() {
     setStartedAt(0);
     setPausedAt(0);
     setNotice(null);
+    setFinishing(false);
     await listener.start(override);
     const t = Date.now();
     startWall.current = t;
     setStartedAt(t);
-    track(isRetry ? 'session_retry' : 'session_start', minute ? { kind: 'minute', pace: 'talking', where: 'talk', which: minutePrompt.id, level: minutePrompt.level } : { kind: 'talk', pace: 'talking', where: 'talk' });
+    track(isRetry ? 'session_retry' : 'session_start', { kind: 'minute', pace: 'talking', where: 'talk', which: minutePrompt.id, level: minutePrompt.level });
   };
 
   /** Try again after a recogniser error: make sure the mic is off first, then start clean. */
@@ -167,25 +147,27 @@ export default function FreeTalk() {
   /** Not enough came through: no score, no Flow, nothing saved. Try again calls begin(). */
   const tooShort = (spoken: number) => {
     setStartedAt(0);
+    setFinishing(false);
     noteRoughPatch();
-    track('session_too_short', { spoken, kind: minute ? 'minute' : 'talk' });
+    track('session_too_short', { spoken, kind: 'minute' });
     setNotice(spoken === 0 ? 'The mic didn’t hear anything. Hold the phone a little closer and try again.' : `Only ${spoken} ${spoken === 1 ? 'word' : 'words'} came through. Try again a little closer to the mic.`);
   };
 
   const finish = async () => {
     if (done.current) return;
     done.current = true;
+    setFinishing(true);
     await listener.stop();
     // Up to the pause if the error card is up: the call isn't talking time.
     const secs = Math.max(1, ((pausedAt || Date.now()) - startedAt) / 1000);
-    if (counts.spoken < (minute ? MIN_MINUTE_WORDS : MIN_WORDS)) return tooShort(counts.spoken);
+    if (counts.spoken < MIN_MINUTE_WORDS) return tooShort(counts.spoken);
 
     // One Minute: Flow and its numbers. Times are taken with the breaks removed.
-    const timing = minute ? withoutBreaks(heardTimes.current, startWall.current, breaks.current) : undefined;
-    const summary = timing ? minuteSummary({ tokens: heard, heardTimes: timing.heardTimes, startedAt: timing.startedAt }) : null;
-    if (minute && !summary) return tooShort(counts.spoken); // same rule as above; belt and braces
+    const timing = withoutBreaks(heardTimes.current, startWall.current, breaks.current);
+    const summary = minuteSummary({ tokens: heard, heardTimes: timing.heardTimes, startedAt: timing.startedAt, prompt: minutePrompt.text });
+    if (!summary) return tooShort(counts.spoken); // same rule as above; belt and braces
 
-    const longPauses = summary ? summary.longPauses : pauses.current;
+    const longPauses = summary.longPauses;
     const fillersPerMin = +(counts.fillerCount / (secs / 60)).toFixed(1);
     // The score is computed as before (Free talk's formula; `score` is a required field). Flow is
     // separate and is what a minute shows; Progress leaves minutes out of Best score for that reason.
@@ -194,7 +176,8 @@ export default function FreeTalk() {
     await saveSession({
       id,
       passageId: 'talk',
-      title: minute ? 'One Minute' : 'Free talk',
+      title: minutePrompt.text,
+      stopId,
       at: Date.now(),
       wpm: stats.wpm,
       fillers: counts.fillerCount,
@@ -207,23 +190,17 @@ export default function FreeTalk() {
       stumbled: [],
       context: 'talking',
       habits: counts.habitCount ? counts.habits : undefined,
-      ...(summary && {
-        kind: 'minute' as const,
-        flow: summary.flow,
-        flowVersion: summary.flowVersion,
-        promptId: minutePrompt.id,
-        level: minutePrompt.level,
-        overruled: [],
-        minute: minuteRecord(summary),
-      }),
+      kind: 'minute',
+      flow: summary.flow,
+      flowVersion: summary.flowVersion,
+      promptId: minutePrompt.id,
+      level: minutePrompt.level,
+      overruled: [],
+      minute: minuteRecord(summary),
     });
-    if (summary) {
-      // Numbers and codes only: the prompt goes as its id, never its text (analytics.ts sanitise).
-      track('session_complete', minuteCompleteProps(summary, minutePrompt, secs));
-    } else {
-      track('session_complete', { kind: 'talk', pace: 'talking', wpm: stats.wpm, fillers_per_min: fillersPerMin, habit_words: counts.habitCount, seconds: Math.round(secs) });
-    }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    // Numbers and codes only: the prompt goes as its id, never its text.
+    track('session_complete', minuteCompleteProps(summary, minutePrompt, secs));
+    if (summary.talkSeconds >= 45) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     router.replace({ pathname: '/tape', params: { id } });
   };
 
@@ -238,150 +215,98 @@ export default function FreeTalk() {
     return <MicGate state={listener.state} onAllowed={() => begin({ allowServer: true })} />;
   }
 
-  const zone = zoneNow;
-  const fillers = Object.entries(counts.fillers).sort((a, b) => b[1] - a[1]);
-  const habits = Object.entries(counts.habits).sort((a, b) => b[1] - a[1]);
-  // Not while a talk is running, paused or resuming: the prompt shouldn't change mid-talk.
-  const canShuffle = !running && !pausedAt;
+  // Keep the topic fixed during starting, listening, interruptions and save.
+  const canShuffle = startedAt === 0 && !pausedAt && !finishing && listener.state !== 'asking' && !notice && !failed;
+  const clockSeconds = running || pausedAt ? left : LIMIT_S;
+  const lineColor = profile.line === 'clear' ? colors.clear : colors.sharp;
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top, paddingBottom: insets.bottom + space(2) }]}>
+    <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
       <View style={styles.top}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Close">
-          <Ionicons name="close" size={26} color={colors.muted} />
+        <Pressable
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/')}
+          accessibilityRole="button"
+          accessibilityLabel="Close topic talk"
+          style={styles.close}
+        >
+          <Ionicons name="close" size={24} color={colors.muted} />
         </Pressable>
-        <Text style={[styles.topTitle, { color: colors.muted }]}>{minute ? 'One Minute' : 'Free talk'}</Text>
-        <Text style={[styles.timer, { color: running ? colors.ink : colors.muted }]}>
-          0:{String(running || pausedAt ? left : LIMIT_S).padStart(2, '0')}
+        <Text style={[styles.topTitle, { color: colors.muted }]}>Topic talk</Text>
+        <Text style={[styles.timer, { color: colors.ink }]} accessibilityLabel={`${clockSeconds} seconds remaining`}>
+          {Math.floor(clockSeconds / 60)}:{String(clockSeconds % 60).padStart(2, '0')}
         </Text>
       </View>
+      <View style={[styles.track, { backgroundColor: colors.line }]} accessible accessibilityRole="progressbar" accessibilityLabel="Talk progress" accessibilityValue={{ min: 0, max: 60, now: Math.min(60, Math.max(0, Math.floor(seconds))) }}>
+        <View style={[styles.trackFill, { backgroundColor: lineColor, width: `${Math.min(100, Math.max(0, seconds / LIMIT_S * 100))}%` }]} />
+      </View>
 
-      {minute ? (
-        <View style={styles.body}>
-          <Text style={[styles.eyebrow, { color: colors.muted }]}>
-            LEVEL {minutePrompt.level} · {LEVEL_NAME[minutePrompt.level].toUpperCase()}
-          </Text>
-          <Text style={[minutePrompt.level === 3 ? styles.prompt : styles.word, { color: colors.ink }]}>{minutePrompt.text}</Text>
-          {canShuffle && (
-            <Pressable onPress={() => setShuffle((n) => n + 1)} hitSlop={8}>
-              <Text style={[styles.shuffle, { color: colors.signal }]}>Different word</Text>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
+        <Text style={[styles.eyebrow, { color: lineColor }]}>{running ? 'ONE MINUTE. YOUR WORDS.' : 'TODAY’S TOPIC'} · {LEVEL_NAME[minutePrompt.level].toUpperCase()}</Text>
+        <Text style={[minutePrompt.level === 3 ? styles.prompt : styles.word, { color: colors.ink }]}>{minutePrompt.text}</Text>
+        <Text style={[styles.hint, { color: colors.muted }]}>
+          {running ? 'Keep going. If you get stuck, say the topic again and one thing it reminds you of.' : 'Talk about it for one minute. Take a moment to think: the first 8 seconds before your first word are free in your Flow rating.'}
+        </Text>
+        {!failed && !notice && (
+          <View style={[styles.ideas, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+            <Text style={[styles.ideasTitle, { color: colors.ink }]}>If you are unsure where to start</Text>
+            <Text style={[styles.idea, { color: colors.muted }]}>One thing you have noticed</Text>
+            <Text style={[styles.idea, { color: colors.muted }]}>A moment from your own life</Text>
+            <Text style={[styles.idea, { color: colors.muted }]}>What you think, and why</Text>
+          </View>
+        )}
+        {failed ? (
+          <ListenError message={listener.error} code={listener.errorCode} onRetry={retryAfterError} onResume={listener.canResume ? resumeAfterError : undefined} />
+        ) : notice ? (
+          <View style={[styles.ideas, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+            <Text accessibilityRole="alert" style={[styles.notice, { color: colors.ink }]}>{notice}</Text>
+          </View>
+        ) : null}
+      </ScrollView>
+
+      <View style={[styles.footer, { borderTopColor: colors.line, paddingBottom: insets.bottom + space(2) }]}>
+        {finishing ? <PrimaryButton label="Saving your talk…" onPress={() => {}} busy /> : running ? (
+          <View style={styles.liveFooter}>
+            <View style={styles.ribbon}><VoiceRibbon level={level} color={colors.signal} /></View>
+            <Pressable accessibilityRole="button" onPress={finish} style={[styles.finish, { borderColor: colors.line }]}>
+              <Text style={[styles.finishText, { color: colors.ink }]}>Finish</Text>
             </Pressable>
-          )}
-          {!running && !pausedAt && !notice && !failed && (
-            <Text style={[styles.hint, { color: colors.muted }]}>
-              Talk about it for one minute. Take your time to start: the quiet before your first word doesn’t count.
-            </Text>
-          )}
-          {running && (
-            <View style={styles.live}>
-              <View style={styles.ribbonRow}>
-                <VoiceRibbon level={level} color={colors.signal} />
-              </View>
-              <Text style={[styles.hint, { color: colors.muted }]}>Keep going. If you get stuck, say the word again.</Text>
-            </View>
-          )}
-          {failed ? (
-            <ListenError message={listener.error} code={listener.errorCode} onRetry={retryAfterError} onResume={listener.canResume ? resumeAfterError : undefined} />
-          ) : (
-            notice && <Text style={[styles.notice, { color: colors.stumble }]}>{notice}</Text>
-          )}
-        </View>
-      ) : (
-        <View style={styles.body}>
-          <Text style={[styles.eyebrow, { color: colors.muted }]}>TODAY’S PROMPT</Text>
-          <Text style={[styles.prompt, { color: colors.ink }]}>{prompt}</Text>
-          {canShuffle && (
-            <Pressable onPress={() => setShuffle((n) => n + 1)} hitSlop={8}>
-              <Text style={[styles.shuffle, { color: colors.signal }]}>Different prompt</Text>
-            </Pressable>
-          )}
-
-          {running && (
-            <View style={styles.live}>
-              <View style={styles.liveRow}>
-                <Text style={[styles.liveNum, { color: colors.ink }]}>{wpm || '–'}</Text>
-                <Text style={[styles.liveUnit, { color: colors.muted }]}>wpm</Text>
-                <Text
-                  style={[
-                    styles.zone,
-                    { color: zone === 'good' ? colors.good : zone === 'fast' ? colors.stumble : zone === 'slow' ? colors.ember : colors.muted },
-                  ]}
-                >
-                  {zone === 'good' ? 'In a good range' : zone === 'fast' ? 'Slow down' : zone === 'slow' ? 'A little slow' : ''}
-                </Text>
-              </View>
-              <View style={styles.ribbonRow}>
-                <VoiceRibbon level={level} color={colors.signal} />
-              </View>
-              <Text style={[styles.jarLabel, { color: colors.muted }]}>Filler jar · um, uh, erm</Text>
-              <View style={styles.jar}>
-                {fillers.length ? (
-                  fillers.map(([w, n]) => (
-                    <View key={w} style={[styles.chip, { borderColor: colors.line, backgroundColor: colors.surface }]}>
-                      <Text style={[styles.chipText, { color: colors.ink }]}>
-                        {w} <Text style={{ color: colors.stumble, fontWeight: '700' }}>×{n}</Text>
-                      </Text>
-                    </View>
-                  ))
-                ) : (
-                  <Text style={[styles.empty, { color: colors.muted }]}>Empty. Keep it that way.</Text>
-                )}
-              </View>
-              {habits.length > 0 && (
-                <Text style={[styles.habits, { color: colors.muted }]}>
-                  Habit words (not scored): {habits.map(([w, n]) => `${w} ×${n}`).join(' · ')}
-                </Text>
-              )}
-            </View>
-          )}
-          {failed ? (
-            <ListenError
-              message={listener.error}
-              code={listener.errorCode}
-              onRetry={retryAfterError}
-              onResume={listener.canResume ? resumeAfterError : undefined}
-            />
-          ) : (
-            notice && <Text style={[styles.notice, { color: colors.stumble }]}>{notice}</Text>
-          )}
-        </View>
-      )}
-
-      {running ? (
-        <PrimaryButton label="Finish" onPress={finish} />
-      ) : failed ? null : (
-        <PrimaryButton
-          label={listener.state === 'asking' ? 'Getting the mic ready…' : notice ? 'Try again' : 'Start talking'}
-          onPress={() => begin()}
-          busy={listener.state === 'asking'}
-        />
-      )}
+          </View>
+        ) : failed ? null : (
+          <PrimaryButton label={listener.state === 'asking' ? 'Getting the mic ready…' : notice ? 'Try again' : 'Start talking'} onPress={() => begin()} busy={listener.state === 'asking'} />
+        )}
+        {canShuffle && (
+          <Pressable onPress={() => setShuffle((n) => n + 1)} accessibilityRole="button" style={styles.shuffleButton}>
+            <Text style={[styles.shuffle, { color: colors.muted }]}>Different topic</Text>
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, paddingHorizontal: space(3) },
-  top: { flexDirection: 'row', alignItems: 'center', gap: space(2), height: 48 },
+  screen: { flex: 1 },
+  top: { flexDirection: 'row', alignItems: 'center', gap: space(1), minHeight: 56, paddingHorizontal: space(2) },
+  close: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   topTitle: { flex: 1, fontSize: 15, fontWeight: '600' },
-  timer: { fontSize: 20, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  body: { flex: 1, justifyContent: 'center', gap: space(2) },
-  eyebrow: { fontSize: 12, fontWeight: '700', letterSpacing: 1.1 },
-  prompt: { fontFamily: fonts.displayBold, fontSize: 30, lineHeight: 37 },
-  word: { fontFamily: fonts.displayBold, fontSize: 48, lineHeight: 56 },
-  shuffle: { fontSize: 16, fontWeight: '600' },
-  hint: { fontSize: 15, lineHeight: 21 },
-  live: { gap: space(1.25), marginTop: space(2) },
-  liveRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  liveNum: { fontSize: 34, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  liveUnit: { fontSize: 15 },
-  zone: { fontSize: 15, fontWeight: '600', marginLeft: space(1) },
-  jarLabel: { fontSize: 13, fontWeight: '600' },
-  ribbonRow: { marginBottom: 4 },
-  habits: { fontSize: 14, lineHeight: 20 },
-  jar: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1), minHeight: 36 },
-  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  chipText: { fontSize: 15 },
-  empty: { fontSize: 15 },
-  notice: { fontSize: 15 },
+  timer: { fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'], paddingRight: space(1) },
+  track: { height: 3, marginHorizontal: space(3), borderRadius: 2, overflow: 'hidden' },
+  trackFill: { height: 3 },
+  scroll: { flex: 1 },
+  body: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: space(3), paddingVertical: space(4), gap: space(2) },
+  eyebrow: { fontSize: 11, lineHeight: 17, fontWeight: '700', letterSpacing: 1.1 },
+  prompt: { fontFamily: fonts.readingBold, fontSize: 30, lineHeight: 42 },
+  word: { fontFamily: fonts.readingBold, fontSize: 48, lineHeight: 62 },
+  hint: { fontSize: 16, lineHeight: 24 },
+  ideas: { borderWidth: 1, borderRadius: 20, padding: space(2), gap: space(0.75), marginTop: space(1) },
+  ideasTitle: { fontSize: 14, fontWeight: '600', marginBottom: space(0.5) },
+  idea: { fontSize: 14, lineHeight: 21 },
+  footer: { borderTopWidth: 1, paddingHorizontal: space(3), paddingTop: space(2) },
+  liveFooter: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
+  ribbon: { flex: 1, minWidth: 0, overflow: 'hidden' },
+  finish: { minHeight: 48, borderWidth: 1, borderRadius: 16, paddingHorizontal: space(2), justifyContent: 'center' },
+  finishText: { fontSize: 16, fontWeight: '600' },
+  shuffleButton: { minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: space(0.5) },
+  shuffle: { fontSize: 14, fontWeight: '600' },
+  notice: { fontSize: 16, lineHeight: 23 },
 });

@@ -3,7 +3,7 @@
 import { tokenise } from '../src/engine/align';
 import { FLOW_SCORED, FLOW_VERSION, flowScore, flowSlotsFrom, flowVersionOf, minuteSummary, stampHeard } from '../src/engine/minute';
 import type { SavedSession } from '../src/store/sessions';
-import { fillerChips, firstWordSeconds, firstWordText, gapAfterBreak, habitCode, minuteRecord, overruleFiller, pastMinutes, savedMinuteLine, standingFillers, trendText, withoutBreaks } from '../src/store/minute';
+import { fillerChips, firstWordSeconds, firstWordText, gapAfterBreak, habitCode, minuteRecord, overruleFiller, pastMinutes, savedMinuteLine, savedMinuteTrend, talkStopId, standingFillers, trendText, withoutBreaks } from '../src/store/minute';
 
 /** n plain words, one every `stepMs` from `from`. */
 function talk(n: number, from: number, stepMs = 400): { tokens: string[]; times: number[] } {
@@ -320,5 +320,54 @@ describe('trend line', () => {
     const all = [m('a', 60), m('b', 70, '0-old'), { ...m('c', 80), kind: undefined }, m('d', 75), m('e', 90)];
     expect(pastMinutes(all, 4, FLOW_VERSION).map((x) => x.id)).toEqual(['a', 'd']);
     expect(pastMinutes(all, 0, FLOW_VERSION)).toEqual([]);
+  });
+});
+
+
+describe('remodel topic talk integration', () => {
+  it('accepts only a known line and a real date for a stop', () => {
+    expect(talkStopId('sharp:2026-11-01')).toBe('sharp:2026-11-01');
+    expect(talkStopId('clear:2028-02-29')).toBe('clear:2028-02-29');
+    for (const bad of [undefined, ['sharp:2026-11-01'], 'sharp:2026-02-30', 'clear:2026-13-01', 'other:2026-11-01', 'sharp:2026-1-1', 'sharp:2026-11-01 extra']) {
+      expect(talkStopId(bad)).toBeUndefined();
+    }
+  });
+
+  it('retains derived wording after JSON storage and leaves prompt words out', () => {
+    const tokens = tokenise('coffee tastes really warm and coffee smells really rich while coffee feels really comforting because coffee makes really simple mornings feel special and really peaceful for everyone around the table');
+    const m = minuteSummary({ tokens, heardTimes: tokens.map((_, i) => 1000 + i * 400), startedAt: 0, prompt: 'Coffee' })!;
+    const record = JSON.parse(JSON.stringify(minuteRecord(m)));
+    expect(record.repeated.map((r: { word: string }) => r.word)).toContain('really');
+    expect(record.repeated.map((r: { word: string }) => r.word)).not.toContain('coffee');
+    expect(record).not.toHaveProperty('tokens');
+    expect(record).not.toHaveProperty('transcript');
+    expect(record).not.toHaveProperty('heardTimes');
+    expect(record).not.toHaveProperty('prompt');
+  });
+
+  it('retains only numeric variety data without an approved precise-word list', () => {
+    const { tokens, times } = talk(150, 1000);
+    const m = minuteSummary({ tokens, heardTimes: times, startedAt: 0, prompt: 'Coffee' })!;
+    const record = minuteRecord(m);
+    expect(record.variety).toBeDefined();
+    expect(record.variety).not.toHaveProperty('precise');
+    expect(Object.values(record.variety!)).toEqual(expect.arrayContaining([expect.any(Number)]));
+  });
+
+  it('unwraps saved first-word times for the same-version trend, excluding current and later talks', () => {
+    const make = (id: string, first: number, version = FLOW_VERSION): SavedSession => {
+      const s = savedMinute(FILLERS, { id, flow: 70, flowVersion: version });
+      return { ...s, minute: { ...s.minute!, timeToFirstWordSeconds: first } };
+    };
+    const current = make('now', 2);
+    const trend = savedMinuteTrend(current, [make('a', 4), make('b', 6), make('old', 99, 'old'), make('c', 5), current, make('later', 90)]);
+    expect(trend?.firstWord).toEqual({ median: 5, count: 3, delta: -3, direction: 'faster' });
+    expect(savedMinuteTrend(current, [current])).toBeNull();
+  });
+
+  it('keeps the late-start coaching signal when rebuilding a saved result', () => {
+    const s = savedMinute(FILLERS);
+    const late = { ...s, minute: { ...s.minute!, talkSeconds: 55, longPauses: 0, wpm: 140, timeToFirstWordSeconds: 30 } };
+    expect(savedMinuteLine(late)).toMatch(/Start within/);
   });
 });

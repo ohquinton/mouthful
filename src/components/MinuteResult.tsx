@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { PACE_BANDS, paceZone } from '../engine/score';
 import { LONG_PAUSE_MS } from '../engine/minute';
 import type { HabitWord } from '../engine/habits';
 import type { SavedSession } from '../store/sessions';
-import { fillerChips, firstWordSeconds, firstWordText, savedMinuteLine } from '../store/minute';
+import { fillerChips, firstWordSeconds, savedMinuteLine, type MinuteRecord } from '../store/minute';
 import { Colors, fonts, space } from '../theme';
 
 /** Always under the number (brief, Decision 3). Flow is about keeping going, never about how you sound. */
@@ -19,6 +20,7 @@ export function MinuteResult({
   s,
   shown,
   trend,
+  firstWordUsual,
   onMeant,
   colors,
 }: {
@@ -27,18 +29,22 @@ export function MinuteResult({
   shown: number;
   /** The trend line (store/minute.ts trendText). */
   trend: string;
+  firstWordUsual?: number;
   /** "I meant that" on a likely filler chip: the earliest standing occurrence of that word. */
   onMeant: (index: number, word: HabitWord) => void;
   colors: Colors;
 }) {
-  const m = s.minute!;
+  const m = s.minute! as MinuteRecord;
+  const reducedMotion = useReducedMotion();
+  const { fontScale, width } = useWindowDimensions();
+  const singleColumn = fontScale > 1.3 || width < 350;
   const [lo, hi] = PACE_BANDS.talking;
   const zone = paceZone(m.wpm, 'talking');
   const chips = fillerChips(s);
   const meant = s.overruled?.length ?? 0;
   const threshold = LONG_PAUSE_MS / 1000;
-  // "You started after 6 seconds." Absent on minutes saved before it was kept.
-  const started = firstWordText(firstWordSeconds(s));
+  const started = firstWordSeconds(s);
+  const repeated = m.repeated?.[0];
 
   const tiles = [
     {
@@ -58,6 +64,18 @@ export function MinuteResult({
     { label: 'Kept going', value: `${Math.round(m.talkSeconds)}`, unit: 's', note: 'of 60', tone: colors.muted },
     // Shown, not scored: on-device recognisers drop many um/uh, so the number runs low.
     { label: 'um/uh the phone heard', value: `${m.umCount}`, unit: '', note: 'Phones miss some.', tone: colors.muted },
+    ...(m.repeated ? [{
+      label: 'Repeated words',
+      value: repeated ? repeated.word : '—',
+      unit: repeated ? `×${repeated.count}` : '',
+      note: repeated ? 'Shown, not scored.' : 'No repeated words flagged.',
+      tone: colors.muted,
+    }] : []),
+    ...(started !== undefined ? [{
+      label: 'First word', value: `${started}`, unit: 's',
+      note: firstWordUsual !== undefined ? `Your usual: ${Math.round(firstWordUsual * 10) / 10} s` : 'The first 8 seconds are free.',
+      tone: colors.muted,
+    }] : []),
   ];
 
   return (
@@ -66,20 +84,25 @@ export function MinuteResult({
         <Text style={[styles.score, { color: colors.ink }]}>{shown}</Text>
         <Text style={[styles.outOf, { color: colors.muted }]}>/100 Flow</Text>
       </View>
-      <Text style={[styles.fine, { color: colors.ink }]}>{FLOW_FINE_PRINT}</Text>
+      <Text style={[styles.fine, { color: colors.muted }]}>{FLOW_FINE_PRINT}</Text>
       <Text style={[styles.trend, { color: colors.muted }]}>{trend}</Text>
-      {started && <Text style={[styles.started, { color: colors.ink }]}>{started}</Text>}
+
+      <View style={[styles.coachCard, { backgroundColor: colors.signalSoft }]}>
+        <Text style={[styles.coachLabel, { color: colors.signal }]}>ONE THING TO TAKE WITH YOU</Text>
+        <Text style={[styles.coach, { color: colors.ink }]}>{savedMinuteLine(s)}</Text>
+      </View>
+      <Text style={[styles.section, { color: colors.muted }]}>YOUR TALK, IN DETAIL</Text>
 
       <View style={styles.grid}>
-        {tiles.map((t) => (
-          <View key={t.label} style={[styles.tile, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+        {tiles.map((t, index) => (
+          <Animated.View key={t.label} entering={reducedMotion ? undefined : FadeIn.duration(240).delay(index * 65)} style={[styles.tile, singleColumn && styles.fullTile, { backgroundColor: colors.surface, borderColor: colors.line }]}>
             <Text style={[styles.tileLabel, { color: colors.muted }]}>{t.label}</Text>
             <Text style={[styles.tileValue, { color: colors.ink }]}>
               {t.value}
               {t.unit ? <Text style={[styles.tileUnit, { color: colors.muted }]}> {t.unit}</Text> : null}
             </Text>
             <Text style={[styles.tileNote, { color: t.tone }]}>{t.note}</Text>
-          </View>
+          </Animated.View>
         ))}
       </View>
       <Text style={[styles.fine, { color: colors.muted }]}>
@@ -127,20 +150,22 @@ export function MinuteResult({
         </Text>
       )}
 
-      <Text style={[styles.coach, { color: colors.ink }]}>{savedMinuteLine(s)}</Text>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  scoreRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginTop: space(1) },
+  scoreRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 4, marginTop: space(1) },
   score: { fontFamily: fonts.display, fontSize: 88, lineHeight: 92 },
   outOf: { fontSize: 20, fontWeight: '600', marginBottom: 14 },
   fine: { fontSize: 13, lineHeight: 18 },
   trend: { fontSize: 15, lineHeight: 21, fontWeight: '600' },
-  started: { fontSize: 17, lineHeight: 24 },
+  coachCard: { borderRadius: 22, padding: space(2.5), gap: space(1) },
+  coachLabel: { fontSize: 10, lineHeight: 16, fontWeight: '700', letterSpacing: 1.1 },
+  section: { fontSize: 11, lineHeight: 17, fontWeight: '700', letterSpacing: 1, marginTop: space(1) },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1.5) },
-  tile: { flexBasis: '47%', flexGrow: 1, borderWidth: 1, borderRadius: 14, padding: space(1.75), gap: 2 },
+  tile: { flexBasis: '47%', flexGrow: 1, flexShrink: 1, minWidth: 0, borderWidth: 1, borderRadius: 18, padding: space(1.75), gap: 4 },
+  fullTile: { flexBasis: '100%' },
   tileLabel: { fontSize: 13, fontWeight: '500' },
   tileValue: { fontSize: 26, fontWeight: '600', fontVariant: ['tabular-nums'] },
   tileUnit: { fontSize: 13, fontWeight: '400' },
@@ -148,7 +173,7 @@ const styles = StyleSheet.create({
   fillers: { gap: space(1) },
   fillerText: { fontSize: 15, lineHeight: 21 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1) },
-  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, minHeight: 40, justifyContent: 'center' },
+  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, minHeight: 44, justifyContent: 'center' },
   chipText: { fontSize: 15 },
   coach: { fontSize: 17, lineHeight: 24 },
 });
