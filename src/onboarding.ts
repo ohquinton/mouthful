@@ -4,6 +4,7 @@
 // MicGate uses micGateExit() so a "no" during onboarding never traps anyone.
 
 import { daysBetween } from './engine/days';
+import { STOPPED_SHARE, stoppedEarlyAt, wholeSeconds } from './store/minute';
 
 /**
  * Where MicGate's "Not now" / "Skip for now" goes.
@@ -123,8 +124,11 @@ export type FirstTalk = {
   minute?: { talkSeconds: number; longPauses: number; umCount: number };
 };
 
-/** Under this many seconds of the 30, the first talk stopped early: no happy eyes, a gentler line. */
-export const STOPPED_EARLY_SECONDS = 22;
+/**
+ * Under this many seconds of the 30, the first talk stopped early: no happy eyes, a gentler line.
+ * The store's threshold (STOPPED_SHARE, 22.5 s), so the results screen agrees if it's reopened.
+ */
+export const STOPPED_EARLY_SECONDS = STOPPED_SHARE * FIRST_TALK.seconds;
 
 export type StartingPoint = {
   flow: number;
@@ -141,11 +145,13 @@ export type StartingPoint = {
  */
 export function startingPoint(s: FirstTalk | undefined, of: number = FIRST_TALK.seconds): StartingPoint | null {
   if (!s || s.kind !== 'minute' || typeof s.flow !== 'number' || !s.minute) return null;
-  const talked = Math.max(0, Math.min(of, Math.round(s.minute.talkSeconds)));
+  // The one rounding rule (wholeSeconds) and the one threshold (stoppedEarlyAt), shared with the
+  // results screen and the coaching line, so "You stopped at N s" is the same number everywhere.
+  const talked = Math.min(of, wholeSeconds(s.minute.talkSeconds));
   const pauses = Math.max(0, s.minute.longPauses);
   const um = Math.max(0, s.minute.umCount);
   const flow = Math.round(s.flow);
-  const keptGoing = talked >= STOPPED_EARLY_SECONDS;
+  const keptGoing = !stoppedEarlyAt(s.minute.talkSeconds, of);
   return {
     flow,
     rows: [
@@ -154,8 +160,10 @@ export function startingPoint(s: FirstTalk | undefined, of: number = FIRST_TALK.
       { label: 'um/uh the phone heard', value: String(um) },
     ],
     keptGoing,
+    // No number to beat: tomorrow is a full minute, a different Flow from 30 seconds, so "beat 74"
+    // would be a promise the results can't show.
     tomorrow: keptGoing
-      ? `Tomorrow: a new topic and a full minute. Try to beat ${flow}.`
+      ? 'Tomorrow: a new topic and a full minute.'
       : `You stopped at ${talked} s. Tomorrow, try to keep going for the whole minute.`,
   };
 }

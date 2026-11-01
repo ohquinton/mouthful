@@ -1,18 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, BackHandler, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native';
+import { AppState, BackHandler, Linking, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  Easing,
-  FadeInDown,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
@@ -36,6 +26,7 @@ import {
   privacyLine,
 } from '../../onboarding';
 import { PrimaryButton } from '../../components/ui';
+import { Drop } from '../../components/Drop';
 import { Colors, fonts, space, useColors } from '../../theme';
 
 const HOOK = BRAND.tagline.split(' ');
@@ -54,8 +45,8 @@ export default function Onboarding() {
   const [step, setStep] = useState<OnboardingStep>(() => parseStep(params.step));
   // Sharp Talk for everyone until they choose; never guessed from the phone's language.
   const [line, setLine] = useState<Line>(() => lineOrDefault(profile.line));
-  // Off until they choose: recordings are kept only with an explicit yes.
-  const [keep, setKeep] = useState(false);
+  // No recording switch here: topic talks don't record, and keepRecordings (reading re-tests) is
+  // only ever changed in You, where it says what it's for.
   const [busy, setBusy] = useState(false);
   const [inked, setInked] = useState(0);
   const onDevice = onDeviceSupported(listenLocale(profile.speechLang));
@@ -111,7 +102,6 @@ export default function Onboarding() {
   const startTalking = async () => {
     if (busy) return;
     setBusy(true);
-    await update({ keepRecordings: keep });
     // Ask here, right under "Your phone will ask to use the microphone", so a "no" lands on our own
     // screen with a way out. Only the permission: nothing listens until talk.tsx starts, after
     // MicGate has had its say about speech services. Web always says yes.
@@ -181,7 +171,7 @@ export default function Onboarding() {
                 <Text style={[styles.h1, styles.flex, { color: colors.ink }]} accessibilityRole="header">
                   Which train are you getting on?
                 </Text>
-                <Drop height={72} look="down" tilt={-10} blink={!reduceMotion} />
+                <Drop height={72} pose="down" tilt={-10} />
               </View>
               <Text style={[styles.lead, { color: colors.muted }]}>Both lines practise the same thing: talking clearly. You can switch any time.</Text>
               <View style={styles.cards} accessibilityRole="radiogroup">
@@ -218,13 +208,6 @@ export default function Onboarding() {
                 <Ionicons name="phone-portrait-outline" size={18} color={colors.muted} style={styles.privacyIcon} />
                 <Text style={[styles.privacyText, { color: colors.muted }]}>{privacyLine(onDevice)}</Text>
               </View>
-              <View style={[styles.box, styles.keep, { backgroundColor: colors.surface, borderColor: colors.line }]}>
-                <View style={styles.flex}>
-                  <Text style={[styles.keepTitle, { color: colors.ink }]}>Keep a recording of this talk</Text>
-                  <Text style={[styles.keepSub, { color: colors.muted }]}>Off unless you turn it on. Saved on this phone.</Text>
-                </View>
-                <Switch value={keep} onValueChange={setKeep} accessibilityLabel="Keep a recording of this talk on this phone" />
-              </View>
             </Animated.View>
           </ScrollView>
           <View style={styles.foot}>
@@ -238,7 +221,7 @@ export default function Onboarding() {
       {step === 'denied' && (
         <>
           <Animated.View key="denied" entering={enter} style={[styles.center, styles.deniedBody]}>
-            <Drop height={120} look="up" blink={!reduceMotion} />
+            <Drop height={120} pose="up" />
             <Text style={[styles.h1, styles.centerText, { color: colors.ink }]} accessibilityRole="header">
               {BRAND.name} can’t hear you yet
             </Text>
@@ -290,86 +273,10 @@ export function TopBar({ onBack, active }: { onBack?: () => void; active: number
   );
 }
 
-// The Drop's eyes stay white in both modes, like the text on `button` (PrimaryButton).
-const DROP_EYE = '#FFFFFF';
-const DROP_PATH = 'M0,-78 C22,-46 52,-18 52,18 A52,52 0 0 1 -52,18 C-52,-18 -22,-46 0,-78 Z';
-// Drawn in a 112 × 156 box with the origin at (56, 82) (docs/design/remodel/src/gen.py).
-const VIEW_W = 112;
-const VIEW_H = 156;
-const EYE_SHIFT: Record<'rest' | 'up' | 'down', [number, number]> = { rest: [0, 0], up: [2, -9], down: [-3, 6] };
-
-/**
- * The Drop: flat, cobalt, two white eyes, no mouth, no shine, never sad (docs/design/ANIMATION.md).
- * A static stand-in for the Rive Drop (remodel step 6). Blinks every few seconds when `blink` is on;
- * callers pass `!reduceMotion`. 'happy' swaps the eyes for two small arcs.
- */
-export function Drop({
-  height,
-  look = 'rest',
-  tilt = 0,
-  blink = false,
-}: {
-  height: number;
-  look?: 'rest' | 'up' | 'down' | 'happy';
-  tilt?: number;
-  blink?: boolean;
-}) {
-  const colors = useColors();
-  const scale = height / VIEW_H;
-  const width = VIEW_W * scale;
-  const open = useSharedValue(1);
-
-  useEffect(() => {
-    if (!blink || look === 'happy') {
-      open.value = 1;
-      return;
-    }
-    // A quick close and open, then a few seconds' rest. Under 160 ms, so it reads as a blink.
-    open.value = withRepeat(
-      withSequence(withDelay(2800, withTiming(0.1, { duration: 70 })), withTiming(1, { duration: 90 })),
-      -1,
-    );
-  }, [blink, look, open]);
-
-  const eyesStyle = useAnimatedStyle(() => ({ transform: [{ scaleY: open.value }] }));
-  const [dx, dy] = look === 'happy' ? [0, 0] : EYE_SHIFT[look];
-  // An eye: 11 × 22, rounded, at x -20 and 9, y 4 (plus where it's looking).
-  const eye = (x: number) => ({
-    position: 'absolute' as const,
-    left: (x + dx + 56) * scale,
-    top: (4 + dy + 82) * scale,
-    width: 11 * scale,
-    height: 22 * scale,
-    borderRadius: 5.5 * scale,
-    backgroundColor: DROP_EYE,
-  });
-
-  return (
-    <View
-      style={{ width, height, transform: tilt ? [{ rotate: `${tilt}deg` }] : undefined }}
-      accessible={false}
-      importantForAccessibility="no-hide-descendants"
-    >
-      <Svg width={width} height={height} viewBox={`-56 -82 ${VIEW_W} ${VIEW_H}`}>
-        <Path d={DROP_PATH} fill={colors.button} />
-        {look === 'happy' && (
-          <>
-            <Path d="M-23,14 q7.5,-11 15,0" stroke={DROP_EYE} strokeWidth={6} fill="none" strokeLinecap="round" />
-            <Path d="M8,14 q7.5,-11 15,0" stroke={DROP_EYE} strokeWidth={6} fill="none" strokeLinecap="round" />
-          </>
-        )}
-      </Svg>
-      {look !== 'happy' && (
-        <Animated.View style={[StyleSheet.absoluteFill, eyesStyle, { transformOrigin: `50% ${((4 + dy + 82 + 11) / VIEW_H) * 100}%` }]}>
-          <View style={eye(-20)} />
-          <View style={eye(9)} />
-        </Animated.View>
-      )}
-    </View>
-  );
-}
-
 // ---------------------------------------------------------------- the hook's picture
+
+// The Drop's shape is 112 × 156 (components/Drop.tsx): its width at a given height.
+const DROP_ASPECT = 112 / 156;
 
 const ART_H = 230;
 const STATION_Y = 168;
@@ -415,8 +322,8 @@ function HookArt({ reduceMotion }: { reduceMotion: boolean }) {
       <Svg width={screenW} height={ART_H} style={StyleSheet.absoluteFill} pointerEvents="none">
         <Circle cx={half} cy={y} r={17} fill={colors.surface} stroke={colors.ink} strokeWidth={6} />
       </Svg>
-      <View style={[styles.artDrop, { top: y - 17 - 132, left: half - (132 * VIEW_W) / VIEW_H / 2 }]}>
-        <Drop height={132} blink={!reduceMotion} />
+      <View style={[styles.artDrop, { top: y - 17 - 132, left: half - (132 * DROP_ASPECT) / 2 }]}>
+        <Drop height={132} />
       </View>
     </View>
   );
@@ -515,9 +422,6 @@ const styles = StyleSheet.create({
   privacy: { flexDirection: 'row', gap: space(1.25) },
   privacyIcon: { marginTop: 2 },
   privacyText: { flex: 1, fontSize: 15, lineHeight: 21 },
-  keep: { flexDirection: 'row', alignItems: 'center', gap: space(1.5) },
-  keepTitle: { fontSize: 16, fontWeight: '700' },
-  keepSub: { fontSize: 13, lineHeight: 18, marginTop: 2 },
   // Hook picture: full bleed, so the lines run off both edges of the screen.
   art: { marginHorizontal: -space(3) },
   clip: { position: 'absolute', top: 0, height: ART_H, overflow: 'hidden' },

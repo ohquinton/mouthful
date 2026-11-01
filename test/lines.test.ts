@@ -5,9 +5,15 @@ import {
   aheadLabel,
   bestFlow,
   currentStopIndex,
+  dailyTalkDoneToday,
+  doneLabel,
   getStop,
   headerTitle,
+  isLastStop,
+  lessonDoneOn,
   lessonDoneToday,
+  shortTopic,
+  stopNumber,
   lessonIsPro,
   lessonTitle,
   lineOf,
@@ -25,6 +31,7 @@ import { MINUTE_PROMPTS } from '../src/content/prompts';
 import { getPack } from '../src/content/wordpacks';
 import { getPassage } from '../src/content/passages';
 import { packPassage } from '../src/content/wordpacks';
+import { dayKey } from '../src/engine/vocab';
 
 const at = (month: number, day: number, h = 12, m = 0) => new Date(2026, month - 1, day, h, m).getTime();
 const done = (stopId: string, t: number, extra: { flow?: number } = {}) => ({ stopId, at: t, passageId: 'talk', ...extra });
@@ -161,10 +168,28 @@ describe('starting a stop', () => {
     });
   });
 
-  it('stop 1 is the 30-second first talk', () => {
-    expect(talkSeconds(0)).toBe('30');
-    expect(talkSeconds(1)).toBe('60');
-    expect(startRoute(sharp(1), { pro: false, lessonDone: false }).params).toMatchObject({ seconds: '30' });
+  it('every stop from Home is a full minute, stop 1 included (only onboarding’s talk is 30 s)', () => {
+    expect(talkSeconds()).toBe('60');
+    expect(startRoute(sharp(1), { pro: false, lessonDone: false }).params).toMatchObject({ seconds: '60', prompt: 'p01', stop: 'sharp-01' });
+  });
+
+  it('"Start this line" on the other line: its stop 1 as a normal minute on its own prompt', () => {
+    // Someone on Sharp Talk with stops done opens Clear English for the first time.
+    const sessions = [done('sharp-01', at(10, 30)), done('sharp-02', at(10, 31))];
+    const first = nextStop('clear', sessions)!;
+    expect(first.id).toBe('clear-01');
+    expect(startRoute(first, { pro: false, lessonDone: false })).toEqual({
+      pathname: '/talk',
+      params: { prompt: first.promptId, stop: 'clear-01', seconds: '60', from: 'home' },
+    });
+  });
+
+  it('an upgraded reader with no line and no first talk starts Sharp Talk stop 1 as a minute', () => {
+    const line = lineOf(undefined);
+    const sessions = withFirstTalk([{ at: at(10, 1), passageId: 'night-shift' }], line);
+    const stop = nextStop(line, sessions)!;
+    expect(stop.id).toBe('sharp-01');
+    expect(startRoute(stop, { pro: false, lessonDone: false }).params).toMatchObject({ seconds: '60', stop: 'sharp-01' });
   });
 
   it('opens the lesson first, then the talk once the lesson is done today', () => {
@@ -209,6 +234,100 @@ describe('labels', () => {
     expect(headerTitle([{ at: at(10, 27) }], 6, now)).toBe('6 days in a row');
     expect(headerTitle([{ at: at(10, 20) }], 0, now)).toBe('Welcome back');
     expect(headerTitle([{ at: at(10, 1) }, { at: at(11, 1) }], 1, now)).toBe('Welcome back');
+  });
+});
+
+describe('stop numbers and short labels', () => {
+  it('numbers a stop by its place on its own line', () => {
+    expect(stopNumber('sharp-01')).toBe(1);
+    expect(stopNumber('clear-12')).toBe(12);
+    expect(stopNumber(LINES.sharp[LINES.sharp.length - 1].id)).toBe(LINES.sharp.length);
+    expect(stopNumber('sharp-6')).toBeUndefined(); // digits alone don't make a stop
+    expect(stopNumber('sharp-15')).toBeUndefined();
+    expect(stopNumber(undefined)).toBeUndefined();
+  });
+
+  it('knows the last stop of each line', () => {
+    expect(isLastStop(LINES.sharp[LINES.sharp.length - 1].id)).toBe(true);
+    expect(isLastStop(LINES.clear[LINES.clear.length - 1].id)).toBe(true);
+    expect(isLastStop('sharp-01')).toBe(false);
+    expect(isLastStop(undefined)).toBe(false);
+  });
+
+  it('every topic has a short name that fits a map label (long questions get one written for them)', () => {
+    for (const p of MINUTE_PROMPTS) {
+      const name = shortTopic(p.id);
+      expect(name.length).toBeLessThanOrEqual(24);
+      expect(name).not.toMatch(/[.?!]$/);
+    }
+    expect(shortTopic('p27')).toBe('An opinion');
+    expect(shortTopic('p01')).toBe('Coffee');
+    expect(shortTopic('nope')).toBe('Topic talk');
+  });
+
+  it('every done label on both lines fits the map’s two lines, never a cut-off question', () => {
+    // ~30 characters a line at 17 pt in the label column on a 375–390 pt phone; titles clamp at 2.
+    for (const stop of [...LINES.sharp, ...LINES.clear]) {
+      expect(doneLabel(stop, { at: at(11, 1), promptId: stop.promptId, flow: 70 }, false).title.length).toBeLessThanOrEqual(36);
+      expect(doneLabel(stop, { at: at(11, 1), promptId: stop.promptId, flow: 70 }, true).title.length).toBeLessThanOrEqual(46);
+    }
+    expect(doneLabel(LINES.sharp[4], { at: at(11, 1), promptId: 'p27', flow: 70 }, false).title).toBe('Topic talk · An opinion');
+  });
+});
+
+describe('done labels say what was done', () => {
+  const t = at(10, 30);
+
+  it('a talk on a different topic is labelled by the topic actually talked about', () => {
+    // Stop 3 is "Explain what you do for work…"; the reader tapped Different topic and talked about bread.
+    expect(doneLabel(LINES.sharp[2], { at: t, promptId: 'p04', flow: 66 }, false)).toEqual({ title: 'Topic talk · Bread', sub: 'Flow 66' });
+  });
+
+  it('a skipped lesson (a free reader, a Pro cold read) shows the talk only', () => {
+    const coldStop = LINES.sharp[3]; // Risk, after a cold read of Signal and Noise
+    expect(doneLabel(coldStop, { at: t, promptId: 'p15', flow: 71 }, false)).toEqual({ title: 'Topic talk · Risk', sub: 'Flow 71' });
+  });
+
+  it('a lesson done that day leads, with the talk under it', () => {
+    expect(doneLabel(LINES.sharp[1], { at: t, promptId: 'p13', flow: 71 }, true)).toEqual({ title: 'Word pack · Make your point', sub: 'Trust · Flow 71' });
+  });
+
+  it('"Your first talk" only for onboarding’s 30 seconds; a full-minute stop 1 is a topic talk', () => {
+    const first = { at: t, promptId: 'p01', flow: 74, flowVersion: '2-k40p35w25-s30' };
+    expect(doneLabel(LINES.sharp[0], first, false)).toEqual({ title: 'Your first talk · Coffee', sub: 'Flow 74 · your starting point' });
+    expect(doneLabel(LINES.clear[0], { at: t, promptId: 'p01', flow: 69, flowVersion: '2-k40p35w25' }, false)).toEqual({ title: 'Topic talk · Coffee', sub: 'Flow 69' });
+  });
+
+  it('a stop done without a saved talk just says done', () => {
+    expect(doneLabel(LINES.sharp[4], undefined, false)).toEqual({ title: 'Topic talk · An opinion', sub: 'Done' });
+  });
+
+  it('a pack lesson counts as done on an old day by the word book’s day keys', () => {
+    const word = getPack('precision')!.words[0].word.toLowerCase();
+    const entry = { word, heardDays: [dayKey(t)], cleanDays: [], stumbles: 0, firstSeen: t, lastSeen: at(11, 1) };
+    const lesson = { kind: 'pack', packId: 'precision' } as const;
+    expect(lessonDoneOn(lesson, { sessions: [], book: { [word]: entry } }, t)).toBe(true);
+    expect(lessonDoneOn(lesson, { sessions: [], book: { [word]: entry } }, at(10, 29))).toBe(false);
+    expect(lessonDoneOn({ kind: 'cold', passageId: 'signal-noise' }, { sessions: [{ passageId: 'signal-noise', at: at(10, 30, 8) }], book: {} }, t)).toBe(true);
+  });
+});
+
+describe('past the last stop', () => {
+  const now = at(11, 1, 18);
+  const talk = (extra: Record<string, unknown>) => ({ at: at(11, 1, 9), passageId: 'talk', kind: 'minute', flowVersion: '2-k40p35w25', ...extra });
+
+  it('a full-minute talk today on the topic of the day is today’s stop done', () => {
+    expect(dailyTalkDoneToday([talk({ promptId: 'p20' })], 'p20', now)).toBe(true);
+    // Different topic, no stop: still today's talk.
+    expect(dailyTalkDoneToday([talk({ promptId: 'p05' })], 'p20', now)).toBe(true);
+  });
+
+  it('not yesterday’s talk, not 30 seconds, not a stop on the other line', () => {
+    expect(dailyTalkDoneToday([talk({ promptId: 'p20', at: at(10, 31, 22) })], 'p20', now)).toBe(false);
+    expect(dailyTalkDoneToday([talk({ promptId: 'p20', flowVersion: '2-k40p35w25-s30' })], 'p20', now)).toBe(false);
+    expect(dailyTalkDoneToday([talk({ promptId: 'p03', stopId: 'clear-03' })], 'p20', now)).toBe(false);
+    const reading = { at: at(11, 1, 9), passageId: 'night-shift' };
+    expect(dailyTalkDoneToday([reading], 'p20', now)).toBe(false);
   });
 });
 

@@ -9,6 +9,7 @@ import { correctSessionWord, loadSessions, SavedSession, streak, updateSession }
 import { recordCorrection } from '../store/words';
 import { useProfile } from '../store/profile';
 import { getMoment } from '../content/moments';
+import { lineOf } from '../content/lines';
 import { DICTIONARY } from '../content/wordpacks';
 import { resolvePassage, sourceOf } from '../content/resolve';
 import { preparePassage, PassageWord } from '../engine/align';
@@ -143,7 +144,7 @@ export default function Tape() {
         style={{ backgroundColor: colors.bg }}
         contentContainerStyle={[styles.wrap, { paddingTop: insets.top + space(2), paddingBottom: insets.bottom + space(3) }]}
       >
-        <MinuteResult s={s} all={all} line={profile.line ?? 'sharp'} onMeant={meant} onBack={done} onAgain={again} colors={colors} />
+        <MinuteResult s={s} all={all} chosenLine={lineOf(profile.line)} onMeant={meant} onBack={done} onAgain={again} colors={colors} />
       </ScrollView>
     );
   }

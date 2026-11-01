@@ -1,13 +1,15 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ScrollViewInstance } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import {
   bestFlow,
   currentStopIndex,
+  dailyTalkDoneToday,
   headerTitle,
   LESSON_KIND,
   lessonDoneToday,
@@ -43,6 +45,42 @@ import { fonts, space, useColors } from '../../theme';
 
 /** "rain", "your phone": a level 1–2 topic reads as part of the sentence. */
 const topicInline = (p: Prompt | undefined) => (p ? p.text.charAt(0).toLowerCase() + p.text.slice(1) : 'today’s topic');
+
+/** Space above the map's first row, so the row scrolled to the top is never cut by the switcher. */
+const MAP_TOP_INSET = space(1.5);
+
+type WebPermissions = { permissions?: { query: (d: { name: string }) => Promise<{ state: string }> } };
+
+/**
+ * Has the microphone been refused for good (a "no" in onboarding, or turned off in Settings)?
+ * Then stop 1 says so and offers Settings, rather than a Start that can only fail. On phones it's
+ * the speech module's permission; on web (our test harness) the browser's microphone permission,
+ * since the module's web build always says yes. Any error means "don't know": no notice.
+ */
+async function micBlocked(): Promise<boolean> {
+  if (Platform.OS === 'web') {
+    try {
+      const nav = (globalThis as { navigator?: WebPermissions }).navigator;
+      const p = await nav?.permissions?.query({ name: 'microphone' });
+      return p?.state === 'denied';
+    } catch {
+      return false;
+    }
+  }
+  try {
+    const p = await ExpoSpeechRecognitionModule.getPermissionsAsync();
+    return !p.granted && p.canAskAgain === false;
+  } catch {
+    return false;
+  }
+}
+
+/** Settings can't open on web (and may throw on some platforms): fail quietly. */
+function openSettings() {
+  try {
+    Linking.openSettings().catch(() => {});
+  } catch {}
+}
 
 export default function Home() {
   const colors = useColors();
@@ -101,9 +139,31 @@ export default function Home() {
   const active = line === chosen || lineStarted(line, sessions);
   const currentIndex = currentStopIndex(line, sessions);
   const stop: Stop | undefined = LINES[line][currentIndex];
-  const todayDone = stopDoneToday(line, sessions, now);
+  // Past the last stop, a full-minute talk on the topic of the day is today's stop.
+  const lineComplete = !stop;
+  const todayDone = stopDoneToday(line, sessions, now) || (lineComplete && dailyTalkDoneToday(sessions, minutePromptOfTheDay(now).id, now));
   const lessonDone = !!stop?.lesson && lessonDoneToday(stop.lesson, { sessions, book }, now);
   const best = bestFlow(sessions, FLOW_VERSION);
+
+  // The microphone, refused for good: checked on focus and when the app comes back (from Settings).
+  const [blocked, setBlocked] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      let live = true;
+      micBlocked().then((b) => live && setBlocked(b));
+      return () => {
+        live = false;
+      };
+    }, []),
+  );
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') micBlocked().then(setBlocked);
+    });
+    return () => sub.remove();
+  }, []);
+  // Only on stop 1 with nothing done yet: after a mic-denied skip, the first talk is still waiting.
+  const micNeeded = blocked && active && currentIndex === 0 && !todayDone;
 
   const { days, freezeUsed } = streak(sessions, now.getTime());
   const week = thisWeek(sessions, now);
@@ -121,17 +181,19 @@ export default function Home() {
     [now, profile.pro, lessonDone],
   );
 
-  // Keep the current stop in view: scroll once each time the line or the stop changes.
+  // Keep the current stop in view: scroll once each time the line or the stop changes. The map
+  // reports the top of the row before today's; scrolling to it puts that whole row at the top, the
+  // MAP_TOP_INSET below the switcher, with today's stop and its card under it. Never a cut label.
   const scroll = useRef<ScrollViewInstance>(null);
   const viewport = useRef(0);
   const scrolledFor = useRef('');
-  const onCurrentY = useCallback(
+  const onScrollAnchor = useCallback(
     (y: number) => {
       const key = `${line}:${currentIndex}`;
       if (scrolledFor.current === key || !viewport.current) return;
       const first = scrolledFor.current === '';
       scrolledFor.current = key;
-      scroll.current?.scrollTo({ y: Math.max(0, y - viewport.current * 0.55), animated: !first && !reduceMotion });
+      scroll.current?.scrollTo({ y: Math.max(0, y), animated: !first && !reduceMotion });
     },
     [line, currentIndex, reduceMotion],
   );
@@ -147,8 +209,9 @@ export default function Home() {
       lessonDone={lessonDone}
       best={best}
       pro={profile.pro}
+      micNeeded={micNeeded}
       now={now}
-      onPress={() => start(stop)}
+      onPress={micNeeded ? openSettings : () => start(stop)}
     />
   );
 
@@ -210,21 +273,22 @@ export default function Home() {
         ref={scroll}
         style={styles.mapScroll}
         onLayout={(e) => (viewport.current = e.nativeEvent.layout.height)}
-        contentContainerStyle={{ paddingBottom: space(2) }}
+        contentContainerStyle={{ paddingTop: MAP_TOP_INSET, paddingBottom: space(2) }}
       >
         {loaded && (
           <Animated.View key={line} entering={reduceMotion ? undefined : FadeIn.duration(200)}>
             <HomeMap
               line={line}
               sessions={sessions}
+              book={book}
               currentIndex={currentIndex}
               todayDone={todayDone}
               active={active}
-              dropMood={todayDone ? 'happy' : 'rest'}
+              dropPose={todayDone ? 'happy' : micNeeded ? 'up' : 'rest'}
               card={card}
               onSwitchLine={() => setShownLine(other)}
               onOpenSession={(id) => router.push({ pathname: '/tape', params: { id } })}
-              onCurrentY={onCurrentY}
+              onScrollAnchor={onScrollAnchor}
               now={now}
             />
           </Animated.View>
@@ -235,11 +299,13 @@ export default function Home() {
       <View style={[styles.bottom, { borderTopColor: colors.line }]}>
         {!active ? (
           <PrimaryButton label="Start this line" onPress={() => start(stop)} />
+        ) : micNeeded ? (
+          <PrimaryButton label="Open Settings" onPress={openSettings} />
         ) : todayDone ? (
           <>
-            <View style={styles.doneRow} accessible accessibilityLabel="Today’s stop is done. See you tomorrow.">
+            <View style={styles.doneRow} accessible accessibilityLabel={`${lineComplete ? 'Today’s talk' : 'Today’s stop'} is done. See you tomorrow.`}>
               <Ionicons name="checkmark" size={22} color={colors.good} />
-              <Text style={[styles.doneText, { color: colors.ink }]}>Today’s stop is done. See you tomorrow.</Text>
+              <Text style={[styles.doneText, { color: colors.ink }]}>{lineComplete ? 'Today’s talk' : 'Today’s stop'} is done. See you tomorrow.</Text>
             </View>
             <SecondaryButton label={stop ? 'Do the next stop now' : 'Talk again'} onPress={() => start(stop)} />
           </>
@@ -278,6 +344,7 @@ function TodayCard({
   lessonDone,
   best,
   pro,
+  micNeeded,
   now,
   onPress,
 }: {
@@ -290,6 +357,8 @@ function TodayCard({
   lessonDone: boolean;
   best: number | undefined;
   pro: boolean;
+  /** The microphone was refused for good: stop 1 says so, and a tap opens Settings. */
+  micNeeded: boolean;
   now: Date;
   onPress: () => void;
 }) {
@@ -301,26 +370,29 @@ function TodayCard({
   let proBadge = false;
 
   if (!active) {
-    // The other line, never started. Its progress never takes from yours.
+    // The other line, never started. Its progress never takes from yours. Its stop 1 is a normal
+    // full-minute talk on its own topic (lines.ts talkSeconds); only onboarding's talk is 30 s.
     eyebrow = 'STOP 1';
     kind = '';
     name = LINE_NAME[line];
     sub = `Your ${LINE_NAME[chosen]} progress stays where it is.`;
   } else if (!stop) {
-    eyebrow = todayDone ? 'TOMORROW' : 'TODAY';
+    // Past the last stop: a talk on the topic of the day, every day, counts as the day's stop.
+    eyebrow = `LINE COMPLETE · ${todayDone ? 'TOMORROW' : 'TODAY'}`;
     kind = 'Topic talk';
     name = minutePromptOfTheDay(now).text;
-    sub = 'You’ve reached the last stop so far. A new topic every day until more stops arrive.';
+    sub = todayDone ? 'Line complete. Today’s talk is done.' : 'Line complete. Keep going with today’s topic.';
   } else {
     const prompt = promptFor(stop);
     eyebrow = `${todayDone ? 'TOMORROW' : 'TODAY'} · STOP ${index + 1}`;
     kind = LESSON_KIND[stopKind(stop)];
-    const minute = index === 0 ? '30 seconds' : '1 minute';
+    // Every stop from Home is a full minute, stop 1 included.
     // A long topic (level 3) is a whole question, so it isn't folded into a sentence.
-    const talkPart = prompt && prompt.level < 3 ? `${minute} on ${topicInline(prompt)}` : `a ${index === 0 ? '30-second' : '1-minute'} topic talk`;
+    const talkPart = prompt && prompt.level < 3 ? `1 minute on ${topicInline(prompt)}` : 'a 1-minute topic talk';
     if (!stop.lesson) {
       name = prompt?.text ?? 'Today’s topic';
-      sub = index === 0 ? '30 seconds. Your first talk.' : best !== undefined ? `1 minute. Your best is ${best}.` : '1 minute. Keep talking until the time is up.';
+      if (micNeeded) sub = 'The phone needs the microphone first.';
+      else sub = best !== undefined ? `1 minute. Your best is ${best}.` : '1 minute. Keep talking until the time is up.';
     } else {
       name = lessonTitle(stop.lesson);
       const locked = !pro && lessonIsPro(stop.lesson);
@@ -337,6 +409,7 @@ function TodayCard({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${eyebrow.toLowerCase()}, ${kind ? `${kind}: ${name}` : `Start ${name} here`}. ${sub}`}
+      accessibilityHint={micNeeded ? 'Opens Settings' : undefined}
       style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.85 : 1 }]}
     >
       <View style={styles.eyebrowRow}>
@@ -352,7 +425,16 @@ function TodayCard({
           Start <Text style={styles.cardName}>{name}</Text> here.
         </Text>
       )}
-      <Text style={[styles.cardSub, { color: colors.muted }]}>{sub}</Text>
+      {micNeeded ? (
+        // Its action is the pinned Open Settings button below (one cobalt thing per screen); a tap
+        // on the card opens Settings too.
+        <View style={styles.micRow}>
+          <Ionicons name="mic-off-outline" size={18} color={colors.ink} />
+          <Text style={[styles.cardSub, styles.micText, { color: colors.ink }]}>{sub}</Text>
+        </View>
+      ) : (
+        <Text style={[styles.cardSub, { color: colors.muted }]}>{sub}</Text>
+      )}
     </Pressable>
   );
 }
@@ -385,4 +467,6 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 19, lineHeight: 25, fontWeight: '600' },
   cardName: { fontFamily: fonts.readingBold },
   cardSub: { fontSize: 15, lineHeight: 20 },
+  micRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  micText: { flex: 1, fontWeight: '600' },
 });

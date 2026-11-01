@@ -4,10 +4,11 @@ import Svg, { Path, Rect } from 'react-native-svg';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { aheadLabel, LESSON_KIND, lessonTitle, LINE_NAME, LineId, LINES, promptFor, sessionForStop, Stop, stopKind } from '../content/lines';
+import { aheadLabel, doneLabel, LESSON_KIND, lessonDoneOn, LINE_NAME, LineId, LINES, sessionForStop, stopKind } from '../content/lines';
+import type { WordBook } from '../engine/vocab';
 import type { SavedSession } from '../store/sessions';
 import { space, useColors } from '../theme';
-import { Drop, DropMood } from './Drop';
+import { Drop, DropPose } from './Drop';
 
 // The home map (docs/briefs/remodel-screens.md §2): one train line drawn down the screen with
 // react-native-svg. Rows are laid out by React Native (so long titles wrap and push the line
@@ -46,23 +47,29 @@ type RowBox = { y: number; h: number };
 export type HomeMapProps = {
   line: LineId;
   sessions: SavedSession[];
+  /** The word book: whether a done stop's word-pack lesson was drilled that day (its label). */
+  book: WordBook;
   /** First stop not done; LINES[line].length when the line is finished (the end sign). */
   currentIndex: number;
   todayDone: boolean;
   /** Whether this line shows progress colour and the Drop (your line, or one you've started). */
   active: boolean;
-  dropMood: DropMood;
+  dropPose: DropPose;
   /** What sits beside the current stop: the today card. */
   card: ReactNode;
   onSwitchLine: () => void;
   onOpenSession: (id: string) => void;
-  /** The current stop's y inside the map, once laid out, for scrolling it into view. */
-  onCurrentY?: (y: number) => void;
+  /**
+   * Where to scroll so today's stop is in view with nothing cut: the top of the row before it (the
+   * station row for stop 1), inside the map, once both are laid out. A whole row edge, never the
+   * middle of a label, so a done stop's title never sits half under the line switcher.
+   */
+  onScrollAnchor?: (y: number) => void;
   now: Date;
 };
 
 export function HomeMap(props: HomeMapProps) {
-  const { line, sessions, currentIndex, todayDone, active, dropMood, card, onSwitchLine, onOpenSession, onCurrentY, now } = props;
+  const { line, sessions, book, currentIndex, todayDone, active, dropPose, card, onSwitchLine, onOpenSession, onScrollAnchor, now } = props;
   const colors = useColors();
   const reduceMotion = useReducedMotion();
   const stops = LINES[line];
@@ -103,10 +110,12 @@ export function HomeMap(props: HomeMapProps) {
     [width, padsOf],
   );
 
-  const current = centre(currentIndex, rows);
+  // The row before today's (STATION_ROW is -1, so stop 1's is the station). Reported once today's
+  // row is laid out too, so the anchor doesn't jump while rows are still measuring.
+  const anchorY = rows[currentIndex] ? rows[currentIndex - 1]?.y : undefined;
   useEffect(() => {
-    if (current && onCurrentY) onCurrentY(current.y);
-  }, [current?.y, onCurrentY]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (anchorY !== undefined && onScrollAnchor) onScrollAnchor(anchorY);
+  }, [anchorY, onScrollAnchor]);
 
   // ---- The Drop: stands on the current stop; hops there from the last one after a finished stop.
   const move = !reduceMotion;
@@ -189,14 +198,6 @@ export function HomeMap(props: HomeMapProps) {
   const BAND_INSET_TOP = CURRENT_TOP - space(3);
   const mapHeight = Object.values(rows).reduce((m, r) => Math.max(m, r.y + r.h), 0);
 
-  const doneLabel = (stop: Stop, i: number): [string, string] => {
-    const s = sessionForStop(stop.id, sessions);
-    const topic = stop.lesson ? lessonTitle(stop.lesson) : promptFor(stop)?.text ?? '';
-    const kind = i === 0 ? 'Your first talk' : LESSON_KIND[stopKind(stop)];
-    const flow = typeof s?.flow === 'number' ? `Flow ${s.flow}` : 'Done';
-    return [`${kind} · ${topic.replace(/[.?]$/, '')}`, i === 0 && s?.flow !== undefined ? `${flow} · your starting point` : flow];
-  };
-
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ minHeight: mapHeight }}>
       {/* The track, behind everything. Ahead is the soft tint; done is the line colour. */}
@@ -252,8 +253,10 @@ export function HomeMap(props: HomeMapProps) {
         }
         const isDone = i < currentIndex || !!sessionForStop(stop.id, sessions);
         if (isDone && active) {
-          const [title, sub] = doneLabel(stop, i);
           const s = sessionForStop(stop.id, sessions);
+          // What was really done: the topic talked about, and the lesson only if it was done that day.
+          const lessonDone = !!stop.lesson && !!s && lessonDoneOn(stop.lesson, { sessions, book }, s.at);
+          const { title, sub } = doneLabel(stop, s, lessonDone);
           return (
             <Pressable
               key={stop.id}
@@ -323,7 +326,7 @@ export function HomeMap(props: HomeMapProps) {
 
       {active && (
         <Animated.View pointerEvents="none" style={[styles.drop, dropStyle]}>
-          <Drop height={DROP_H} mood={dropMood} />
+          <Drop height={DROP_H} pose={dropPose} />
         </Animated.View>
       )}
     </View>
