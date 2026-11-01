@@ -1,10 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import type { PaceSegment, Steadiness } from '../engine/steadiness';
 import { UNSTEADY_BELOW } from '../engine/steadiness';
 import { Colors, space } from '../theme';
 
 const H = 72;
+/** Gap between bars starting to grow (RESULTS-ANIMATIONS: ~80–120 ms), and how long each grows. */
+const STAGGER_MS = 90;
+const GROW_MS = 360;
+
+/**
+ * One bar. Grows from 0 to its height once, after `delay`, height only (no bounce, no colour flash).
+ * Under Reduce Motion it is drawn at full height at once.
+ */
+function Bar({ height, delay, color, opacity, still }: { height: number; delay: number; color: string; opacity: number; still: boolean }) {
+  const h = useSharedValue(still ? height : 0);
+  useEffect(() => {
+    h.set(still ? height : withDelay(delay, withTiming(height, { duration: GROW_MS, easing: Easing.out(Easing.cubic) })));
+  }, [h, height, delay, still]);
+  const style = useAnimatedStyle(() => ({ height: h.value }));
+  return <Animated.View style={[styles.bar, { backgroundColor: color, opacity }, style]} />;
+}
 
 /**
  * Pace of each stretch of the passage as thin bars, with the suggested range shaded.
@@ -25,7 +42,17 @@ export function PaceStrip({
   snippet: (s: PaceSegment) => string;
   colors: Colors;
 }) {
+  const still = useReducedMotion();
   const unsteady = steady.score < UNSTEADY_BELOW;
+  // Grow order: out-of-range bars first, furthest out first, so the eye lands on what's worth
+  // fixing; then the in-range ones left to right. Maps a bar's index to its turn.
+  const turn = useMemo(() => {
+    const off = (w: number) => (w > band[1] ? w - band[1] : w < band[0] ? band[0] - w : 0);
+    const order = segments.map((seg, i) => i).sort((a, b) => off(segments[b].wpm) - off(segments[a].wpm) || a - b);
+    const out: number[] = [];
+    order.forEach((i, k) => (out[i] = k));
+    return out;
+  }, [segments, band]);
   // Start on the fastest stretch when the pace drifted: that's usually the rush to fix.
   const [picked, setPicked] = useState<number | null>(unsteady ? steady.fastest : null);
   const lo = Math.min(band[0], steady.low) - 20;
@@ -68,15 +95,12 @@ export function PaceStrip({
               accessibilityLabel={`Stretch ${i + 1} of ${segments.length}: ${s.wpm} words per minute, ${where(s.wpm)}`}
               accessibilityState={{ selected: on }}
             >
-              <View
-                style={[
-                  styles.bar,
-                  {
-                    height: Math.max(4, y(s.wpm)),
-                    backgroundColor: inRange ? colors.good : colors.ember,
-                    opacity: picked === null || on ? 1 : 0.45,
-                  },
-                ]}
+              <Bar
+                height={Math.max(4, y(s.wpm))}
+                delay={turn[i] * STAGGER_MS}
+                color={inRange ? colors.good : colors.ember}
+                opacity={picked === null || on ? 1 : 0.45}
+                still={still}
               />
             </Pressable>
           );

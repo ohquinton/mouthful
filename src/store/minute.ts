@@ -2,7 +2,8 @@
 // on the Tape. Pure functions (no React, no storage), tested in test/minute.test.ts.
 // The maths itself is engine/minute.ts; this file only feeds it and stores what it says.
 
-import { FLOW_SLOTS, FLOW_VERSION, flowScore, MIN_RATE_SECONDS, minuteLine, type FlowSlots, type MinuteSummary, type MinuteTrend } from '../engine/minute';
+import { FLOW_SLOTS, FLOW_VERSION, flowScore, MIN_RATE_SECONDS, MINUTE_SECONDS, minuteLine, minuteTrend, type FlowSlots, type MinuteSummary, type MinuteTrend } from '../engine/minute';
+import { pooledVariety, type VocabularyVariety } from '../engine/wording';
 import type { HabitWord } from '../engine/habits';
 import type { SavedSession } from './sessions';
 
@@ -72,10 +73,92 @@ export function gapAfterBreak(heardTimes: readonly number[], breaks: readonly Mi
 export type MinuteRecord = NonNullable<SavedSession['minute']> & {
   /** Seconds from Start to the first heard word, one decimal (engine timeToFirstWordSeconds). */
   timeToFirstWordSeconds?: number;
+  /**
+   * How long the talk was meant to be: 30 (onboarding's first talk) or 60. Unset on older minutes,
+   * which were all 60. A 30 also has its own flowVersion (versionFor), so it never joins a 60 s trend.
+   */
+  limitSeconds?: TalkLength;
+  /**
+   * Content words leaned on (engine wording.ts repeatedWords), most used first: the word and its
+   * count only. Stays on the phone and is never sent anywhere (minuteCompleteProps never reads it).
+   */
+  repeated?: { word: string; count: number }[];
+  /** This talk's variety record, for pooledVariety only. Never shown on its own (too noisy per talk). */
+  variety?: Pick<VocabularyVariety, 'mattr' | 'windows' | 'words'>;
 };
 
-/** The `minute` block of a saved session, from minuteSummary(). */
-export function minuteRecord(m: MinuteSummary): MinuteRecord {
+// ---------------------------------------------------------------------------------------------
+// Talk length: a full minute, or onboarding's 30-second first talk
+
+export type TalkLength = 30 | 60;
+
+/** The `seconds` route param: '30' gives a 30-second talk, anything else (or nothing) a minute. */
+export function talkLength(param: string | string[] | undefined): TalkLength {
+  return param === '30' ? 30 : 60;
+}
+
+/**
+ * The Flow version a talk of this length saves. A 30-second talk gets its own ("2-k40p35w25-s30"),
+ * so pastMinutes, minuteTrend and anything else that compares by version never mixes it with full
+ * minutes. Still a short code, so it passes analytics' sanitise as `flow_version`.
+ */
+export function versionFor(limit: TalkLength, version: string = FLOW_VERSION): string {
+  return limit === 30 ? `${version}-s30` : version;
+}
+
+/** A 30-second talk (onboarding's first). Leave these out of 60-second trends and "your usual". */
+export function isShortTalk(s: Pick<SavedSession, 'minute' | 'flowVersion'>): boolean {
+  return (s.minute as MinuteRecord | undefined)?.limitSeconds === 30 || (s.flowVersion ?? '').endsWith('-s30');
+}
+
+/** Stopping before this share of the talk is "stopped early" (45 s of a minute, as engine/minute.ts). */
+const STOPPED_SHARE = 0.75;
+
+/** Did the talk stop before 45 s of a minute (or 22.5 s of a 30-second talk)? Gentle, never a failure. */
+export function stoppedEarly(s: Pick<SavedSession, 'minute'>): boolean {
+  const m = s.minute as MinuteRecord | undefined;
+  if (!m) return false;
+  return m.talkSeconds < STOPPED_SHARE * (m.limitSeconds ?? 60);
+}
+
+const KEPT_GOING_LINE = 'You kept going the whole minute.';
+
+/**
+ * The engine's coaching line, for a talk of either length. engine/minute.ts measures everything out
+ * of a minute (MINUTE_SECONDS), so for a 30-second talk the time is put on the minute's scale to
+ * pick the issue, and "the whole minute" says "the whole 30 seconds". A talk that stopped early keeps
+ * its real seconds ("You stopped at 18 s"): under the stop line both scales pick the same issue.
+ */
+function lineFor(stats: Parameters<typeof minuteLine>[0], limit: TalkLength, slots: FlowSlots): string {
+  if (limit === MINUTE_SECONDS) return minuteLine(stats, slots);
+  const scaled = stats.talkSeconds * (MINUTE_SECONDS / limit);
+  const line = minuteLine(scaled < STOPPED_SHARE * MINUTE_SECONDS ? stats : { ...stats, talkSeconds: scaled }, slots);
+  return line === KEPT_GOING_LINE ? `You kept going the whole ${limit} seconds.` : line;
+}
+
+/**
+ * A summary for a talk of `limit` seconds. A minute is returned as is. For 30 seconds, kept going is
+ * scored out of 30 (the engine's slot is out of 60, so it is doubled; the engine caps it), the
+ * version is versionFor(30), and the line is lineFor's. Every other number is the engine's.
+ * Interim until speech-engine makes the talk's length an engine parameter (remodel-screens §6).
+ */
+export function forLength(m: MinuteSummary, limit: TalkLength, slots: FlowSlots = FLOW_SLOTS): MinuteSummary {
+  if (limit === MINUTE_SECONDS) return m;
+  const scored = { ...m.input, keptGoingSeconds: m.input.keptGoingSeconds * (MINUTE_SECONDS / limit) };
+  return {
+    ...m,
+    flow: flowScore(scored, slots),
+    flowVersion: versionFor(limit, m.flowVersion),
+    line: lineFor(
+      { talkSeconds: m.talkSeconds, longPauses: m.longPauses, wpm: m.wpm, habitFillersPerMin: m.input.habitFillersPerMin, timeToFirstWordSeconds: m.timeToFirstWordSeconds },
+      limit,
+      slots,
+    ),
+  };
+}
+
+/** The `minute` block of a saved session, from minuteSummary() (or forLength()). */
+export function minuteRecord(m: MinuteSummary, limit: TalkLength = 60): MinuteRecord {
   return {
     longPauses: m.longPauses,
     longestPauseSeconds: m.longestPauseSeconds,
@@ -89,6 +172,10 @@ export function minuteRecord(m: MinuteSummary): MinuteRecord {
     habitFillers: m.habitResults.filter((r) => r.label === 'filler').map((r) => ({ index: r.index, word: r.word })),
     habitUnsure: m.habits.unsure,
     input: { ...m.input },
+    limitSeconds: limit,
+    // Word and count only (not every form heard): enough for the tile and the finding.
+    ...(m.repeated && { repeated: m.repeated.map((r) => ({ word: r.word, count: r.count })) }),
+    ...(m.variety && { variety: { mattr: m.variety.mattr, windows: m.variety.windows, words: m.variety.words } }),
   };
 }
 
@@ -127,12 +214,58 @@ export function overruleFiller(s: SavedSession, index: number, slots: FlowSlots 
   return { ...next, flow: flowScore(input, slots), minute: { ...s.minute, input } };
 }
 
-/** The coaching line for a saved minute (minuteLine from its stored numbers). */
+/** The coaching line for a saved minute (minuteLine from its stored numbers, for its length). */
 export function savedMinuteLine(s: SavedSession, slots: FlowSlots = FLOW_SLOTS): string {
-  const m = s.minute;
+  const m = s.minute as MinuteRecord | undefined;
   if (!m) return '';
   const top = fillerChips(s)[0]?.word;
-  return minuteLine({ talkSeconds: m.talkSeconds, longPauses: m.longPauses, wpm: m.wpm, habitFillersPerMin: m.input.habitFillersPerMin, topHabit: top }, slots);
+  return lineFor(
+    { talkSeconds: m.talkSeconds, longPauses: m.longPauses, wpm: m.wpm, habitFillersPerMin: m.input.habitFillersPerMin, topHabit: top, timeToFirstWordSeconds: m.timeToFirstWordSeconds },
+    m.limitSeconds ?? 60,
+    slots,
+  );
+}
+
+/** A content word said this often in one talk earns the finding, if nothing else does (remodel-screens §4). */
+export const REPEATED_FINDING_AT = 6;
+
+/** The saved talk's most used word, if the engine flagged one (4+ uses). */
+export function topRepeated(s: Pick<SavedSession, 'minute'>): { word: string; count: number } | undefined {
+  return (s.minute as MinuteRecord | undefined)?.repeated?.[0];
+}
+
+/**
+ * The one most useful finding on the results: the engine's coaching line (stopped early, long
+ * pauses, too fast, a slow start) and, only when none of those fired, a word said 6+ times:
+ * "You said “really” 9 times. Tomorrow, try a different word, or leave it out." Never a list.
+ */
+export function mainFinding(s: SavedSession, slots: FlowSlots = FLOW_SLOTS): string {
+  const line = savedMinuteLine(s, slots);
+  const kept = line === KEPT_GOING_LINE || /^You kept going the whole \d+ seconds\.$/.test(line);
+  const top = topRepeated(s);
+  if (kept && top && top.count >= REPEATED_FINDING_AT) {
+    return `You said “${top.word}” ${top.count} times. Tomorrow, try a different word, or leave it out.`;
+  }
+  return line;
+}
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Vocabulary variety for the 7 days up to `at`: pooledVariety over the full-minute talks that kept
+ * a record. Undefined until there are 3+ such talks and 250+ words: no number rather than a noisy
+ * one. Never per talk (DECISIONS 2026-11-01).
+ */
+export function weeklyVariety(sessions: readonly SavedSession[], at: number): number | undefined {
+  const records = sessions
+    .filter((x) => x.kind === 'minute' && !isShortTalk(x) && x.at <= at && at - x.at < WEEK_MS)
+    .map((x) => (x.minute as MinuteRecord | undefined)?.variety);
+  return pooledVariety(records)?.per50;
+}
+
+/** "Different words this week: about 41 in every 50". */
+export function varietyText(per50: number): string {
+  return `Different words this week: about ${per50} in every 50`;
 }
 
 /** A saved minute's time to first word, or undefined for a minute saved before it was kept. */
@@ -181,9 +314,60 @@ export function minuteCompleteProps(m: MinuteSummary, prompt: { id: string; leve
   };
 }
 
-/** Saved minutes before `index` with this Flow version: what minuteTrend compares against. */
+/**
+ * Saved minutes before `index` with this Flow version: what minuteTrend compares against. A 30-second
+ * talk has its own version (versionFor), and is also left out of a full minute's version explicitly.
+ */
 export function pastMinutes(sessions: readonly SavedSession[], index: number, version: string): SavedSession[] {
-  return sessions.slice(0, Math.max(0, index)).filter((x) => x.kind === 'minute' && x.flowVersion === version && typeof x.flow === 'number');
+  const short = version.endsWith('-s30');
+  return sessions
+    .slice(0, Math.max(0, index))
+    .filter((x) => x.kind === 'minute' && x.flowVersion === version && typeof x.flow === 'number' && isShortTalk(x) === short);
+}
+
+/** "Your usual" for a saved minute: its own version's earlier talks only, plus whether it's a best. */
+export function usualFor(s: SavedSession, all: readonly SavedSession[]): { trend: MinuteTrend | null; past: number; best: boolean } {
+  const version = s.flowVersion ?? '';
+  const past = pastMinutes(all, all.findIndex((x) => x.id === s.id), version);
+  const rows = past.map((x) => ({ flow: x.flow, flowVersion: x.flowVersion, timeToFirstWordSeconds: firstWordSeconds(x) }));
+  const trend = minuteTrend(rows, version, s.flow, firstWordSeconds(s));
+  // A best only means something once there's a usual (3+ talks), and only when it beats every one.
+  const best = !!trend && past.every((x) => (x.flow ?? 0) < (s.flow ?? 0));
+  return { trend, past: past.length, best };
+}
+
+/**
+ * The line under the Flow number. Up: "↑ 6 on your usual 72" (good colour). A best: "↑ Your best so
+ * far". Stopped early, down or about the same: "Your usual is 72", quiet, never a down arrow. Under 3
+ * earlier talks: how many more until there's a usual.
+ */
+export function usualText(u: { trend: MinuteTrend | null; past: number; best: boolean }, early: boolean): { text: string; good: boolean } {
+  const t = u.trend;
+  if (!t || t.delta === undefined) {
+    const more = Math.max(1, 3 - u.past);
+    return { text: `${more} more ${more === 1 ? 'talk' : 'talks'} and you’ll see your usual.`, good: false };
+  }
+  const usual = Math.round(t.median);
+  if (!early && t.direction === 'up') {
+    return u.best ? { text: '↑ Your best so far', good: true } : { text: `↑ ${Math.round(t.delta)} on your usual ${usual}`, good: true };
+  }
+  return { text: `Your usual is ${usual}`, good: false };
+}
+
+/**
+ * The stop's number for the results strip, from the end of its id ("sharp-6" → 6), until
+ * content/lines.ts can say. Undefined when the talk wasn't a stop or the id ends in no number.
+ */
+export function stopNumber(stopId: string | undefined): number | undefined {
+  const n = stopId?.match(/(\d+)$/)?.[1];
+  return n ? Number(n) : undefined;
+}
+
+/** "Stop 6 done" / "Stop 7 tomorrow: beat 78". Stopped early: no "beat" (the stop still counts). */
+export function stripText(stop: number | undefined, flow: number, early: boolean): { done: string; next: string } {
+  const beat = early ? '' : `: beat ${flow}`;
+  if (stop === undefined) return { done: 'Today’s talk done', next: early ? 'Talk again tomorrow' : `Tomorrow${beat}` };
+  return { done: `Stop ${stop} done`, next: `Stop ${stop + 1} tomorrow${beat}` };
 }
 
 /** "1 One Minute talk", "3 One Minute talks": the mode's name, so "minute" is never read as 60 seconds. */

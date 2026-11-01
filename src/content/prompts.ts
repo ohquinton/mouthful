@@ -6,36 +6,47 @@ import { localDay } from './passages';
 // The ids are what analytics sees (`which: 'p07'`), never the text, so never reuse or renumber one.
 
 export type PromptLevel = 1 | 2 | 3;
-export type Prompt = { id: string; level: PromptLevel; text: string };
+export type Prompt = {
+  id: string;
+  level: PromptLevel;
+  text: string;
+  /**
+   * Synonyms of the topic (bike for "A bicycle"). Passed to minuteSummary as `related`, so talking
+   * about the topic is never flagged as a repeated word (engine/wording.ts promptFamily).
+   */
+  related?: readonly string[];
+  /** "If you get stuck" starter ideas, three short phrases. Shown on the ready screen when present. */
+  ideas?: readonly string[];
+};
 
 /** What each level is, for the eyebrow above the prompt. */
 export const LEVEL_NAME: Record<PromptLevel, string> = { 1: 'Everyday thing', 2: 'An idea', 3: 'A topic' };
 
 export const MINUTE_PROMPTS: readonly Prompt[] = [
-  { id: 'p01', level: 1, text: 'Coffee' },
+  { id: 'p01', level: 1, text: 'Coffee', ideas: ['How you take it', 'A café you like', 'Why so many people drink it'] },
   { id: 'p02', level: 1, text: 'Rain' },
-  { id: 'p03', level: 1, text: 'Your phone' },
+  { id: 'p03', level: 1, text: 'Your phone', related: ['mobile', 'smartphone', 'cellphone'] },
   { id: 'p04', level: 1, text: 'Bread' },
-  { id: 'p05', level: 1, text: 'The bus' },
+  { id: 'p05', level: 1, text: 'The bus', related: ['coach'] },
   { id: 'p06', level: 1, text: 'Shoes' },
   { id: 'p07', level: 1, text: 'A window' },
   { id: 'p08', level: 1, text: 'Your kitchen' },
   { id: 'p09', level: 1, text: 'A clock' },
-  { id: 'p10', level: 1, text: 'A bicycle' },
-  { id: 'p11', level: 1, text: 'Keys' },
+  { id: 'p10', level: 1, text: 'A bicycle', related: ['bike', 'cycle'] },
+  { id: 'p11', level: 1, text: 'Keys', related: ['keyring'] },
   { id: 'p12', level: 1, text: 'A river' },
 
   { id: 'p13', level: 2, text: 'Trust' },
   { id: 'p14', level: 2, text: 'Time' },
   { id: 'p15', level: 2, text: 'Risk' },
   { id: 'p16', level: 2, text: 'Luck' },
-  { id: 'p17', level: 2, text: 'Patience' },
+  { id: 'p17', level: 2, text: 'Patience', related: ['wait'] },
   { id: 'p18', level: 2, text: 'Change' },
   { id: 'p19', level: 2, text: 'Home' },
   { id: 'p20', level: 2, text: 'Success' },
-  { id: 'p21', level: 2, text: 'Kindness' },
-  { id: 'p22', level: 2, text: 'Freedom' },
-  { id: 'p23', level: 2, text: 'Habits' },
+  { id: 'p21', level: 2, text: 'Kindness', related: ['nice', 'kind-hearted'] },
+  { id: 'p22', level: 2, text: 'Freedom', related: ['liberty'] },
+  { id: 'p23', level: 2, text: 'Habits', related: ['routine'] },
   { id: 'p24', level: 2, text: 'Silence' },
 
   // Level 3 is Free talk's original 12, in their original order (promptOfTheDay still uses them).
@@ -53,7 +64,12 @@ export const MINUTE_PROMPTS: readonly Prompt[] = [
   { id: 'p36', level: 3, text: 'What advice would you give yourself five years ago?' },
 ];
 
-/** Free talk's prompts (tester mode off): level 3's text. */
+/** A prompt by id (a route param or a saved session's promptId), or undefined for an unknown id. */
+export function promptById(id: string | undefined): Prompt | undefined {
+  return id ? MINUTE_PROMPTS.find((p) => p.id === id) : undefined;
+}
+
+/** The old Free talk prompts: level 3's text. Free talk is gone (topic talk replaced it); kept for promptOfTheDay's tests. */
 export const PROMPTS: readonly string[] = MINUTE_PROMPTS.filter((p) => p.level === 3).map((p) => p.text);
 
 /**
@@ -77,11 +93,21 @@ export function minutePromptForDay(day: number, offset = 0): Prompt {
   return ROTATION[(((day + offset) % n) + n) % n];
 }
 
+/**
+ * The prompt `steps` places after `p` in the rotation: "Different topic" when a stop or onboarding
+ * chose the prompt rather than the day. 0 steps gives `p` itself.
+ */
+export function promptAfter(p: Prompt, steps: number): Prompt {
+  const n = ROTATION.length;
+  const at = ROTATION.findIndex((x) => x.id === p.id);
+  return ROTATION[(((at + steps) % n) + n) % n];
+}
+
 export function minutePromptOfTheDay(date = new Date(), offset = 0): Prompt {
   return minutePromptForDay(localDay(date), offset);
 }
 
-/** Free talk's prompt (tester mode off). Unchanged from before One Minute. */
+/** The old Free talk prompt of the day. Nothing in the app uses it since topic talk; locale.test.ts still checks its day maths. */
 export function promptOfTheDay(date = new Date(), offset = 0): string {
   return PROMPTS[(localDay(date) + offset) % PROMPTS.length];
 }
