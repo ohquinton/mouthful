@@ -1,34 +1,74 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { estimateSeconds, formatDuration as duration, PASSAGES, passageOfTheDay } from '../../content/passages';
-import { MOMENTS } from '../../content/moments';
-import { minutePromptOfTheDay } from '../../content/prompts';
+import {
+  bestFlow,
+  currentStopIndex,
+  headerTitle,
+  LESSON_KIND,
+  lessonDoneToday,
+  lessonIsPro,
+  lessonTitle,
+  LINE_NAME,
+  LineId,
+  lineOf,
+  LINES,
+  lineStarted,
+  promptFor,
+  startRoute,
+  Stop,
+  stopDoneToday,
+  stopKind,
+  withFirstTalk,
+} from '../../content/lines';
+import { minutePromptOfTheDay, Prompt } from '../../content/prompts';
+import { FLOW_VERSION } from '../../engine/minute';
+import type { WordBook } from '../../engine/vocab';
 import { loadSessions, SavedSession, streak, thisWeek } from '../../store/sessions';
+import { loadBook } from '../../store/words';
 import { useProfile } from '../../store/profile';
-import { ahaPaywallRoute, ahaPending, claimAhaPaywall, requirePro } from '../../pro';
+import { ahaPaywallRoute, ahaPending, claimAhaPaywall } from '../../pro';
 import { PlanCard } from '../../components/PlanCard';
-import { streakPillShown } from '../../onboarding';
-import { ProBadge } from '../../components/ui';
+import { HomeMap } from '../../components/HomeMap';
+import { PrimaryButton, ProBadge, SecondaryButton } from '../../components/ui';
 import { fonts, space, useColors } from '../../theme';
 
-function greeting(d = new Date()) {
-  const h = d.getHours();
-  return h < 12 ? 'Morning' : h < 18 ? 'Afternoon' : 'Evening';
-}
+// Home: the two-line train map (docs/briefs/remodel-screens.md §2, DECISIONS 2026-11-01).
+// "What do I do today?" is answered by one place on a line and one button. Progress is worked out
+// from saved sessions (a stop is done when a session carries its stopId), so nothing new is stored.
 
-export default function Today() {
+/** "rain", "your phone": a level 1–2 topic reads as part of the sentence. */
+const topicInline = (p: Prompt | undefined) => (p ? p.text.charAt(0).toLowerCase() + p.text.slice(1) : 'today’s topic');
+
+export default function Home() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
   const { profile, ready, update } = useProfile();
-  const [sessions, setSessions] = useState<SavedSession[]>([]);
-  const today = passageOfTheDay();
+  const [saved, setSaved] = useState<SavedSession[]>([]);
+  const [book, setBook] = useState<WordBook>({});
+  const [loaded, setLoaded] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+  // Which line is on screen. Starts on the one chosen in onboarding; the other is one tap away.
+  const [shownLine, setShownLine] = useState<LineId | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      loadSessions().then(setSessions);
+      let live = true;
+      Promise.all([loadSessions(), loadBook()]).then(([s, b]) => {
+        if (!live) return;
+        setSaved(s);
+        setBook(b);
+        setNow(new Date()); // the day may have changed while the app sat in the background
+        setLoaded(true);
+      });
+      return () => {
+        live = false;
+      };
     }, []),
   );
 
@@ -52,204 +92,297 @@ export default function Today() {
     }, [ready, pro, ahaPaywallShown, moment, update]),
   );
 
-  const { days, freezeUsed } = streak(sessions);
-  const week = thisWeek(sessions);
-  const doneToday = sessions.some((s) => s.passageId === today.id && new Date(s.at).toDateString() === new Date().toDateString());
-  const last = sessions[sessions.length - 1];
-  // Cold read uses a passage the reader hasn't opened yet.
-  const readIds = new Set(sessions.map((s) => s.passageId));
-  const unseen = PASSAGES.find((p) => !readIds.has(p.id) && p.id !== today.id) ?? PASSAGES[(PASSAGES.indexOf(today) + 1) % PASSAGES.length];
+  const chosen = lineOf(profile.line);
+  // Onboarding's first talk is stop 1 of the line you picked (it's saved without a stopId).
+  const sessions = useMemo(() => withFirstTalk(saved, chosen), [saved, chosen]);
+  const line = shownLine ?? chosen;
+  const other: LineId = line === 'sharp' ? 'clear' : 'sharp';
+  // The Drop and the progress colour live on your line, and on the other one once you've started it.
+  const active = line === chosen || lineStarted(line, sessions);
+  const currentIndex = currentStopIndex(line, sessions);
+  const stop: Stop | undefined = LINES[line][currentIndex];
+  const todayDone = stopDoneToday(line, sessions, now);
+  const lessonDone = !!stop?.lesson && lessonDoneToday(stop.lesson, { sessions, book }, now);
+  const best = bestFlow(sessions, FLOW_VERSION);
 
-  // Tester mode: Free talk is One Minute (beta first, then everyone), showing the day's word.
-  const minute = profile.testerMode === true;
-  const tiles = [
-    {
-      key: 'vocabulary',
-      title: 'Vocabulary',
-      sub: 'Find precise words. Make them your own.',
-      icon: 'book-outline' as const,
-      badge: false,
-      onPress: () => router.push('/(tabs)/library'),
+  const { days, freezeUsed } = streak(sessions, now.getTime());
+  const week = thisWeek(sessions, now);
+  const weekDone = week.filter((d) => d.done).length;
+
+  const start = useCallback(
+    (s: Stop | undefined) => {
+      if (!s) {
+        // Past the last stop: topic talks keep coming daily, so the loop never stops.
+        router.push({ pathname: '/talk', params: { prompt: minutePromptOfTheDay(now).id, seconds: '60', from: 'home' } });
+        return;
+      }
+      router.push(startRoute(s, { pro: profile.pro, lessonDone }));
     },
-    {
-      key: 'scripts',
-      title: 'Your scripts',
-      sub: 'Paste it, rehearse it',
-      icon: 'document-text-outline' as const,
-      badge: !profile.pro,
-      // Free readers can open the list: their first script is free. "Paste a script" walls the second.
-      onPress: () => router.push('/scripts'),
+    [now, profile.pro, lessonDone],
+  );
+
+  // Keep the current stop in view: scroll once each time the line or the stop changes.
+  const scroll = useRef<ScrollViewInstance>(null);
+  const viewport = useRef(0);
+  const scrolledFor = useRef('');
+  const onCurrentY = useCallback(
+    (y: number) => {
+      const key = `${line}:${currentIndex}`;
+      if (scrolledFor.current === key || !viewport.current) return;
+      const first = scrolledFor.current === '';
+      scrolledFor.current = key;
+      scroll.current?.scrollTo({ y: Math.max(0, y - viewport.current * 0.55), animated: !first && !reduceMotion });
     },
-    {
-      key: 'talk',
-      title: minute ? 'One Minute' : 'Free talk',
-      sub: minute ? `Today: ${minutePromptOfTheDay().text}` : '60 seconds, no script',
-      icon: 'chatbubble-ellipses-outline' as const,
-      badge: false,
-      onPress: () => router.push('/talk'),
-    },
-    {
-      key: 'cold',
-      title: 'Cold read',
-      sub: 'Unseen passage',
-      icon: 'eye-off-outline' as const,
-      // Pro only, like Scripts. No streak lock: being locked twice read as bait.
-      badge: !profile.pro,
-      onPress: () => requirePro(profile, 'cold') && router.push({ pathname: '/session/[id]', params: { id: unseen.id, cold: '1' } }),
-    },
-  ];
+    [line, currentIndex, reduceMotion],
+  );
+
+  const card = (
+    <TodayCard
+      stop={stop}
+      index={currentIndex}
+      active={active}
+      line={line}
+      chosen={chosen}
+      todayDone={todayDone}
+      lessonDone={lessonDone}
+      best={best}
+      pro={profile.pro}
+      now={now}
+      onPress={() => start(stop)}
+    />
+  );
 
   return (
-    <ScrollView
-      style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={[styles.wrap, { paddingTop: insets.top + space(2), paddingBottom: space(4) }]}
-    >
-      <View style={styles.header}>
-        <View>
+    <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + space(1.5) }]}>
+      {/* Date, this week, and the streak in words. No emoji, no amber (Taste rule). */}
+      <View style={styles.head}>
+        <View style={styles.headTop}>
           <Text style={[styles.date, { color: colors.muted }]}>
-            {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+            {now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
           </Text>
-          <Text style={[styles.hello, { color: colors.ink }]}>{greeting()}.</Text>
-        </View>
-        {/* Hidden until day 2: a streak of 1 on the first day says nothing. */}
-        {streakPillShown(days) && (
-          <View style={[styles.streak, { borderColor: colors.line, backgroundColor: colors.surface }]}>
-            <Text style={[styles.streakText, { color: colors.ember }]}>🔥 {days}</Text>
-          </View>
-        )}
-      </View>
-      {freezeUsed && <Text style={[styles.freeze, { color: colors.muted }]}>Streak freeze used this week. You’re still on {days}.</Text>}
-
-      {/* What you're preparing for comes first */}
-      {profile.moment ? (
-        <PlanCard sessions={sessions} />
-      ) : (
-        <View style={[styles.prep, { backgroundColor: colors.card }]}>
-          <Text style={[styles.prepTitle, { color: colors.cardInk }]}>What are you preparing for?</Text>
-          <Text style={[styles.prepSub, { color: colors.cardMuted }]}>Get a five-step plan for the moment that matters.</Text>
-          <View style={styles.prepGrid}>
-            {MOMENTS.map((m) => (
-              <Pressable
-                key={m.id}
-                onPress={() => router.push({ pathname: '/moment', params: { id: m.id } })}
-                style={({ pressed }) => [styles.prepTile, { backgroundColor: 'rgba(255,255,255,0.07)', opacity: pressed ? 0.75 : 1 }]}
-              >
-                <Ionicons name={m.icon} size={20} color={colors.cardInk} />
-                <Text style={[styles.prepTileText, { color: colors.cardInk }]}>{m.title}</Text>
-              </Pressable>
+          <View style={styles.week} accessible accessibilityLabel={`${weekDone} of 7 days this week`}>
+            {week.map((d, i) => (
+              <View key={i} style={styles.day}>
+                <View
+                  style={[
+                    styles.dayDot,
+                    d.done
+                      ? { backgroundColor: colors.ink, borderColor: colors.ink }
+                      : { borderColor: d.today ? colors.ink : colors.line, borderWidth: d.today ? 2 : 1.5 },
+                  ]}
+                >
+                  {d.done && <Ionicons name="checkmark" size={14} color={colors.bg} />}
+                </View>
+                <Text style={[styles.dayLabel, { color: d.today ? colors.ink : colors.muted }]}>{d.label}</Text>
+              </View>
             ))}
           </View>
         </View>
-      )}
-
-      {/* Daily warm-up: the habit between big moments */}
-      <Pressable
-        onPress={() => router.push({ pathname: '/session/[id]', params: { id: today.id } })}
-        style={({ pressed }) => [styles.warmup, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.8 : 1 }]}
-      >
-        <View style={[styles.warmIcon, { backgroundColor: colors.signalSoft }]}>
-          <Ionicons name={doneToday ? 'checkmark' : 'mic'} size={20} color={colors.signal} />
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={[styles.warmEyebrow, { color: colors.muted }]}>
-            DAILY WARM-UP · {duration(estimateSeconds(today.text))}
-          </Text>
-          <Text style={[styles.warmTitle, { color: colors.ink }]} numberOfLines={1}>
-            {today.title}
-          </Text>
-        </View>
-        <Text style={[styles.warmGo, { color: colors.signal }]}>{doneToday ? 'Again' : 'Read'}</Text>
-      </Pressable>
-
-      <Text style={[styles.section, { color: colors.ink }]}>Ways to practise</Text>
-      <View style={styles.tiles}>
-        {tiles.map((t) => (
-          <Pressable
-            key={t.key}
-            onPress={t.onPress}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.75 : 1 }]}
-          >
-            <View style={styles.tileTop}>
-              <Ionicons name={t.icon} size={22} color={colors.signal} />
-              {t.badge && <ProBadge />}
-            </View>
-            <Text style={[styles.tileTitle, { color: colors.ink }]}>{t.title}</Text>
-            <Text style={[styles.tileSub, { color: colors.muted }]}>
-              {t.sub}
-            </Text>
-          </Pressable>
-        ))}
+        <Text style={[styles.title, { color: colors.ink }]} accessibilityRole="header">
+          {headerTitle(sessions, days, now)}
+        </Text>
+        {freezeUsed && <Text style={[styles.freeze, { color: colors.muted }]}>Streak freeze used this week. You’re still on {days}.</Text>}
       </View>
 
-      {/* This week */}
-      <Text style={[styles.section, { color: colors.ink }]}>This week</Text>
-      <View style={[styles.week, { backgroundColor: colors.surface, borderColor: colors.line }]}>
-        {week.map((d, i) => (
-          <View key={i} style={styles.day}>
-            <Text style={[styles.dayLabel, { color: d.today ? colors.ink : colors.muted }]}>{d.label}</Text>
-            <View
-              style={[
-                styles.dayDot,
-                d.done
-                  ? { backgroundColor: colors.ink }
-                  : d.today
-                    ? { borderWidth: 1.5, borderColor: colors.signal, borderStyle: 'dashed' }
-                    : { backgroundColor: colors.line },
-              ]}
+      {/* Which line is on screen. A tab list to VoiceOver. */}
+      <View style={[styles.switcher, { backgroundColor: colors.line }]} accessibilityRole="tablist">
+        {(['sharp', 'clear'] as const).map((l, i) => {
+          const on = l === line;
+          return (
+            <Pressable
+              key={l}
+              onPress={() => setShownLine(l)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={`${LINE_NAME[l]}, ${i + 1} of 2`}
+              style={[styles.segment, on && { backgroundColor: colors.surface }]}
             >
-              {d.done && <Ionicons name="checkmark" size={16} color={colors.bg} />}
-            </View>
-          </View>
-        ))}
+              <View style={[styles.lineDot, { backgroundColor: colors[l] }]} />
+              <Text style={[styles.segmentText, { color: on ? colors.ink : colors.muted }]} numberOfLines={1}>
+                {LINE_NAME[l]}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
-      {/* Leftover work from last time */}
-      {last && last.stumbled.length > 0 && (
-        <Pressable
-          onPress={() => requirePro(profile, 'fixit') && router.push({ pathname: '/fixit', params: { sid: last.id } })}
-          style={({ pressed }) => [styles.fixRow, { backgroundColor: colors.signalSoft, opacity: pressed ? 0.8 : 1 }]}
-        >
-          <Ionicons name="pulse" size={22} color={colors.signal} />
-          <Text style={[styles.fixText, { color: colors.ink }]} numberOfLines={2}>
-            Practise last time’s missed words: {last.stumbled.map((w) => `“${w}”`).join(', ')}
-          </Text>
-          {!profile.pro && <ProBadge />}
-        </Pressable>
+      <ScrollView
+        ref={scroll}
+        style={styles.mapScroll}
+        onLayout={(e) => (viewport.current = e.nativeEvent.layout.height)}
+        contentContainerStyle={{ paddingBottom: space(2) }}
+      >
+        {loaded && (
+          <Animated.View key={line} entering={reduceMotion ? undefined : FadeIn.duration(200)}>
+            <HomeMap
+              line={line}
+              sessions={sessions}
+              currentIndex={currentIndex}
+              todayDone={todayDone}
+              active={active}
+              dropMood={todayDone ? 'happy' : 'rest'}
+              card={card}
+              onSwitchLine={() => setShownLine(other)}
+              onOpenSession={(id) => router.push({ pathname: '/tape', params: { id } })}
+              onCurrentY={onCurrentY}
+              now={now}
+            />
+          </Animated.View>
+        )}
+      </ScrollView>
+
+      {/* Pinned: one button for today, then moments as a quiet row (or the active plan, small). */}
+      <View style={[styles.bottom, { borderTopColor: colors.line }]}>
+        {!active ? (
+          <PrimaryButton label="Start this line" onPress={() => start(stop)} />
+        ) : todayDone ? (
+          <>
+            <View style={styles.doneRow} accessible accessibilityLabel="Today’s stop is done. See you tomorrow.">
+              <Ionicons name="checkmark" size={22} color={colors.good} />
+              <Text style={[styles.doneText, { color: colors.ink }]}>Today’s stop is done. See you tomorrow.</Text>
+            </View>
+            <SecondaryButton label={stop ? 'Do the next stop now' : 'Talk again'} onPress={() => start(stop)} />
+          </>
+        ) : (
+          <PrimaryButton label={stop ? 'Start today’s stop' : 'Start today’s talk'} onPress={() => start(stop)} />
+        )}
+        {moment ? (
+          <PlanCard sessions={sessions} />
+        ) : (
+          <Pressable
+            onPress={() => router.push('/moment')}
+            accessibilityRole="button"
+            accessibilityLabel="Got something coming up? Plan for it"
+            style={({ pressed }) => [styles.planRow, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Ionicons name="calendar-outline" size={18} color={colors.muted} />
+            <Text style={[styles.planText, { color: colors.muted }]}>
+              Got something coming up? <Text style={[styles.planLink, { color: colors.ink }]}>Plan for it</Text>
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.ink} />
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
+/** The card beside the current stop: what today's stop is, in one line, and a tap to start it. */
+function TodayCard({
+  stop,
+  index,
+  active,
+  line,
+  chosen,
+  todayDone,
+  lessonDone,
+  best,
+  pro,
+  now,
+  onPress,
+}: {
+  stop: Stop | undefined;
+  index: number;
+  active: boolean;
+  line: LineId;
+  chosen: LineId;
+  todayDone: boolean;
+  lessonDone: boolean;
+  best: number | undefined;
+  pro: boolean;
+  now: Date;
+  onPress: () => void;
+}) {
+  const colors = useColors();
+  let eyebrow: string;
+  let kind: string;
+  let name: string;
+  let sub: string;
+  let proBadge = false;
+
+  if (!active) {
+    // The other line, never started. Its progress never takes from yours.
+    eyebrow = 'STOP 1';
+    kind = '';
+    name = LINE_NAME[line];
+    sub = `Your ${LINE_NAME[chosen]} progress stays where it is.`;
+  } else if (!stop) {
+    eyebrow = todayDone ? 'TOMORROW' : 'TODAY';
+    kind = 'Topic talk';
+    name = minutePromptOfTheDay(now).text;
+    sub = 'You’ve reached the last stop so far. A new topic every day until more stops arrive.';
+  } else {
+    const prompt = promptFor(stop);
+    eyebrow = `${todayDone ? 'TOMORROW' : 'TODAY'} · STOP ${index + 1}`;
+    kind = LESSON_KIND[stopKind(stop)];
+    const minute = index === 0 ? '30 seconds' : '1 minute';
+    // A long topic (level 3) is a whole question, so it isn't folded into a sentence.
+    const talkPart = prompt && prompt.level < 3 ? `${minute} on ${topicInline(prompt)}` : `a ${index === 0 ? '30-second' : '1-minute'} topic talk`;
+    if (!stop.lesson) {
+      name = prompt?.text ?? 'Today’s topic';
+      sub = index === 0 ? '30 seconds. Your first talk.' : best !== undefined ? `1 minute. Your best is ${best}.` : '1 minute. Keep talking until the time is up.';
+    } else {
+      name = lessonTitle(stop.lesson);
+      const locked = !pro && lessonIsPro(stop.lesson);
+      proBadge = locked;
+      if (locked) sub = `Today: ${talkPart}. The ${kind.toLowerCase()} comes with Pro.`;
+      else if (lessonDone) sub = `${kind} done. Now ${talkPart}.`;
+      else if (stop.lesson.kind === 'pack') sub = `Learn the words, then ${talkPart}.`;
+      else sub = `Then ${talkPart}.`;
+    }
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${eyebrow.toLowerCase()}, ${kind ? `${kind}: ${name}` : `Start ${name} here`}. ${sub}`}
+      style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.85 : 1 }]}
+    >
+      <View style={styles.eyebrowRow}>
+        <Text style={[styles.eyebrow, { color: colors.muted }]}>{eyebrow}</Text>
+        {proBadge && <ProBadge />}
+      </View>
+      {kind ? (
+        <Text style={[styles.cardTitle, { color: colors.ink }]}>
+          {kind}: <Text style={styles.cardName}>{name}</Text>
+        </Text>
+      ) : (
+        <Text style={[styles.cardTitle, { color: colors.ink }]}>
+          Start <Text style={styles.cardName}>{name}</Text> here.
+        </Text>
       )}
-    </ScrollView>
+      <Text style={[styles.cardSub, { color: colors.muted }]}>{sub}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: space(2.5), gap: space(2) },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  date: { fontSize: 15 },
-  hello: { fontFamily: fonts.displayBold, fontSize: 32 },
-  streak: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  streakText: { fontSize: 16, fontWeight: '700' },
-  freeze: { fontSize: 14, marginTop: -space(1) },
-  prep: { borderRadius: 24, padding: space(2.5), gap: space(1) },
-  prepTitle: { fontFamily: fonts.readingBold, fontSize: 24, lineHeight: 30 },
-  prepSub: { fontSize: 15, lineHeight: 21 },
-  prepGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1), marginTop: space(1) },
-  prepTile: { flexBasis: '47%', flexGrow: 1, borderRadius: 14, padding: space(1.5), gap: 6, minHeight: 72 },
-  prepTileText: { fontSize: 15, fontWeight: '600' },
-  warmup: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), borderWidth: 1, borderRadius: 18, padding: space(1.75) },
-  warmIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  warmEyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 0.9 },
-  warmTitle: { fontFamily: fonts.readingBold, fontSize: 18, marginTop: 2 },
-  warmGo: { fontSize: 15, fontWeight: '700' },
-  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1.25) },
-  tile: { flexBasis: '47%', flexGrow: 1, flexShrink: 1, minWidth: 140, borderWidth: 1, borderRadius: 18, padding: space(1.5), gap: 4, minHeight: 124 },
-  tileTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  tileTitle: { fontSize: 15, fontWeight: '700' },
-  tileSub: { fontSize: 13, lineHeight: 17 },
-  section: { fontSize: 17, fontWeight: '700', marginTop: space(1) },
-  week: { flexDirection: 'row', justifyContent: 'space-between', borderWidth: 1, borderRadius: 18, padding: space(2) },
-  day: { alignItems: 'center', gap: 8 },
-  dayLabel: { fontSize: 13, fontWeight: '600' },
-  dayDot: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  fixRow: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), borderRadius: 18, padding: space(2) },
-  fixText: { flex: 1, fontSize: 15, fontWeight: '500' },
+  screen: { flex: 1 },
+  head: { paddingHorizontal: space(2.5), gap: 2 },
+  headTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space(1) },
+  date: { fontSize: 15, flexShrink: 1 },
+  title: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, marginTop: space(0.5) },
+  freeze: { fontSize: 14 },
+  week: { flexDirection: 'row', gap: 5 },
+  day: { alignItems: 'center', gap: 3 },
+  dayDot: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
+  dayLabel: { fontSize: 10, fontWeight: '600' },
+  switcher: { flexDirection: 'row', marginHorizontal: space(2.5), marginTop: space(1.5), borderRadius: 16, padding: 4 },
+  segment: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44, borderRadius: 12 },
+  segmentText: { fontSize: 16, fontWeight: '700' },
+  lineDot: { width: 12, height: 12, borderRadius: 6 },
+  mapScroll: { flex: 1 },
+  bottom: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: space(2.5), paddingTop: space(1.5), paddingBottom: space(1), gap: space(1) },
+  doneRow: { flexDirection: 'row', alignItems: 'center', gap: space(1), paddingHorizontal: space(0.5) },
+  doneText: { flex: 1, fontSize: 16, fontWeight: '600', lineHeight: 21 },
+  planRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44 },
+  planText: { fontSize: 15, flexShrink: 1 },
+  planLink: { fontWeight: '700' },
+  card: { borderWidth: 1, borderRadius: 20, padding: space(2), gap: 4 },
+  eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2 },
+  cardTitle: { fontSize: 19, lineHeight: 25, fontWeight: '600' },
+  cardName: { fontFamily: fonts.readingBold },
+  cardSub: { fontSize: 15, lineHeight: 20 },
 });
