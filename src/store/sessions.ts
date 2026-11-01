@@ -27,9 +27,8 @@ export type SavedSession = {
   stumbledContext?: Record<string, string>; // word → sentence it came from
   corrected?: string[]; // words the user marked "I said it"
   recordings?: string[]; // local file URIs (Day 1 and re-tests, with consent)
-  /** Remodel: which stop on the home map this session completed (content/lines.ts id), and the topic prompt id. */
+  /** Remodel: which stop on the home map this session completed (content/lines.ts id). */
   stopId?: string;
-  promptId?: string;
   habits?: Record<string, number>; // like, so, you know: reported on the Tape, never scored
   segments?: PaceSegment[]; // pace of each stretch of the passage (engine/steadiness.ts)
   steadiness?: number; // 0–100; shown on the Tape, not part of the score
