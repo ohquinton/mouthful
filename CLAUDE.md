@@ -95,7 +95,7 @@ Today currently shows the active moment's plan (`PlanCard`): learn the words →
 ## Commands
 
 ```bash
-npm test                  # engine + store tests (724); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
+npm test                  # engine + store tests (735); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)
