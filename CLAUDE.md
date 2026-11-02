@@ -64,7 +64,7 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
 - `src/content/lines.ts` — the two lines as 14 ordered stops each (ids `sharp-01`… and `clear-01`…, never rename), one stop a day, each an optional lesson then a topic talk; pure helpers for current stop, done today, start route
 - `src/content/` — passages, Word Packs (7, including the free Make your point pack with self-guided speaking prompts), moments (interview, presentation, raise, meeting), scripts
 - `src/app/` — Expo Router screens: `(tabs)/` Home (the two-line train map), Library, Progress, You; `session/[id]`, `tape`, `fixit`, `talk`, `moment`, `pack/[id]`, `words`, `scripts/*`, `onboarding/*`, `paywall`, `review` (tester mode only)
-- `src/components/` — `HomeMap` (the line, stops, the Drop hopping) and `Drop` (the flat mascot; two more copies live in `onboarding/index.tsx` and `MinuteResult.tsx` until they're merged), `InkCursor` and `VoiceRibbon` (Reanimated), `GlideWord`, `PlanCard`, `MicGate`, `Replay` (expo-audio), `Charts`
+- `src/components/` — `HomeMap` (the line, stops, the Drop hopping) and `Drop` (the one flat mascot: breathing, blink, happy/up/down poses, nod; static under Reduce Motion), `InkCursor` and `VoiceRibbon` (Reanimated), `GlideWord`, `PlanCard`, `MicGate`, `Replay` (expo-audio), `Charts`
 - `src/purchases.native.ts` — RevenueCat (phones). `src/purchases.ts` — web/test stub.
 - `src/analytics.ts` — PostHog batch client. Event names, numbers and allowlisted short codes only; free text is dropped before sending.
 
@@ -96,7 +96,7 @@ Home shows an active moment only as a compact `PlanCard` row under the map ("Got
 ## Commands
 
 ```bash
-npm test                  # engine + store tests (735); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
+npm test                  # engine + store tests (787); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)

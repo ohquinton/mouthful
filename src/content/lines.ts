@@ -8,11 +8,11 @@
 //
 // Stop ids are what sessions keep, so never rename or reuse one. Add new stops at the end.
 
-import { MINUTE_PROMPTS, Prompt } from './prompts';
+import { MINUTE_PROMPTS, Prompt, promptById } from './prompts';
 import { getPack, packPassage } from './wordpacks';
 import { getPassage } from './passages';
 import { calendarDay } from '../engine/days';
-import type { WordBook } from '../engine/vocab';
+import { dayKey, type WordBook } from '../engine/vocab';
 
 export type LineId = 'sharp' | 'clear';
 
@@ -86,9 +86,55 @@ export function promptFor(stop: Stop): Prompt | undefined {
   return MINUTE_PROMPTS.find((p) => p.id === stop.promptId);
 }
 
+/**
+ * A stop's number on its own line (1-based), from the line's list, never parsed out of the id.
+ * Undefined for an unknown id (an old or odd session, a talk that wasn't a stop).
+ */
+export function stopNumber(id: string | undefined): number | undefined {
+  const stop = getStop(id);
+  return stop ? LINES[stop.line].indexOf(stop) + 1 : undefined;
+}
+
+/** Is this the last stop of its line? (The results then say "Line complete", never "Stop 15".) */
+export function isLastStop(id: string | undefined): boolean {
+  const stop = getStop(id);
+  return !!stop && LINES[stop.line].indexOf(stop) === LINES[stop.line].length - 1;
+}
+
+/**
+ * Short names for the long (level 3) topics, so a done stop on the map reads in one line
+ * ("Topic talk · An opinion"). The full question shows on the talk screen. Keyed by prompt id, so
+ * a talk on a different topic ("Different topic") is labelled by what was really talked about.
+ */
+const SHORT_TOPIC: Record<string, string> = {
+  p25: 'Your work, simply',
+  p26: 'A restaurant you like',
+  p27: 'An opinion',
+  p28: 'The best meal',
+  p29: 'Something you learned',
+  p30: 'An extra hour',
+  p31: 'A project update',
+  p32: 'A plan that went wrong',
+  p33: 'Your first day',
+  p34: 'Your city',
+  p35: 'A hobby',
+  p36: 'Advice to yourself',
+};
+
+/** A topic's short name: "Coffee", "Trust", "An opinion". Short topics are already their own name. */
+export function shortTopic(promptId: string | undefined): string {
+  if (promptId && SHORT_TOPIC[promptId]) return SHORT_TOPIC[promptId];
+  return (promptById(promptId)?.text ?? 'Topic talk').replace(/[.?!]$/, '');
+}
+
 type HasStop = { stopId?: string; at: number };
 
 type MaybeFirstTalk = HasStop & { kind?: string; promptId?: string; flowVersion?: string; minute?: unknown };
+
+/** A 30-second talk (onboarding's first), by its record or its Flow version (as store/minute.ts isShortTalk). */
+function thirty(s: { minute?: unknown; flowVersion?: string }): boolean {
+  return (s.minute as { limitSeconds?: number } | undefined)?.limitSeconds === 30 || (s.flowVersion ?? '').endsWith('-s30');
+}
 
 /**
  * Onboarding's first talk (30 seconds on Coffee, src/onboarding.ts firstTalkRoute) is stop 1 of
@@ -99,7 +145,6 @@ type MaybeFirstTalk = HasStop & { kind?: string; promptId?: string; flowVersion?
 export function withFirstTalk<T extends MaybeFirstTalk>(sessions: readonly T[], line: LineId): T[] {
   const first = LINES[line][0];
   if (sessions.some((s) => s.stopId === first.id)) return [...sessions];
-  const thirty = (s: T) => (s.minute as { limitSeconds?: number } | undefined)?.limitSeconds === 30 || (s.flowVersion ?? '').endsWith('-s30');
   let pick: T | undefined;
   for (const s of sessions) {
     if (!s.stopId && s.kind === 'minute' && s.promptId === first.promptId && thirty(s) && (!pick || s.at < pick.at)) pick = s;
@@ -135,6 +180,16 @@ export function stopDoneToday(line: LineId, sessions: readonly HasStop[], now: D
   return sessions.some((s) => !!s.stopId && ids.has(s.stopId) && calendarDay(s.at) === today);
 }
 
+/**
+ * Past the last stop, today's stop is a full-minute topic talk on the topic of the day
+ * (`promptId`), or any full-minute talk today that wasn't a stop on a line ("Different topic").
+ * Onboarding's 30 seconds and stops on the other line don't count.
+ */
+export function dailyTalkDoneToday(sessions: readonly MaybeFirstTalk[], promptId: string, now: Date | number = Date.now()): boolean {
+  const today = calendarDay(now);
+  return sessions.some((s) => s.kind === 'minute' && !thirty(s) && calendarDay(s.at) === today && (s.promptId === promptId || !s.stopId));
+}
+
 /** Has anything on this line been done? (The other line shows its station until it has.) */
 export function lineStarted(line: LineId, sessions: readonly HasStop[]): boolean {
   return LINES[line].some((s) => doneStopIds(sessions).has(s.id));
@@ -157,29 +212,39 @@ export function lessonIsPro(lesson: Lesson): boolean {
   return false; // built-in and pack passages are free to Glide
 }
 
+type LessonData = { sessions: readonly { passageId: string; at: number }[]; book: WordBook };
+
 /**
- * Was this stop's lesson done today? Pack drills save no session, but every drilled word lands
- * in the word book with `lastSeen`; passages save a session with their passage id.
+ * Was this lesson done on the calendar day of `when`? Pack drills save no session, but every
+ * drilled word lands in the word book (`heardDays` as day keys, and `lastSeen`); passages save a
+ * session with their passage id. Home asks about today; the map asks about an old stop's day, so
+ * its label only names a lesson that was really done.
  */
-export function lessonDoneToday(
-  lesson: Lesson,
-  data: { sessions: readonly { passageId: string; at: number }[]; book: WordBook },
-  now: Date | number = Date.now(),
-): boolean {
-  const today = calendarDay(now);
+export function lessonDoneOn(lesson: Lesson, data: LessonData, when: Date | number): boolean {
+  const day = calendarDay(when);
   if (lesson.kind === 'pack') {
+    const key = dayKey(typeof when === 'number' ? when : when.getTime());
     const words = getPack(lesson.packId)?.words ?? [];
     return words.some((w) => {
       const e = data.book[w.word.toLowerCase()];
-      return !!e && calendarDay(e.lastSeen) === today;
+      return !!e && (calendarDay(e.lastSeen) === day || (e.heardDays ?? []).includes(key) || (e.cleanDays ?? []).includes(key));
     });
   }
-  return data.sessions.some((s) => s.passageId === lesson.passageId && calendarDay(s.at) === today);
+  return data.sessions.some((s) => s.passageId === lesson.passageId && calendarDay(s.at) === day);
 }
 
-/** Stop 1 is the 30-second first talk; every stop after it is a full minute. */
-export function talkSeconds(stopIndex: number): '30' | '60' {
-  return stopIndex === 0 ? '30' : '60';
+/** Was this stop's lesson done today? */
+export function lessonDoneToday(lesson: Lesson, data: LessonData, now: Date | number = Date.now()): boolean {
+  return lessonDoneOn(lesson, data, now);
+}
+
+/**
+ * Every stop opened from Home is a full minute, stop 1 included (the other line's stop 1, or your
+ * own after a mic-denied skip, or an upgraded reader with no first talk). Only onboarding's first
+ * talk is 30 seconds (src/onboarding.ts firstTalkRoute).
+ */
+export function talkSeconds(): '30' | '60' {
+  return '60';
 }
 
 export type StartRoute =
@@ -203,8 +268,7 @@ export function startRoute(stop: Stop, opts: { pro: boolean; lessonDone: boolean
       return { pathname: '/session/[id]', params: { id: l.passageId } };
     }
   }
-  const index = LINES[stop.line].findIndex((s) => s.id === stop.id);
-  return { pathname: '/talk', params: { prompt: stop.promptId, stop: stop.id, seconds: talkSeconds(index), from: 'home' } };
+  return { pathname: '/talk', params: { prompt: stop.promptId, stop: stop.id, seconds: talkSeconds(), from: 'home' } };
 }
 
 /** The lesson's display name ("Make your point", "Signal and Noise"). */
@@ -225,6 +289,24 @@ export const LESSON_KIND: Record<Lesson['kind'] | 'talk', string> = {
 /** What kind of stop this is, by what comes first. */
 export function stopKind(stop: Stop): Lesson['kind'] | 'talk' {
   return stop.lesson?.kind ?? 'talk';
+}
+
+type DoneSession = { at: number; promptId?: string; flow?: number; minute?: unknown; flowVersion?: string };
+
+/**
+ * A done stop's two lines on the map, saying what was really done:
+ * - the talk, named by the topic actually talked about ("Different topic" may have changed it);
+ * - the lesson only when it was done that day (a free reader skips a Pro lesson: the talk only);
+ * - "Your first talk" only for onboarding's 30 seconds, never for a full-minute stop 1.
+ */
+export function doneLabel(stop: Stop, session: DoneSession | undefined, lessonDone: boolean): { title: string; sub: string } {
+  const topic = shortTopic(session?.promptId ?? stop.promptId);
+  const flow = typeof session?.flow === 'number' ? `Flow ${session.flow}` : 'Done';
+  if (session && thirty(session)) {
+    return { title: `Your first talk · ${topic}`, sub: typeof session.flow === 'number' ? `${flow} · your starting point` : flow };
+  }
+  if (stop.lesson && lessonDone) return { title: `${LESSON_KIND[stop.lesson.kind]} · ${lessonTitle(stop.lesson)}`, sub: `${topic} · ${flow}` };
+  return { title: `${LESSON_KIND.talk} · ${topic}`, sub: flow };
 }
 
 /** The best Flow among talks of the same Flow version (trends never compare across versions). */

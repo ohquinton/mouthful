@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PACE_BANDS } from '../../engine/score';
 import { contextOf, day1VsNow, heatStrip, paceContexts, personalBests, recent, retestDue, SpeakingContext } from '../../engine/progress';
 import { loadSessions, SavedSession, streak } from '../../store/sessions';
+import { chartsHint, fullTalksOnly } from '../../store/minute';
 import { useProfile } from '../../store/profile';
 import { requirePro } from '../../pro';
 import { FillerBars, HeatStrip, PaceChart } from '../../components/Charts';
@@ -38,7 +39,8 @@ export default function Progress() {
   );
 
   const chartW = Math.min(width, 560) - space(2.5) * 2 - space(2) * 2;
-  const readings = sessions.filter((s) => s.kind !== 'minute');
+  const full = fullTalksOnly(sessions);
+  const readings = full.filter((s) => s.kind !== 'minute');
   const shown = recent(readings, profile.pro ? 30 : FREE_HISTORY);
   const { available: contexts, initial } = paceContexts(shown);
   const ctx = paceCtx && contexts.includes(paceCtx) ? paceCtx : initial;
@@ -47,8 +49,8 @@ export default function Progress() {
   const bests = personalBests(readings);
   // One Minute sessions are left out of Best score: the Tape shows them as Flow, a different
   // 0–100 scale, so their old Free talk `score` would be a number the reader never saw.
-  const bestScore = personalBests(sessions.filter((s) => s.kind !== 'minute')).bestScore;
-  const cmp = day1VsNow(sessions, profile.baselineSessionId);
+  const bestScore = personalBests(full.filter((s) => s.kind !== 'minute')).bestScore;
+  const cmp = day1VsNow(full, profile.baselineSessionId);
   const due = retestDue(sessions, profile.baselineSessionId);
   const { days } = streak(readings);
   const day1Audio = (cmp?.day1 as SavedSession | undefined)?.recordings ?? [];
@@ -175,7 +177,7 @@ export default function Progress() {
           </View>
         </>
       ) : (
-        <Text style={[styles.lead, { color: colors.muted }]}>Do one more session and your charts appear here.</Text>
+        <Text style={[styles.lead, { color: colors.muted }]}>{chartsHint(shown.length)}</Text>
       )}
 
       </>}
