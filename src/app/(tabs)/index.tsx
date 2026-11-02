@@ -48,6 +48,8 @@ const topicInline = (p: Prompt | undefined) => (p ? p.text.charAt(0).toLowerCase
 
 /** Space above the map's first row, so the row scrolled to the top is never cut by the switcher. */
 const MAP_TOP_INSET = space(1.5);
+/** How long Home keeps today's stop anchored while the map's rows finish measuring. */
+const SETTLE_MS = 1500;
 
 type WebPermissions = { permissions?: { query: (d: { name: string }) => Promise<{ state: string }> } };
 
@@ -187,15 +189,45 @@ export default function Home() {
   const scroll = useRef<ScrollViewInstance>(null);
   const viewport = useRef(0);
   const scrolledFor = useRef('');
+  // Room under the end of the line, so the anchor row can reach the top even near the end (Line
+  // complete). Without it the scroll stops short and the row at the top is cut in half.
+  const [tailPad, setTailPad] = useState(space(2));
+  const tailRef = useRef(tailPad);
+  const pending = useRef<{ y: number; animated: boolean } | null>(null);
+  // Rows re-measure for a moment after the first layout (fonts arrive, labels re-wrap), which
+  // moves the anchor. Follow it until the reader scrolls themselves, or for SETTLE_MS at most.
+  const anchoredAt = useRef(0);
+  const touched = useRef(false);
+  /** Scroll back to the anchor once the content has grown, unless the reader has taken over. */
+  const onContentSize = useCallback(() => {
+    const to = pending.current;
+    if (!to || touched.current || Date.now() - anchoredAt.current > SETTLE_MS) return;
+    scroll.current?.scrollTo({ y: to.y, animated: false });
+  }, []);
   const onScrollAnchor = useCallback(
-    (y: number) => {
+    (y: number, mapHeight: number) => {
+      if (!viewport.current) return;
+      const tail = Math.max(space(2), Math.ceil(viewport.current - (mapHeight - y) - MAP_TOP_INSET));
+      const grows = tail !== tailRef.current;
+      tailRef.current = tail;
+      if (grows) setTailPad(tail);
       const key = `${line}:${currentIndex}`;
-      if (scrolledFor.current === key || !viewport.current) return;
+      const settling = scrolledFor.current === key && !touched.current && Date.now() - anchoredAt.current < SETTLE_MS;
+      if (scrolledFor.current === key && !settling) return;
       const first = scrolledFor.current === '';
-      scrolledFor.current = key;
-      scroll.current?.scrollTo({ y: Math.max(0, y), animated: !first && !reduceMotion });
+      if (!settling) {
+        scrolledFor.current = key;
+        anchoredAt.current = Date.now();
+        touched.current = false;
+      }
+      const to = { y: Math.max(0, y), animated: !first && !settling && !reduceMotion };
+      scroll.current?.scrollTo(to);
+      // If the padding is changing, the scroll above may stop short at the old end: go again once
+      // the content has its new size (and after two frames, where onContentSizeChange is late).
+      pending.current = to;
+      if (grows) requestAnimationFrame(() => requestAnimationFrame(onContentSize));
     },
-    [line, currentIndex, reduceMotion],
+    [line, currentIndex, reduceMotion, onContentSize],
   );
 
   const card = (
@@ -273,7 +305,9 @@ export default function Home() {
         ref={scroll}
         style={styles.mapScroll}
         onLayout={(e) => (viewport.current = e.nativeEvent.layout.height)}
-        contentContainerStyle={{ paddingTop: MAP_TOP_INSET, paddingBottom: space(2) }}
+        onContentSizeChange={onContentSize}
+        onScrollBeginDrag={() => (touched.current = true)}
+        contentContainerStyle={{ paddingTop: MAP_TOP_INSET, paddingBottom: tailPad }}
       >
         {loaded && (
           <Animated.View key={line} entering={reduceMotion ? undefined : FadeIn.duration(200)}>

@@ -62,9 +62,10 @@ export type HomeMapProps = {
   /**
    * Where to scroll so today's stop is in view with nothing cut: the top of the row before it (the
    * station row for stop 1), inside the map, once both are laid out. A whole row edge, never the
-   * middle of a label, so a done stop's title never sits half under the line switcher.
+   * middle of a label, so a done stop's title never sits half under the line switcher. Also the
+   * map's height, so Home can leave room below the end of the line for that row to reach the top.
    */
-  onScrollAnchor?: (y: number) => void;
+  onScrollAnchor?: (y: number, mapHeight: number) => void;
   now: Date;
 };
 
@@ -113,9 +114,10 @@ export function HomeMap(props: HomeMapProps) {
   // The row before today's (STATION_ROW is -1, so stop 1's is the station). Reported once today's
   // row is laid out too, so the anchor doesn't jump while rows are still measuring.
   const anchorY = rows[currentIndex] ? rows[currentIndex - 1]?.y : undefined;
+  const mapBottom = Object.values(rows).reduce((m, r) => Math.max(m, r.y + r.h), 0);
   useEffect(() => {
-    if (anchorY !== undefined && onScrollAnchor) onScrollAnchor(anchorY);
-  }, [anchorY, onScrollAnchor]);
+    if (anchorY !== undefined && onScrollAnchor) onScrollAnchor(anchorY, mapBottom);
+  }, [anchorY, mapBottom, onScrollAnchor]);
 
   // ---- The Drop: stands on the current stop; hops there from the last one after a finished stop.
   const move = !reduceMotion;
@@ -196,7 +198,7 @@ export function HomeMap(props: HomeMapProps) {
   // A soft band of the line colour behind today's stop and its card (drawn under the track).
   const bandRow = rows[Math.min(currentIndex, stops.length)];
   const BAND_INSET_TOP = CURRENT_TOP - space(3);
-  const mapHeight = Object.values(rows).reduce((m, r) => Math.max(m, r.y + r.h), 0);
+  const mapHeight = mapBottom;
 
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ minHeight: mapHeight }}>
