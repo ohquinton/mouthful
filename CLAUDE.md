@@ -79,7 +79,8 @@ Agents live in `.claude/agents/`. Only the main session hands out work and merge
 5. **Shared files are main-session only:** `package.json`, `package-lock.json`, `app.json`, `CLAUDE.md`, `patches/`, `src/theme.ts`, `src/brand.ts`. A writer that needs a change there says so in its handoff instead of making it.
 6. **Merge one branch at a time.** After each merge into `main`: `npm test` and `npm run typecheck` must pass before the next merge. A failing merge is reverted and sent back to its author.
 7. **qa-critic reviews every merged change** before the next wave starts, never the agent that wrote it.
-8. **Waves:** read (review, audit, decide) → write (fixes and features, isolated) → merge one by one → qa-critic → next wave.
+8. **Never `git worktree remove` a worktree whose `node_modules` is a junction** to this checkout's: on Windows git follows the junction and deletes this checkout's packages (it happened 2026-11-01; fixed with `npm ci`). Delete the junction as a link first (PowerShell `(Get-Item <path> -Force).Delete()`), then the folder, then `git worktree prune`. Better: `npm ci` inside the worktree instead of a junction.
+9. **Waves:** read (review, audit, decide) → write (fixes and features, isolated) → merge one by one → qa-critic → next wave.
 
 ## Tester mode (supervised beta only)
 
@@ -96,7 +97,7 @@ Home shows an active moment only as a compact `PlanCard` row under the map ("Got
 ## Commands
 
 ```bash
-npm test                  # engine + store tests (787); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
+npm test                  # engine + store tests (791); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)

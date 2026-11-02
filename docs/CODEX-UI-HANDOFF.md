@@ -1,5 +1,7 @@
 # Codex UI pass — 2026-11-01
 
+> The first sections describe Codex's earlier pass and are history (e.g. onboarding and the numbered lesson map now come from the merged Claude work). The current state is the "Combined Claude/Codex snapshot" at the end.
+
 Branch: codex/remodel. Base: Claude main 4c88ccc. Work performed in separate Codex Repo checkout and isolated railway/talk worktrees; Claude checkout untouched.
 
 ## Completed

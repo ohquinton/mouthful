@@ -41,7 +41,7 @@ export function TalkProgress({ sessions, limit }: { sessions: SavedSession[]; li
               style={({ pressed }) => [styles.row, { borderTopColor: colors.line, opacity: pressed ? 0.65 : 1 }]}>
               <View style={styles.rowText}>
                 <Text style={[styles.topic, { color: colors.ink }]}>{s.title}</Text>
-                <Text style={[styles.date, { color: colors.muted }]}>{new Date(s.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}{s.flowVersion !== FLOW_VERSION ? ' · Earlier Flow version' : ''}</Text>
+                <Text style={[styles.date, { color: colors.muted }]}>{new Date(s.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}{isShortTalk(s) ? ' · 30-second first talk' : s.flowVersion !== FLOW_VERSION ? ' · Earlier Flow version' : ''}</Text>
               </View>
               <Text style={[styles.flow, { color: colors.ink }]}>{s.flow}<Text style={styles.flowUnit}> Flow</Text></Text>
             </Pressable>
