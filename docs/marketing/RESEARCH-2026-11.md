@@ -48,3 +48,10 @@ Evidence is thin: few documented Wellspoken complaints (Trustpilot mostly positi
 2. **Daily topic thread:** post the day's topic in ESL/speaking communities and a Telegram group; people reply with cards. First step: read each subreddit's rules, post 5 helpful prompts with no link; start a Telegram group with 10 waitlist testers.
 3. **Build in public + small creators:** film your own 30-day challenge with real result screens; offer free lifetime codes to 10 small ESL/speaking creators (1k–20k). First step: record Day 1 today and send 10 DMs. Never pay for fake testimonials; disclose AI presenters.
 - Later: "invite a friend, both get a week of word packs" via RevenueCat promo codes, once loop 1 works.
+
+## Do this first (ranked)
+1. Lock the hero line: check "Sound as sharp as you think" and "One minute a day. Clearer every week." for App Store collisions; use as subtitle and TikTok hook.
+2. Build the result share card (stats before/after, no audio) and track shares in PostHog: the only loop that grows by itself.
+3. Record Day 1 of your own 30-day challenge and post it ($0; the content engine).
+4. Waitlist page + form + a 10-person Telegram tester group (early users and real quotes).
+5. Cheap features that make the loop visible: one shared topic of the day + Say-it-again; then the weekly report.
