@@ -1,30 +1,28 @@
-# WIP: Library remodel (mobile-engineer)
+# Library remodel checkpoint
 
-Branch: `worktree-agent-a7359e8ce59d150c7`, from main 7e66756. Owns only `src/app/(tabs)/library.tsx`,
-`src/components/library/*`, this file, `test/library*.test.ts`. Paused on the coordinator's wrap-up
-(usage), 2026-11-01. At this point: `npm test` 807 pass (791 + 16 new), typecheck clean, lint clean on `src/components/library`.
+Integrated on `codex/remodel`, 2026-11-02. Claude's three committed foundation steps
+were cherry-picked; Codex's isolated pending screen/components were reviewed and copied.
+The original `Codex Library` worktree is preserved; its local changes are now superseded
+by this integrated branch and must not be blindly merged again.
 
-## Plan
-1. [x] Pure helpers `src/components/library/libraryData.ts` (best Flow per topic, same Flow version + full
-   minutes only; pack line tint; shelf copy; cold-read pick) + `test/library.test.ts` (16 tests)
-2. [x] Components, built but NOT wired into the screen yet and not seen on screen:
-   - `TopicTalks.tsx`: heading, Drop empty state, Everyday / Ideas / Bigger topics switcher, 2-col tiles
-     (levels 1–2) or full-width rows (level 3), "Best 76" + check in line colour
-   - `PackCard.tsx`: line-soft tint + "On Sharp Talk" when a line uses the pack, FREE pill / ProBadge, progress bar
-   - `ShelfRow.tsx`: icon row (Your words, Your scripts, Cold read)
-   - `ReadAloud.tsx`: collapsed by default; cold read row + passages by level (today free, rest locked)
-3. [ ] Rewrite `src/app/(tabs)/library.tsx` in this order: header "Library" (Bricolage 34) → `<TopicTalks>`
-   (level state from `defaultLevel(profile.line)`; records from `topicRecords(loadSessions())`; onOpen →
-   `router.push(topicRoute(p.id))`) → "Word packs" heading + horizontal `<PackCard>` list (line =
-   `packLine(p.id, lineOf(profile.line))`, done = `packDone(p, book)`, press → `/pack/[id]`) → `<ShelfRow>`
-   Your words (`/words`, `wordsMeta`) and Your scripts (`/scripts`, `scriptsMeta` with `loadScripts()`) →
-   `<ReadAloud>` (onRead: today's passage or `requirePro(profile,'library')` → `/session/[id]`; onColdRead:
-   `requirePro(profile,'cold')` then `/session/[id]` with `cold: '1'` on `coldReadPick(PASSAGES, sessions)`)
-   → the "Got something coming up? Plan for it" row (`/moment`, copy Home's `planRow` style).
-   Load sessions, book and scripts in one `useFocusEffect`.
-4. [ ] Checks: npm test, `MOUTHFUL_TEST_TZ=Asia/Kolkata npm test`, typecheck, `npx expo lint`
-5. [ ] Web screenshots `docs/design/remodel/built/library-*.png` (390×844 light + dark, 375×667 light, empty state)
-6. [ ] Handoff
+## Implemented
+- Topic talks by category, free full-minute routes, comparable best Flow per topic.
+- Word-pack cards with line labels, honest comfort progress and Free/Pro labels.
+- Saved words and scripts with loading/empty metadata.
+- Expandable reading shelf; consistent displayed free passage and gate.
+- Cold reads wait for refreshed history, retain Pro gating and announce that requirement.
+- Responsive single-column treatment at large font scale; no title truncation.
+- Fixed corrupted punctuation, false not-tried loading labels and unseen-passage promises.
 
-## Next step
-Step 3: wire the components into `library.tsx` as above.
+## Validation
+- TypeScript passed; lint has no errors and 13 existing warnings.
+- Toronto: 47 suites, 817 tests passed.
+- Kolkata: 47 suites, 807 passed, 10 timezone-specific tests skipped.
+- Browser: dark 390x844 Library, 320x568 shelves and long-prompt talk; category switch,
+  topic route, Close return, tab refocus, cold-read paywall/dismiss, onboarding skip.
+- Independent static QA found no blocker. Its remaining stale-history-on-refocus note
+  was fixed by clearing ready before each focused reload.
+
+## Still needs device/visual coverage
+Light theme, native Dynamic Type/VoiceOver, populated history/progress screenshots,
+and native speech/Rive behavior. Browser checks did not start a microphone or purchase.

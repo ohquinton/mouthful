@@ -15,7 +15,7 @@ export const UPSELL: Record<ProFeature, { title: string; line: string }> = {
   fixit: { title: 'Fix the words you trip on', line: 'A 20-second drill on the exact words you stumbled over.' },
   history: { title: 'Every session, charted', line: 'See your pace and fillers improve over weeks, not days.' },
   packs: { title: 'Every Word Pack', line: 'Finance, tech, raise-day words and more: what they mean and how to say them.' },
-  cold: { title: 'Cold read', line: 'Read something you haven’t seen, like being handed notes in a meeting.' },
+  cold: { title: 'Cold read', line: 'Practise reading out loud without previewing the passage.' },
 };
 
 /**

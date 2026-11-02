@@ -1,144 +1,96 @@
-import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { estimateSeconds, formatDuration as duration, Level, PASSAGES, passageOfTheDay } from '../../content/passages';
+import { PASSAGES, passageOfTheDay } from '../../content/passages';
 import { WORD_PACKS } from '../../content/wordpacks';
-import { isLearned, summarise, WordBook } from '../../engine/vocab';
+import { loadScripts } from '../../content/scripts';
+import { lineOf } from '../../content/lines';
+import type { PromptLevel } from '../../content/prompts';
+import { summarise, type WordBook } from '../../engine/vocab';
 import { loadBook } from '../../store/words';
+import { loadSessions, type SavedSession } from '../../store/sessions';
 import { useProfile } from '../../store/profile';
 import { requirePro } from '../../pro';
-import { ProBadge, Row, SectionTitle } from '../../components/ui';
+import { TopicTalks } from '../../components/library/TopicTalks';
+import { PackCard } from '../../components/library/PackCard';
+import { ShelfRow } from '../../components/library/ShelfRow';
+import { ReadAloud } from '../../components/library/ReadAloud';
+import { coldReadPick, defaultLevel, packDone, packLine, scriptsMeta, topicRecords, topicRoute, wordsMeta } from '../../components/library/libraryData';
 import { fonts, space, useColors } from '../../theme';
-
-const LEVELS: { level: Level; blurb: string }[] = [
-  { level: 'Steady', blurb: 'Short sentences, everyday words.' },
-  { level: 'Flowing', blurb: 'Mixed rhythm, longer phrases.' },
-  { level: 'Sharp', blurb: 'Dense, technical, long clauses.' },
-];
 
 export default function Library() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { width, fontScale } = useWindowDimensions();
   const { profile } = useProfile();
-  const today = passageOfTheDay();
+  const line = lineOf(profile.line);
+  // A deliberate topic choice survives tab switches; before that, follow the chosen line.
+  const [chosenLevel, setLevel] = useState<PromptLevel>();
+  const level = chosenLevel ?? defaultLevel(line);
   const [book, setBook] = useState<WordBook>({});
-  const [bookReady, setBookReady] = useState(false);
-
-  useFocusEffect(
-    useCallback(() => {
-      let live = true;
-      loadBook().then((loaded) => {
-        if (live) { setBook(loaded); setBookReady(true); }
-      });
-      return () => { live = false; };
-    }, []),
-  );
-
+  const [sessions, setSessions] = useState<SavedSession[]>([]);
+  const [scriptCount, setScriptCount] = useState(0);
+  const [ready, setReady] = useState(false);
+  const [date, setDate] = useState(() => new Date());
+  useFocusEffect(useCallback(() => {
+    let live = true;
+    setReady(false);
+    setDate(new Date());
+    // All three store readers handle unavailable storage without rejecting.
+    Promise.all([loadSessions(), loadBook(), loadScripts()]).then(([all, words, scripts]) => {
+      if (!live) return;
+      setSessions(all); setBook(words); setScriptCount(scripts.length); setReady(true);
+    });
+    return () => { live = false; };
+  }, []));
+  const today = passageOfTheDay(date);
+  const records = useMemo(() => topicRecords(sessions), [sessions]);
   const { learning, learned } = summarise(book);
-
+  const largeText = fontScale > 1.3;
+  const packWidth = largeText ? Math.min(width - space(5), 520) : Math.min(240, width - space(5));
   return (
-    <ScrollView
-      style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={[styles.wrap, { paddingTop: insets.top + space(2), paddingBottom: space(4) }]}
-    >
-      <Text style={[styles.h1, { color: colors.ink }]}>Library</Text>
-
-      {/* Word Packs */}
-      <SectionTitle>Word Packs</SectionTitle>
-      <Text style={[styles.blurb, { color: colors.muted }]}>
-        Find the precise word. Learn what it means, then put it into a thought of your own.
-      </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packs}>
-        {WORD_PACKS.map((p) => {
-          const done = p.words.filter((w) => {
-            const e = book[w.word.toLowerCase()];
-            return e && isLearned(e);
-          }).length;
-          return (
-            <Pressable
-              key={p.id}
-              accessibilityRole="button"
-              accessibilityLabel={`${p.title}, ${p.words.length} words${bookReady ? `, ${done} comfortable` : ''}${!p.free && !profile.pro ? ', practice requires Pro' : ''}`}
-              onPress={() => router.push({ pathname: '/pack/[id]', params: { id: p.id } })}
-              style={({ pressed }) => [styles.pack, { backgroundColor: colors.card, opacity: pressed ? 0.85 : 1 }]}
-            >
-              <View style={styles.packTop}>
-                <Text style={[styles.packCount, { color: colors.cardMuted }]}>{p.words.length} WORDS</Text>
-                {!p.free && !profile.pro ? <ProBadge /> : p.free ? <Text style={[styles.free, { color: colors.good }]}>FREE</Text> : null}
-              </View>
-              <Text style={[styles.packTitle, { color: colors.cardInk }]}>{p.title}</Text>
-              <Text style={[styles.packWords, { color: colors.cardMuted }]} numberOfLines={2}>
-                {p.words.slice(0, 3).map((w) => w.word).join(' · ')}…
-              </Text>
-              <View style={[styles.packBar, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-                <View style={[styles.packFill, { backgroundColor: colors.good, width: `${(done / p.words.length) * 100}%` }]} />
-              </View>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => router.push('/words')}
-        style={({ pressed }) => [styles.wordsRow, { backgroundColor: colors.signalSoft, opacity: pressed ? 0.8 : 1 }]}
-      >
-        <Ionicons name="bookmark" size={20} color={colors.signal} />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.wordsTitle, { color: colors.ink }]}>Your words</Text>
-          <Text style={[styles.wordsMeta, { color: colors.muted }]}>
-            {!bookReady ? 'Loading your words…' : learning.length + learned.length === 0 ? 'Words you practise or trip on collect here' : `${learning.length} learning · ${learned.length} comfortable`}
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={[styles.wrap, { paddingTop: insets.top + space(2), paddingBottom: space(4) }]}>
+      <View style={styles.header}>
+        <Text accessibilityRole="header" style={[styles.h1, { color: colors.ink }]}>Library</Text>
+        <Text style={[styles.lead, { color: colors.muted }]}>Something to say. More ways to practise.</Text>
+      </View>
+      <TopicTalks level={level} onLevel={setLevel} records={records} ready={ready} line={line} onOpen={(p) => router.push(topicRoute(p.id))} />
+      <View style={styles.section}>
+        <Text accessibilityRole="header" style={[styles.h2, { color: colors.ink }]}>Word packs</Text>
+        <Text style={[styles.lead, { color: colors.muted }]}>Find the precise word, then make it your own.</Text>
+        <ScrollView horizontal={!largeText} showsHorizontalScrollIndicator={!largeText} contentContainerStyle={[styles.packs, largeText && styles.packList]}>
+          {WORD_PACKS.map((p) => <PackCard key={p.id} pack={p} done={packDone(p, book)} ready={ready} line={packLine(p.id, line)} pro={profile.pro} width={packWidth} onPress={() => router.push({ pathname: '/pack/[id]', params: { id: p.id } })} />)}
+        </ScrollView>
+      </View>
+      <View style={styles.section}>
+        <ShelfRow icon="bookmark-outline" title="Your words" meta={wordsMeta(ready, learning.length, learned.length)} onPress={() => router.push('/words')} />
+        <ShelfRow icon="document-text-outline" title="Your scripts" meta={scriptsMeta(ready, scriptCount, profile.pro)} onPress={() => router.push('/scripts')} />
+      </View>
+      <View style={[styles.reading, { borderTopColor: colors.line }]}>
+        <ReadAloud passages={PASSAGES} todayId={today.id} pro={profile.pro} ready={ready}
+          onRead={(p) => { if (p.id === today.id || requirePro(profile, 'library')) router.push({ pathname: '/session/[id]', params: { id: p.id } }); }}
+          onColdRead={() => { const p = coldReadPick(PASSAGES, sessions); if (p && requirePro(profile, 'cold')) router.push({ pathname: '/session/[id]', params: { id: p.id, cold: '1' } }); }} />
+      </View>
+      <Pressable accessibilityRole="button" onPress={() => router.push('/moment')} style={({ pressed }) => [styles.plan, { opacity: pressed ? 0.7 : 1 }]}>
+        <Ionicons name="calendar-outline" size={18} color={colors.muted} />
+        <Text style={[styles.planText, { color: colors.muted }]}>Something coming up? <Text style={{ color: colors.ink, fontWeight: '700' }}>Plan for it</Text></Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.muted} />
       </Pressable>
-
-      {/* Passages */}
-      <Text style={[styles.sub, { color: colors.muted, marginTop: space(1) }]}>
-        {profile.pro ? 'Every passage, any time.' : 'Today’s read is free. The rest of the passages come with Pro.'}
-      </Text>
-      {LEVELS.map(({ level, blurb }) => (
-        <View key={level} style={{ gap: space(1.25) }}>
-          <SectionTitle>{level}</SectionTitle>
-          <Text style={[styles.blurb, { color: colors.muted }]}>{blurb}</Text>
-          {PASSAGES.filter((p) => p.level === level).map((p) => {
-            const locked = !profile.pro && p.id !== today.id;
-            return (
-              <Row
-                key={p.id}
-                title={p.title}
-                meta={`${p.id === today.id ? 'Today · ' : ''}${duration(estimateSeconds(p.text))}`}
-                locked={locked}
-                onPress={() =>
-                  (p.id === today.id || requirePro(profile, 'library')) &&
-                  router.push({ pathname: '/session/[id]', params: { id: p.id } })
-                }
-              />
-            );
-          })}
-        </View>
-      ))}
     </ScrollView>
   );
 }
-
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: space(2.5), gap: space(1.5) },
-  h1: { fontFamily: fonts.displayBold, fontSize: 32 },
-  sub: { fontSize: 15, lineHeight: 21 },
-  blurb: { fontSize: 14, marginTop: -space(1) },
-  packs: { gap: space(1.25), paddingRight: space(2.5) },
-  pack: { width: 220, borderRadius: 20, padding: space(2), gap: 6 },
-  packTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  packCount: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  free: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-  packTitle: { fontFamily: fonts.readingBold, fontSize: 21 },
-  packWords: { fontSize: 13, lineHeight: 18 },
-  packBar: { height: 4, borderRadius: 2, marginTop: 6 },
-  packFill: { height: 4, borderRadius: 2 },
-  wordsRow: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), borderRadius: 16, padding: space(2) },
-  wordsTitle: { fontSize: 17, fontWeight: '700' },
-  wordsMeta: { fontSize: 14, marginTop: 2 },
+  wrap: { paddingHorizontal: space(2.5), gap: space(3), maxWidth: 620, width: '100%', alignSelf: 'center' },
+  header: { gap: space(0.75) },
+  h1: { fontFamily: fonts.displayBold, fontSize: 34, lineHeight: 42 },
+  h2: { fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 30 },
+  lead: { fontSize: 15, lineHeight: 22 },
+  section: { gap: space(1.25) },
+  packs: { gap: space(1.25), paddingBottom: space(1) },
+  packList: { flexDirection: 'column' },
+  reading: { borderTopWidth: 1, paddingTop: space(2.5) },
+  plan: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: space(1), paddingBottom: space(1) },
+  planText: { flex: 1, fontSize: 14, lineHeight: 21 },
 });

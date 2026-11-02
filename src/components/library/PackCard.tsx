@@ -16,6 +16,7 @@ export function PackCard({
   line,
   pro,
   onPress,
+  width = 212,
 }: {
   pack: WordPack;
   /** Words comfortable so far (libraryData packDone). */
@@ -25,6 +26,7 @@ export function PackCard({
   line: LineId | undefined;
   pro: boolean;
   onPress: () => void;
+  width?: number;
 }) {
   const colors = useColors();
   const total = pack.words.length;
@@ -38,7 +40,7 @@ export function PackCard({
       accessibilityRole="button"
       accessibilityLabel={`${pack.title}. ${ready ? packMeta(done, total) : `${total} words`}.${line ? ` On ${LINE_NAME[line]}.` : ''}${pack.free ? ' Free.' : locked ? ' Practice needs Pro.' : ''}`}
       onPress={onPress}
-      style={({ pressed }) => [styles.card, { backgroundColor: bg, borderColor: line ? bg : colors.line, opacity: pressed ? 0.85 : 1 }]}
+      style={({ pressed }) => [styles.card, { width, backgroundColor: bg, borderColor: line ? bg : colors.line, opacity: pressed ? 0.85 : 1 }]}
     >
       <View style={styles.top}>
         <Text style={[styles.count, { color: colors.muted }]}>{ready ? packMeta(done, total).toUpperCase() : `${total} WORDS`}</Text>
@@ -51,10 +53,10 @@ export function PackCard({
           </View>
         ) : null}
       </View>
-      <Text style={[styles.title, { color: colors.ink }]} numberOfLines={2}>
+      <Text style={[styles.title, { color: colors.ink }]} >
         {pack.title}
       </Text>
-      <Text style={[styles.words, { color: colors.muted }]} numberOfLines={2}>
+      <Text style={[styles.words, { color: colors.muted }]} >
         {pack.words
           .slice(0, 3)
           .map((w) => w.word)
@@ -68,7 +70,7 @@ export function PackCard({
         {line && (
           <View style={styles.lineRow}>
             <View style={[styles.dot, { backgroundColor: colors[line] }]} />
-            <Text style={[styles.lineText, { color: colors.ink }]} numberOfLines={1}>
+            <Text style={[styles.lineText, { color: colors.ink }]} >
               On {LINE_NAME[line]}
             </Text>
           </View>

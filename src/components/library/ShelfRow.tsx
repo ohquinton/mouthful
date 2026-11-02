@@ -15,6 +15,7 @@ export function ShelfRow({
   onPress,
   right,
   hint,
+  disabled = false,
 }: {
   icon: IconName;
   title: string;
@@ -22,21 +23,24 @@ export function ShelfRow({
   onPress: () => void;
   right?: ReactNode;
   hint?: string;
+  disabled?: boolean;
 }) {
   const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
+      accessibilityState={{ disabled }}
       accessibilityRole="button"
       accessibilityLabel={`${title}. ${meta}`}
       accessibilityHint={hint}
-      style={({ pressed }) => [styles.row, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.75 : 1 }]}
+      style={({ pressed }) => [styles.row, { backgroundColor: colors.surface, borderColor: colors.line, opacity: disabled ? 0.6 : pressed ? 0.75 : 1 }]}
     >
       <View style={[styles.icon, { backgroundColor: colors.signalSoft }]}>
         <Ionicons name={icon} size={20} color={colors.signal} />
       </View>
       <View style={styles.text}>
-        <Text style={[styles.title, { color: colors.ink }]} numberOfLines={1}>
+        <Text style={[styles.title, { color: colors.ink }]} >
           {title}
         </Text>
         <Text style={[styles.meta, { color: colors.muted }]}>{meta}</Text>

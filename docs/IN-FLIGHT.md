@@ -63,3 +63,17 @@ The original worktree is preserved. Library remains unfinished and is not includ
   the expected browser automation tools were unavailable. No fresh browser sign-off is claimed.
 - Native compilation and phone rendering remain unverified. No EAS build, release or OTA was sent.
 - Native integration checklist and limitations: design/rive/drop/README.md.
+
+## Library completed on Codex branch, 2026-11-02
+
+The earlier Library WIP status above is superseded: foundations and screen wiring are
+integrated on `codex/remodel`. `Codex Library` remains preserved for provenance, not
+pending integration. See docs/wip/library.md for exact coverage and remaining phone checks.
+Onboarding's first talk now offers Skip for now before starting the mic; the existing
+skip handler finishes onboarding without fabricating a completed stop or session.
+Cold-read paywall copy now describes no-preview practice, without promising never-seen content.
+
+The supported browser tool is working with Metro on port 8095. Verified dark phone-width
+Library, topic selection/navigation, compact long-prompt layout, refocus, cold-read Pro gate
+and first-talk skip. Earlier browser-unavailable notes describe the previous checkpoint.
+Native Rive and microphone verification remain outstanding; no native release was sent.

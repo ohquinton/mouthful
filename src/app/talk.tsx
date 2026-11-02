@@ -354,7 +354,7 @@ export default function TopicTalk() {
                 <Text style={[styles.quiet, { color: colors.muted }]}>Different topic</Text>
               </Pressable>
             )}
-            {notice && fromOnboarding && (
+            {fromOnboarding && listener.state !== 'asking' && (
               <Pressable onPress={skip} hitSlop={8} accessibilityRole="button">
                 <Text style={[styles.quiet, { color: colors.muted }]}>Skip for now</Text>
               </Pressable>

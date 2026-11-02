@@ -20,12 +20,14 @@ export function ReadAloud({
   passages,
   todayId,
   pro,
+  ready,
   onRead,
   onColdRead,
 }: {
   passages: readonly Passage[];
   todayId: string;
   pro: boolean;
+  ready: boolean;
   /** Opens Glide on a passage (the screen applies the Pro rule for anything but today's). */
   onRead: (p: Passage) => void;
   onColdRead: () => void;
@@ -57,8 +59,10 @@ export function ReadAloud({
           <ShelfRow
             icon="eye-outline"
             title="Cold read"
-            meta="A passage you haven’t seen, read out loud as it appears."
+            disabled={!ready}
+            meta={ready ? "Read a passage out loud without a preview." : "Loading your reading history…"}
             right={pro ? undefined : <ProBadge />}
+            hint={pro ? undefined : "Requires Pro"}
             onPress={onColdRead}
           />
           {LEVELS.map(({ level, blurb }) => (
