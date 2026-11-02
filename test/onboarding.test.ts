@@ -22,6 +22,7 @@ import {
   UM_NOTE,
   WHEN_CHIPS,
 } from '../src/onboarding';
+import { STOPPED_SHARE, stoppedEarlyAt, wholeSeconds } from '../src/store/minute';
 import { countdownLabel, getMoment } from '../src/content/moments';
 import { MINUTE_PROMPTS } from '../src/content/prompts';
 
@@ -126,7 +127,21 @@ describe('startingPoint', () => {
       { label: 'um/uh the phone heard', value: '1' },
     ]);
     expect(p.keptGoing).toBe(true);
-    expect(p.tomorrow).toBe('Tomorrow: a new topic and a full minute. Try to beat 74.');
+    // No number to beat: tomorrow's full minute isn't comparable with 30 seconds.
+    expect(p.tomorrow).toBe('Tomorrow: a new topic and a full minute.');
+    expect(p.tomorrow).not.toMatch(/\d/);
+  });
+
+  it('uses the store’s one stopped-early threshold and one rounding rule', () => {
+    expect(STOPPED_EARLY_SECONDS).toBe(STOPPED_SHARE * 30);
+    // 22.4 s: stopped early here and on the results screen alike, and the seconds round down.
+    const p = startingPoint(talk(22.4))!;
+    expect(p.keptGoing).toBe(false);
+    expect(p.keptGoing).toBe(!stoppedEarlyAt(22.4, 30));
+    expect(p.tomorrow).toBe('You stopped at 22 s. Tomorrow, try to keep going for the whole minute.');
+    expect(p.rows[0].value).toBe(`${wholeSeconds(22.4)} of 30 s`);
+    expect(startingPoint(talk(22.6))!.keptGoing).toBe(true);
+    expect(startingPoint(talk(29.8))!.rows[0].value).toBe('29 of 30 s');
   });
 
   it('counts long pauses and never shows more talk than the 30 seconds', () => {

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PACE_BANDS } from '../../engine/score';
 import { contextOf, day1VsNow, heatStrip, paceContexts, personalBests, recent, retestDue, SpeakingContext } from '../../engine/progress';
 import { loadSessions, SavedSession, streak } from '../../store/sessions';
+import { chartsHint, fullTalksOnly } from '../../store/minute';
 import { useProfile } from '../../store/profile';
 import { requirePro } from '../../pro';
 import { FillerBars, HeatStrip, PaceChart } from '../../components/Charts';
@@ -31,16 +32,20 @@ export default function Progress() {
   );
 
   const chartW = Math.min(width, 560) - space(2.5) * 2 - space(2) * 2;
-  const shown = recent(sessions, profile.pro ? 30 : FREE_HISTORY);
+  // 30-second talks (onboarding's first) stay out of every number and chart: half a minute's pace
+  // and fillers per minute aren't comparable with full minutes. They still count as days practised.
+  const full = fullTalksOnly(sessions);
+  const shown = recent(full, profile.pro ? 30 : FREE_HISTORY);
   const { available: contexts, initial } = paceContexts(shown);
   const ctx = paceCtx && contexts.includes(paceCtx) ? paceCtx : initial;
   const paceShown = shown.filter((s) => contextOf(s) === ctx);
   const band = PACE_BANDS[ctx];
-  const bests = personalBests(sessions);
+  const bests = personalBests(full);
   // One Minute sessions are left out of Best score: the Tape shows them as Flow, a different
   // 0–100 scale, so their old Free talk `score` would be a number the reader never saw.
-  const bestScore = personalBests(sessions.filter((s) => s.kind !== 'minute')).bestScore;
-  const cmp = day1VsNow(sessions, profile.baselineSessionId);
+  const bestScore = personalBests(full.filter((s) => s.kind !== 'minute')).bestScore;
+  const daysPractised = personalBests(sessions).totalDays;
+  const cmp = day1VsNow(full, profile.baselineSessionId);
   const due = retestDue(sessions, profile.baselineSessionId);
   const { days } = streak(sessions);
   const day1Audio = (cmp?.day1 as SavedSession | undefined)?.recordings ?? [];
@@ -50,8 +55,8 @@ export default function Progress() {
     return (
       <View style={[styles.empty, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
         <Text style={[styles.h1, { color: colors.ink }]}>Progress</Text>
-        <Text style={[styles.lead, { color: colors.muted }]}>Nothing here yet. Your first read takes about a minute.</Text>
-        <PrimaryButton label="Do today’s read" onPress={() => router.navigate('/')} />
+        <Text style={[styles.lead, { color: colors.muted }]}>Nothing here yet. Your first topic talk takes a minute.</Text>
+        <PrimaryButton label="Do today’s talk" onPress={() => router.navigate('/')} />
       </View>
     );
   }
@@ -59,7 +64,7 @@ export default function Progress() {
   const tiles = [
     { label: 'Best score', value: bestScore ?? '–' },
     { label: 'Fewest fillers', value: bests.cleanest !== undefined ? `${bests.cleanest}/min` : '–' },
-    { label: 'Days practised', value: bests.totalDays },
+    { label: 'Days practised', value: daysPractised },
     { label: 'Current streak', value: days },
   ];
 
@@ -159,16 +164,16 @@ export default function Progress() {
           </View>
         </>
       ) : (
-        <Text style={[styles.lead, { color: colors.muted }]}>Do one more session and your charts appear here.</Text>
+        <Text style={[styles.lead, { color: colors.muted }]}>{chartsHint(shown.length)}</Text>
       )}
 
-      {!profile.pro && sessions.length > FREE_HISTORY && (
+      {!profile.pro && full.length > FREE_HISTORY && (
         <Pressable
           onPress={() => requirePro(profile, 'history')}
           style={[styles.upsell, { backgroundColor: colors.signalSoft }]}
         >
           <Text style={[styles.upsellText, { color: colors.ink }]}>
-            Showing your last {FREE_HISTORY} sessions. See all {sessions.length}.
+            Showing your last {FREE_HISTORY} sessions. See all {full.length}.
           </Text>
           <ProBadge />
         </Pressable>

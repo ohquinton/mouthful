@@ -5,6 +5,8 @@
 import { FLOW_SLOTS, FLOW_VERSION, flowScore, MIN_RATE_SECONDS, MINUTE_SECONDS, minuteLine, minuteTrend, type FlowSlots, type MinuteSummary, type MinuteTrend } from '../engine/minute';
 import { pooledVariety, type VocabularyVariety } from '../engine/wording';
 import type { HabitWord } from '../engine/habits';
+import { calendarDay } from '../engine/days';
+import { isLastStop, stopNumber } from '../content/lines';
 import type { SavedSession } from './sessions';
 
 /** A time away from the minute: the error card was up (a call, Siri) and then "Carry on" resumed it. */
@@ -111,14 +113,31 @@ export function isShortTalk(s: Pick<SavedSession, 'minute' | 'flowVersion'>): bo
   return (s.minute as MinuteRecord | undefined)?.limitSeconds === 30 || (s.flowVersion ?? '').endsWith('-s30');
 }
 
-/** Stopping before this share of the talk is "stopped early" (45 s of a minute, as engine/minute.ts). */
-const STOPPED_SHARE = 0.75;
+/**
+ * Stopping before this share of the talk is "stopped early" (45 s of a minute, as engine/minute.ts).
+ * The one threshold: the results, the starting point (src/onboarding.ts) and the coaching line agree.
+ */
+export const STOPPED_SHARE = 0.75;
+
+/** Did a talk of `limit` seconds stop early after `talkSeconds`? (Under 45 s of 60, under 22.5 s of 30.) */
+export function stoppedEarlyAt(talkSeconds: number, limit: number): boolean {
+  return talkSeconds < STOPPED_SHARE * limit;
+}
 
 /** Did the talk stop before 45 s of a minute (or 22.5 s of a 30-second talk)? Gentle, never a failure. */
 export function stoppedEarly(s: Pick<SavedSession, 'minute'>): boolean {
   const m = s.minute as MinuteRecord | undefined;
   if (!m) return false;
-  return m.talkSeconds < STOPPED_SHARE * (m.limitSeconds ?? 60);
+  return stoppedEarlyAt(m.talkSeconds, m.limitSeconds ?? 60);
+}
+
+/**
+ * Talk seconds as a whole number, the one rounding rule for every "N s" about how long someone
+ * talked: down, as the engine's "You stopped at N s" line does (engine/minute.ts minuteLine). So
+ * the line, the Kept going tile and the starting point never disagree by a second.
+ */
+export function wholeSeconds(talkSeconds: number): number {
+  return Math.max(0, Math.floor(talkSeconds));
 }
 
 const KEPT_GOING_LINE = 'You kept going the whole minute.';
@@ -341,7 +360,14 @@ export function usualFor(s: SavedSession, all: readonly SavedSession[]): { trend
  * far". Stopped early, down or about the same: "Your usual is 72", quiet, never a down arrow. Under 3
  * earlier talks: how many more until there's a usual.
  */
-export function usualText(u: { trend: MinuteTrend | null; past: number; best: boolean }, early: boolean): { text: string; good: boolean } {
+export function usualText(
+  u: { trend: MinuteTrend | null; past: number; best: boolean },
+  early: boolean,
+  short = false,
+): { text: string; good: boolean } | null {
+  // A 30-second talk never gets a usual (it never joins the full-minute trend), so no countdown
+  // to one: "3 more talks and you'll see your usual" would be a promise it can't keep.
+  if (short) return null;
   const t = u.trend;
   if (!t || t.delta === undefined) {
     const more = Math.max(1, 3 - u.past);
@@ -354,20 +380,66 @@ export function usualText(u: { trend: MinuteTrend | null; past: number; best: bo
   return { text: `Your usual is ${usual}`, good: false };
 }
 
-/**
- * The stop's number for the results strip, from the end of its id ("sharp-6" → 6), until
- * content/lines.ts can say. Undefined when the talk wasn't a stop or the id ends in no number.
- */
-export function stopNumber(stopId: string | undefined): number | undefined {
-  const n = stopId?.match(/(\d+)$/)?.[1];
-  return n ? Number(n) : undefined;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "Nov 1": a talk's local day, the same whatever the phone's language (no Intl surprises). */
+export function shortDate(at: number): string {
+  const d = new Date(at);
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
 
-/** "Stop 6 done" / "Stop 7 tomorrow: beat 78". Stopped early: no "beat" (the stop still counts). */
-export function stripText(stop: number | undefined, flow: number, early: boolean): { done: string; next: string } {
-  const beat = early ? '' : `: beat ${flow}`;
-  if (stop === undefined) return { done: 'Today’s talk done', next: early ? 'Talk again tomorrow' : `Tomorrow${beat}` };
+export type StripInput = {
+  stopId: string | undefined;
+  flow: number;
+  early: boolean;
+  /** A 30-second talk: tomorrow is a full minute, so there's no number to beat. */
+  short: boolean;
+  /** When the talk happened, and now. A talk from another day says what happened then. */
+  at: number;
+  now: number;
+  /** The stop after this one is already done, so "Stop 7 tomorrow" would be wrong even today. */
+  nextDone?: boolean;
+};
+
+/** Is the strip about a talk just done (today, and the next stop not done yet)? Else it's history. */
+export function stripIsFresh(i: Pick<StripInput, 'at' | 'now' | 'nextDone'>): boolean {
+  return calendarDay(i.at) === calendarDay(i.now) && !i.nextDone;
+}
+
+/**
+ * The results strip. Just now: "Stop 6 done" / "Stop 7 tomorrow: beat 78" (stopped early or a
+ * 30-second talk: no "beat"). Reopened on another day (or once the next stop is done): what
+ * happened then, "Stop 6 done · Nov 1", and nothing about tomorrow. The last stop never points at
+ * a stop that doesn't exist: "Line complete". Stop numbers come from content/lines.ts.
+ */
+export function stripText(i: StripInput): { done: string; next: string } {
+  const stop = stopNumber(i.stopId);
+  const last = isLastStop(i.stopId);
+  if (!stripIsFresh(i)) {
+    const what = stop === undefined ? 'Talk done' : `Stop ${stop} done`;
+    return { done: `${what} · ${shortDate(i.at)}`, next: last ? 'Line complete' : '' };
+  }
+  const beat = i.early || i.short ? '' : `: beat ${i.flow}`;
+  if (stop === undefined) {
+    if (i.short) return { done: 'Today’s talk done', next: 'Tomorrow: a full minute' };
+    return { done: 'Today’s talk done', next: i.early ? 'Talk again tomorrow' : `Tomorrow${beat}` };
+  }
+  if (last) return { done: `Stop ${stop} done`, next: 'Line complete' };
   return { done: `Stop ${stop} done`, next: `Stop ${stop + 1} tomorrow${beat}` };
+}
+
+/**
+ * Sessions for Progress's numbers and charts: everything but 30-second talks (onboarding's first),
+ * which would sit in a full-minute trend at half the length. They still count as days practised.
+ */
+export function fullTalksOnly<T extends Pick<SavedSession, 'minute' | 'flowVersion'>>(sessions: readonly T[]): T[] {
+  return sessions.filter((s) => !isShortTalk(s));
+}
+
+/** Progress, before its charts appear (they need 2 sessions): how many more talks until they do. */
+export function chartsHint(count: number): string {
+  const more = Math.max(1, 2 - count);
+  return more === 1 ? 'One more talk and your charts appear here.' : 'Two more talks and your charts appear here.';
 }
 
 /** "1 One Minute talk", "3 One Minute talks": the mode's name, so "minute" is never read as 60 seconds. */

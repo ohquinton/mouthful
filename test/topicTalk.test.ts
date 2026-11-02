@@ -14,8 +14,13 @@ import {
   minuteRecord,
   pastMinutes,
   REPEATED_FINDING_AT,
-  stopNumber,
+  chartsHint,
+  fullTalksOnly,
+  shortDate,
+  STOPPED_SHARE,
   stoppedEarly,
+  stoppedEarlyAt,
+  stripIsFresh,
   stripText,
   talkLength,
   usualFor,
@@ -23,8 +28,11 @@ import {
   varietyText,
   versionFor,
   weeklyVariety,
+  wholeSeconds,
   type MinuteRecord,
+  type StripInput,
 } from '../src/store/minute';
+import { LINES } from '../src/content/lines';
 
 const PLAIN = 'we should keep the plan simple and test it with real people before the end of the month'.split(' ');
 
@@ -203,9 +211,15 @@ describe('your usual', () => {
     const all = [at('a', 60), at('now', 70)];
     const u = usualFor(all[1], all);
     expect(usualText(u, false)).toEqual({ text: '2 more talks and you’ll see your usual.', good: false });
-    expect(usualText(usualFor(all[0], all), false).text).toBe('3 more talks and you’ll see your usual.');
+    expect(usualText(usualFor(all[0], all), false)!.text).toBe('3 more talks and you’ll see your usual.');
     const three = [at('a', 60), at('b', 60), at('now', 70)];
-    expect(usualText(usualFor(three[2], three), false).text).toBe('1 more talk and you’ll see your usual.');
+    expect(usualText(usualFor(three[2], three), false)!.text).toBe('1 more talk and you’ll see your usual.');
+  });
+
+  it('a 30-second talk gets no usual line at all (never "3 more talks and you’ll see your usual")', () => {
+    const short = session(forLength(summary(60, { stepMs: 450 }), 30), { id: 'now' }, 30);
+    expect(usualText(usualFor(short, [short]), false, true)).toBeNull();
+    expect(usualText(usualFor(short, [short]), true, true)).toBeNull();
   });
 
   it('up: "↑ 6 on your usual 72"; a best says so; down or same is quiet, never a down arrow', () => {
@@ -250,18 +264,89 @@ describe('vocabulary variety: weekly, never per talk', () => {
 });
 
 describe('the stop strip', () => {
-  it('reads the stop number from the end of its id', () => {
-    expect(stopNumber('sharp-6')).toBe(6);
-    expect(stopNumber('clear.12')).toBe(12);
-    expect(stopNumber('sharp-talk')).toBeUndefined();
-    expect(stopNumber(undefined)).toBeUndefined();
+  const nov1 = new Date(2026, 10, 1, 9).getTime();
+  const later = new Date(2026, 10, 1, 21).getTime();
+  const nov4 = new Date(2026, 10, 4, 9).getTime();
+  const strip = (over: Partial<StripInput> = {}) =>
+    stripText({ stopId: 'sharp-06', flow: 78, early: false, short: false, at: nov1, now: later, ...over });
+
+  it('just now: "Stop 6 done · Stop 7 tomorrow: beat 78"; stopped early has no "beat"; no stop still moves on', () => {
+    expect(strip()).toEqual({ done: 'Stop 6 done', next: 'Stop 7 tomorrow: beat 78' });
+    expect(strip({ flow: 55, early: true })).toEqual({ done: 'Stop 6 done', next: 'Stop 7 tomorrow' });
+    expect(strip({ stopId: undefined })).toEqual({ done: 'Today’s talk done', next: 'Tomorrow: beat 78' });
+    expect(strip({ stopId: undefined, flow: 55, early: true })).toEqual({ done: 'Today’s talk done', next: 'Talk again tomorrow' });
   });
 
-  it('"Stop 6 done · Stop 7 tomorrow: beat 78"; stopped early has no "beat"; no stop still moves on', () => {
-    expect(stripText(6, 78, false)).toEqual({ done: 'Stop 6 done', next: 'Stop 7 tomorrow: beat 78' });
-    expect(stripText(6, 55, true)).toEqual({ done: 'Stop 6 done', next: 'Stop 7 tomorrow' });
-    expect(stripText(undefined, 78, false)).toEqual({ done: 'Today’s talk done', next: 'Tomorrow: beat 78' });
-    expect(stripText(undefined, 55, true)).toEqual({ done: 'Today’s talk done', next: 'Talk again tomorrow' });
+  it('reopened on a later day: says what happened then, never "Tomorrow"', () => {
+    expect(strip({ now: nov4 })).toEqual({ done: 'Stop 6 done · Nov 1', next: '' });
+    expect(strip({ stopId: undefined, now: nov4 })).toEqual({ done: 'Talk done · Nov 1', next: '' });
+    expect(stripIsFresh({ at: nov1, now: nov4 })).toBe(false);
+    expect(stripIsFresh({ at: nov1, now: later })).toBe(true);
+  });
+
+  it('the same day, once the next stop is done too: also history', () => {
+    expect(strip({ nextDone: true })).toEqual({ done: 'Stop 6 done · Nov 1', next: '' });
+    expect(stripIsFresh({ at: nov1, now: later, nextDone: true })).toBe(false);
+  });
+
+  it('the last stop says "Line complete", never "Stop 15"', () => {
+    const last = LINES.sharp[LINES.sharp.length - 1].id;
+    expect(strip({ stopId: last })).toEqual({ done: `Stop ${LINES.sharp.length} done`, next: 'Line complete' });
+    expect(strip({ stopId: last, now: nov4 })).toEqual({ done: `Stop ${LINES.sharp.length} done · Nov 1`, next: 'Line complete' });
+    expect(JSON.stringify(strip({ stopId: LINES.clear[LINES.clear.length - 1].id }))).not.toMatch(/Stop 15/);
+  });
+
+  it('takes stop numbers from the line, never from digits in the id', () => {
+    expect(strip({ stopId: 'clear-12' }).done).toBe('Stop 12 done');
+    // Not a real stop: no made-up number.
+    expect(strip({ stopId: 'sharp-6' }).done).toBe('Today’s talk done');
+    expect(strip({ stopId: 'sharp-99' }).done).toBe('Today’s talk done');
+  });
+
+  it('a 30-second talk has no number to beat: tomorrow is a full minute', () => {
+    expect(strip({ stopId: 'sharp-01', short: true, flow: 74 })).toEqual({ done: 'Stop 1 done', next: 'Stop 2 tomorrow' });
+    expect(strip({ stopId: undefined, short: true })).toEqual({ done: 'Today’s talk done', next: 'Tomorrow: a full minute' });
+  });
+
+  it('dates read the same whatever the phone language: "Nov 1"', () => {
+    expect(shortDate(nov1)).toBe('Nov 1');
+    expect(shortDate(new Date(2026, 0, 31, 23, 50).getTime())).toBe('Jan 31');
+  });
+});
+
+describe('one rule for stopped early and its seconds', () => {
+  it('one threshold: 45 s of a minute, 22.5 s of 30 seconds', () => {
+    expect(STOPPED_SHARE).toBe(0.75);
+    expect(stoppedEarlyAt(44.9, 60)).toBe(true);
+    expect(stoppedEarlyAt(45, 60)).toBe(false);
+    expect(stoppedEarlyAt(22.4, 30)).toBe(true);
+    expect(stoppedEarlyAt(22.5, 30)).toBe(false);
+  });
+
+  it('whole seconds round down, as the engine’s "You stopped at N s" does', () => {
+    expect(wholeSeconds(30.9)).toBe(30);
+    expect(wholeSeconds(59.4)).toBe(59);
+    expect(wholeSeconds(-1)).toBe(0);
+    // The Kept going tile and the coaching line agree on a talk that stopped at 30.9 s.
+    const m = summary(70, { stepMs: 450 }); // last word at 1.5 + 69 × 0.45 = 32.55 s
+    const s = session(m);
+    expect(mainFinding(s)).toContain(`You stopped at ${wholeSeconds(s.minute!.talkSeconds)} s.`);
+  });
+});
+
+describe('Progress leaves 30-second talks out', () => {
+  const full = session(summary(130), { id: 'full' });
+  const short = session(forLength(summary(60, { stepMs: 450 }), 30), { id: 'short' }, 30);
+
+  it('keeps full minutes and readings, drops 30-second talks', () => {
+    const reading = { ...full, id: 'read', kind: undefined, minute: undefined, flowVersion: undefined, passageId: 'night-shift' };
+    expect(fullTalksOnly([full, short, reading]).map((s) => s.id)).toEqual(['full', 'read']);
+  });
+
+  it('says how many more talks until the charts appear', () => {
+    expect(chartsHint(0)).toBe('Two more talks and your charts appear here.');
+    expect(chartsHint(1)).toBe('One more talk and your charts appear here.');
+    expect(chartsHint(1)).not.toMatch(/read/);
   });
 });
 

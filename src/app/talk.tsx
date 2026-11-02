@@ -10,19 +10,11 @@ import { sessionScore, wordsPerMinute } from '../engine/score';
 import { MIN_MINUTE_WORDS, minuteSummary, stampHeard } from '../engine/minute';
 import { minutePromptOfTheDay, promptAfter, promptById } from '../content/prompts';
 import { saveSession } from '../store/sessions';
-import {
-  forLength,
-  gapAfterBreak,
-  minuteCompleteProps,
-  minuteRecord,
-  stopNumber,
-  talkLength,
-  withoutBreaks,
-  type MinuteBreak,
-} from '../store/minute';
+import { forLength, gapAfterBreak, minuteCompleteProps, minuteRecord, talkLength, withoutBreaks, type MinuteBreak } from '../store/minute';
+import { stopNumber } from '../content/lines';
 import { listenLocale, useListener } from '../speech/useListener';
 import { PrimaryButton } from '../components/ui';
-import { Drop } from '../components/MinuteResult';
+import { Drop } from '../components/Drop';
 import { useProfile } from '../store/profile';
 import { track } from '../analytics';
 import { noteRoughPatch } from '../rating';
@@ -335,7 +327,7 @@ export default function TopicTalk() {
         {running ? (
           // The calm start: the button gives way to the Drop looking up at the topic, the ribbon and Finish.
           <Animated.View entering={still ? undefined : FadeIn.duration(200)} style={styles.liveFooter}>
-            <Drop size={36} pose="up" color={colors.button} />
+            <Drop height={44} pose="up" />
             <View style={styles.ribbon}>
               <VoiceRibbon level={level} color={colors.signal} height={22} />
             </View>

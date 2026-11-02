@@ -11,7 +11,8 @@ import { PrimaryButton } from '../../components/ui';
 import { FLOW_FINE_PRINT } from '../../components/MinuteResult';
 import { track } from '../../analytics';
 import { fonts, space, useColors } from '../../theme';
-import { Drop, TopBar } from './index';
+import { Drop } from '../../components/Drop';
+import { TopBar } from './index';
 
 type Reminder = { hour: number; minute: number };
 
@@ -37,8 +38,8 @@ function useCountUp(target: number | undefined, skip: boolean): { value: number;
 }
 
 /**
- * "Your starting point": the first 30-second topic talk's Flow, a short honest table, the number to
- * beat tomorrow and a reminder time. talk.tsx replaces itself with this screen (`?id=<sessionId>`).
+ * "Your starting point": the first 30-second topic talk's Flow, a short honest table, what
+ * tomorrow brings and a reminder time. talk.tsx replaces itself with this screen (`?id=<sessionId>`).
  * Brief: docs/briefs/remodel-screens.md section 1.4.
  */
 export default function StartingPoint() {
@@ -89,7 +90,7 @@ export default function StartingPoint() {
       <View style={screenStyle}>
         <TopBar onBack={back} active={dashIndex('start')} />
         <View style={styles.empty}>
-          <Drop height={96} look="up" />
+          <Drop height={96} pose="up" />
           <Text style={[styles.lead, styles.centerText, { color: colors.ink }]}>Couldn’t load that talk. Your line is ready anyway.</Text>
         </View>
         <View style={styles.foot}>
@@ -133,7 +134,7 @@ export default function StartingPoint() {
         {/* The Drop sits by the coaching line, never beside the number (ANIMATION.md). Happy eyes
             once the count lands, and only after a talk that kept going. */}
         <Animated.View entering={enter(rows.length)} style={styles.dropRow}>
-          <Drop height={76} look={point.keptGoing && count.done && !reduceMotion ? 'happy' : 'rest'} blink={!reduceMotion} />
+          <Drop height={76} pose={point.keptGoing && count.done ? 'happy' : 'rest'} />
           <Text style={[styles.tomorrow, { color: colors.ink }]}>{point.tomorrow}</Text>
         </Animated.View>
 

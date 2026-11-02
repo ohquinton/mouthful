@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
-import Svg, { Ellipse, Path } from 'react-native-svg';
 import Animated, {
   Easing,
   FadeIn,
@@ -21,25 +20,26 @@ import type { SavedSession } from '../store/sessions';
 import {
   fillerChips,
   firstWordSeconds,
+  isShortTalk,
   mainFinding,
-  stopNumber,
   stoppedEarly,
+  stripIsFresh,
   stripText,
   topRepeated,
   usualFor,
   usualText,
   varietyText,
   weeklyVariety,
+  wholeSeconds,
   type MinuteRecord,
 } from '../store/minute';
 import { promptById } from '../content/prompts';
+import { getStop, LINES, sessionForStop, stopNumber, withFirstTalk, type LineId } from '../content/lines';
+import { Drop } from './Drop';
 import { Colors, fonts, space } from '../theme';
 
 /** Always under the number (brief, Decision 3). Flow is about keeping going, never about how you sound. */
 export const FLOW_FINE_PRINT = 'Flow is whether you kept talking. It isn’t a grade of your accent or your English.';
-
-/** The Drop's eyes: white on the cobalt body in both modes, as button text is (ui.tsx). */
-const EYE = '#fff';
 
 // Timings (docs/design/RESULTS-ANIMATIONS.md). One celebration: the count. Everything else is a fade.
 const COUNT_MS = 700;
@@ -47,44 +47,6 @@ const TILE_STAGGER_MS = 100;
 const FINDING_AT_MS = COUNT_MS + 50;
 const STRIP_AT_MS = COUNT_MS + 150;
 const NOD_AT_MS = FINDING_AT_MS + 350;
-
-export type DropPose = 'rest' | 'happy' | 'up';
-
-/**
- * The Drop, flat: a cobalt body, two white eyes, no mouth, never sad (DECISIONS 2026-10-30).
- * `nodAt` (ms after mount) gives one small nod, once; nothing under Reduce Motion.
- * Lives here until the shared components/Drop.tsx lands (remodel-screens §0.3); talk.tsx uses it too.
- */
-export function Drop({ size = 44, pose = 'rest', color, nodAt }: { size?: number; pose?: DropPose; color: string; nodAt?: number }) {
-  const still = useReducedMotion();
-  const tilt = useSharedValue(0);
-  useEffect(() => {
-    if (still || nodAt === undefined) return;
-    const ease = { duration: 160, easing: Easing.inOut(Easing.quad) };
-    tilt.set(withDelay(nodAt, withSequence(withTiming(1, ease), withTiming(0, ease))));
-  }, [still, nodAt, tilt]);
-  // A nod: tip forward a few degrees and dip a little, then back.
-  const style = useAnimatedStyle(() => ({ transform: [{ translateY: tilt.value * 3 }, { rotate: `${tilt.value * 8}deg` }] }));
-  const eyeY = pose === 'up' ? 29 : 33;
-  return (
-    <Animated.View style={[{ width: size, height: size * 1.2 }, style]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <Svg width={size} height={size * 1.2} viewBox="0 0 40 48">
-        <Path d="M20 2 C17 8 4 21 4 31 A16 16 0 0 0 36 31 C36 21 23 8 20 2 Z" fill={color} />
-        {pose === 'happy' ? (
-          <>
-            <Path d="M11.5 34 Q14 30.5 16.5 34" stroke={EYE} strokeWidth={2.6} strokeLinecap="round" fill="none" />
-            <Path d="M23.5 34 Q26 30.5 28.5 34" stroke={EYE} strokeWidth={2.6} strokeLinecap="round" fill="none" />
-          </>
-        ) : (
-          <>
-            <Ellipse cx={14} cy={eyeY} rx={2.4} ry={3.4} fill={EYE} />
-            <Ellipse cx={26} cy={eyeY} rx={2.4} ry={3.4} fill={EYE} />
-          </>
-        )}
-      </Svg>
-    </Animated.View>
-  );
-}
 
 /**
  * A button that presses to 0.97 with a light haptic (RESULTS-ANIMATIONS §6). No larger scale.
@@ -141,7 +103,7 @@ function useCountUp(from: number, to: number, still: boolean): number {
 export function MinuteResult({
   s,
   all,
-  line,
+  chosenLine,
   onMeant,
   onBack,
   onAgain,
@@ -150,8 +112,12 @@ export function MinuteResult({
   s: SavedSession;
   /** Every saved session, oldest first: for your usual and the week's variety. */
   all: SavedSession[];
-  /** The reader's train line, read-only (profile.line), for the colour of the stop strip. */
-  line: 'sharp' | 'clear';
+  /**
+   * The reader's chosen line (profile.line), read-only: only to find onboarding's first talk, which
+   * is saved without a stopId but is stop 1 of this line (content/lines.ts withFirstTalk). The strip's
+   * colour comes from the stop's own line.
+   */
+  chosenLine: LineId;
   /** "I meant that" on a likely filler chip: the earliest standing occurrence of that word. */
   onMeant: (index: number, word: HabitWord) => void;
   onBack: () => void;
@@ -161,17 +127,29 @@ export function MinuteResult({
   const still = useReducedMotion();
   const m = s.minute as MinuteRecord;
   const limit = m.limitSeconds ?? 60;
+  const short = isShortTalk(s);
   const flow = s.flow ?? 0;
   const early = stoppedEarly(s);
   const usual = usualFor(s, all);
-  const under = usualText(usual, early);
+  // Null for a 30-second talk: it never gets a usual, so no countdown to one.
+  const under = usualText(usual, early, short);
   // Count from your usual (or 0 the first time): the number lands where you are against yourself.
   const [from] = useState(() => (usual.trend ? Math.round(usual.trend.median) : 0));
   const shown = useCountUp(from, flow, still);
   const [open, setOpen] = useState(true);
+  const [now] = useState(() => Date.now());
 
   const topic = promptById(s.promptId)?.text;
-  const strip = stripText(stopNumber(s.stopId), flow, early);
+  // The stop this talk completed, and its own line (not profile.line: it may be the other line).
+  const stopId = s.stopId ?? withFirstTalk(all, chosenLine).find((x) => x.id === s.id)?.stopId;
+  const stopInfo = getStop(stopId);
+  const stop = stopNumber(stopId);
+  const nextStop = stopInfo && stop !== undefined ? LINES[stopInfo.line][stop] : undefined;
+  const nextDone = !!nextStop && !!sessionForStop(nextStop.id, all);
+  const stripInput = { stopId, flow, early, short, at: s.at, now, nextDone };
+  const strip = stripText(stripInput);
+  // Reopened later: the strip says what happened then, drawn already, no hop onto tomorrow's stop.
+  const fresh = stripIsFresh(stripInput);
   // "34 s" never breaks across lines: a no-break space between the number and the s.
   const finding = mainFinding(s).replace(/(\d) s\b/g, '$1\u00a0s');
   const variety = weeklyVariety(all, s.at);
@@ -193,7 +171,8 @@ export function MinuteResult({
     top
       ? { label: 'Repeated words', value: top.word, unit: `×${top.count}`, note: 'Your most used word', tone: colors.muted, serif: true }
       : { label: 'Repeated words', value: 'None', note: 'No word stood out', tone: colors.muted },
-    { label: 'Kept going', value: `${Math.round(m.talkSeconds)}`, unit: 's', note: pausesNote, tone: colors.muted },
+    // Whole seconds by the same rule as "You stopped at N s" (wholeSeconds), so the two agree.
+    { label: 'Kept going', value: `${wholeSeconds(m.talkSeconds)}`, unit: 's', note: pausesNote, tone: colors.muted },
     first === undefined
       ? { label: 'First word', value: '–', note: 'The first 8 s are free', tone: colors.muted }
       : {
@@ -212,9 +191,10 @@ export function MinuteResult({
     },
   ];
 
+  // The strip in the colour of the stop's own line; a talk that wasn't a stop uses your line's.
+  const line = stopInfo?.line ?? chosenLine;
   const lineColour = colors[line];
   const lineSoft = line === 'sharp' ? colors.sharpSoft : colors.clearSoft;
-  const stop = stopNumber(s.stopId);
   // Checks drawn before the next stop: this one and up to two before it (fewer on stops 1 and 2).
   const doneDots = Math.max(1, Math.min(3, stop ?? 3));
 
@@ -235,18 +215,18 @@ export function MinuteResult({
         </Pressable>
       </View>
 
-      <View style={styles.scoreRow} accessible accessibilityLabel={`Flow ${flow} out of 100. ${under.text.replace('↑', 'up')}`}>
+      <View style={styles.scoreRow} accessible accessibilityLabel={`Flow ${flow} out of 100.${under ? ` ${under.text.replace('↑', 'up')}` : ''}`}>
         <Text style={[styles.score, { color: colors.ink }]}>{shown}</Text>
         <View style={styles.scoreSide}>
           <Text style={[styles.flowWord, { color: colors.ink }]}>Flow</Text>
-          <Text style={[styles.usual, { color: under.good ? colors.good : colors.muted }]}>{under.text}</Text>
+          {under && <Text style={[styles.usual, { color: under.good ? colors.good : colors.muted }]}>{under.text}</Text>}
         </View>
       </View>
       <Text style={[styles.fine, { color: colors.ink }]}>{FLOW_FINE_PRINT}</Text>
 
       {/* The one most useful finding, with the Drop next to the words, never next to the number. */}
       <Animated.View entering={still ? undefined : FadeIn.delay(FINDING_AT_MS).duration(300)} style={styles.finding}>
-        <Drop size={44} pose={early ? 'rest' : 'happy'} color={colors.button} nodAt={NOD_AT_MS} />
+        <Drop height={56} pose={early ? 'rest' : 'happy'} nodAt={NOD_AT_MS} />
         <Text style={[styles.findingText, { color: colors.ink }]}>
           {early && <Text style={{ fontWeight: '700' }}>A good start. </Text>}
           {finding}
@@ -260,7 +240,7 @@ export function MinuteResult({
         soft={lineSoft}
         colors={colors}
         happy={!early}
-        still={still}
+        still={still || !fresh}
       />
 
       <PressScale onPress={onBack} label="Back to the map" style={[styles.primary, { backgroundColor: colors.button }]}>
@@ -402,7 +382,7 @@ function Strip({
     <View
       style={[styles.strip, { backgroundColor: colors.surface, borderColor: colors.line }]}
       accessible
-      accessibilityLabel={`${text.done}. ${text.next}.`}
+      accessibilityLabel={text.next ? `${text.done}. ${text.next}.` : `${text.done}.`}
     >
       <View style={styles.stripRow}>
         {Array.from({ length: dots }, (_, k) => (
@@ -420,7 +400,7 @@ function Strip({
           </View>
           <View style={[styles.dot, styles.next, { backgroundColor: colors.surface, borderColor: colour }]} />
           <Animated.View style={[styles.stripDrop, drop]}>
-            <Drop size={22} pose={happy ? 'happy' : 'rest'} color={colors.button} />
+            <Drop height={28} pose={happy ? 'happy' : 'rest'} />
           </Animated.View>
         </View>
         <View style={[styles.stripCell, styles.ahead]}>
@@ -430,7 +410,7 @@ function Strip({
       </View>
       <View style={styles.stripText}>
         <Text style={[styles.stripDone, { color: colors.ink }]}>{text.done}</Text>
-        <Text style={[styles.stripNext, { color: colors.muted }]}>{text.next}</Text>
+        {!!text.next && <Text style={[styles.stripNext, { color: colors.muted }]}>{text.next}</Text>}
       </View>
     </View>
   );
