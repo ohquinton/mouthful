@@ -13,20 +13,22 @@ section, so a cutoff loses at most one step.
 finished steps, continue from "Next step". Never `git worktree remove` a worktree with a `node_modules`
 junction (CLAUDE.md team rule 8).
 
-_Last updated 2026-11-01 evening. Usage then: 5-hour 38%, weekly 74% (resets Nov 6)._
+_Last updated 2026-11-01 wrap-up. Usage then: 5-hour ~60%, weekly ~77% (resets Nov 6)._
 
 | # | Task | Who | Branch / output | Status | Next step |
 |---|---|---|---|---|---|
-| 3 | Library remodel: topic talks by level, packs in line colours, your words/scripts, reading lower, moments as one row | mobile-engineer | `worktree-agent-abb043bc058efa1bc` | Running (restarted after a pause; was reading files) | Build `library.tsx` + `components/library/`, tests, web screenshots `library-*.png` |
-| 4 | "If you get stuck" ideas for all 36 prompts, plus a content test | product-lead as content writer | its worktree branch (owns `src/content/prompts.ts`) | Running (restarted) | Write ideas, test, handoff with the full list |
-| M | App Store listing (name, subtitle, keywords, 6 captions) + waitlist landing copy | marketing-lead (read-only) | report to main → `docs/marketing/` | **Done** → `docs/marketing/APP-STORE-LISTING.md`, `WAITLIST-PAGE.md` (honesty pass applied) | Quinton's 7 open questions (see the waitlist doc and chat) |
-| R | Research: daily-habit retention, Rive licence/watermark + RN 0.88, word-list licence (NGSL), competitor update | research (read-only) | report to main → `docs/research/` | Running (restarted) | Sections sent to main as done |
+| 3 | Library remodel | mobile-engineer | **`wip/library-remodel`** on GitHub (3 commits on 7e66756; helpers + 4 components + 16 tests; plan in `docs/wip/library.md` on the branch) | **Paused at step 2 of 6.** The tab on screen is unchanged; components exist but aren't wired | Step 3: rewrite `src/app/(tabs)/library.tsx` (header → TopicTalks → PackCards → Your words / Your scripts → ReadAloud → Plan for it row), then Kolkata tests + full lint, web screenshots `library-*.png`, merge |
+
+Nothing else is running (2026-11-01 wrap-up).
 
 ## Done recently (for context)
+- 2026-11-01 wrap-up: "If you get stuck" ideas for all 36 prompts (merged); research saved in `docs/research/` (RIVE, WORD-LIST, RETENTION, COMPETITORS-UPDATE-2026-11); marketing saved in `docs/marketing/` (APP-STORE-LISTING, WAITLIST-PAGE). 797 tests.
 - Remodel built and QA-fixed: onboarding, the two-line Home map, topic talk + results, one shared Drop.
 - Codex's Progress ("Your voice, over time") reviewed and merged; main at 1cd9a39.
 
 ## Queued after these
+- Level 3 prompts hide their ideas on the talk screen (`talk.tsx:273`, `long = level === 3`): decide whether to show them.
+- Prompts p25, p31, p33 assume the speaker has a job (content writer, S3).
 - **Clear English promises content that doesn't exist** (marketing): the onboarding card says "Say this, not that / Everyday words, said clearly", but all 7 packs are work-themed and Clear English stop 2 is "Run the Meeting". Decide: write 2–3 everyday packs, or soften the card.
 - **Retention (research, docs/research/RETENTION.md):** smarter reminders (stale `reminders.ts` copy, fires even after practice), a day-2 hook after each talk, a visible rest day + streak repair.
 0. Clear English line on Home (from marketing): `home-day2-clear-light.png` shows a duplicate "Sharp Talk >" chip under the switcher, and a work pack ("Run the Meeting") as Clear English stop 2. Check `content/lines.ts` and HomeMap.
