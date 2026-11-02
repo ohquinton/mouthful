@@ -27,5 +27,6 @@ _Last updated 2026-11-01 evening. Usage then: 5-hour 38%, weekly 74% (resets Nov
 - Codex's Progress ("Your voice, over time") reviewed and merged; main at 1cd9a39.
 
 ## Queued after these
+0. Clear English line on Home (from marketing): `home-day2-clear-light.png` shows a duplicate "Sharp Talk >" chip under the switcher, and a work pack ("Run the Meeting") as Clear English stop 2. Check `content/lines.ts` and HomeMap.
 1. Home polish: the line crossing done labels; today's card sitting low after a long run of done stops.
 2. Progress per-skill trend lines (fillers, repeated words, start time, pace) from the approved mockup.
