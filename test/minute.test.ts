@@ -3,7 +3,7 @@
 import { tokenise } from '../src/engine/align';
 import { FLOW_SCORED, FLOW_VERSION, flowScore, flowSlotsFrom, flowVersionOf, minuteSummary, stampHeard } from '../src/engine/minute';
 import type { SavedSession } from '../src/store/sessions';
-import { fillerChips, firstWordSeconds, firstWordText, gapAfterBreak, habitCode, minuteRecord, overruleFiller, pastMinutes, savedMinuteLine, savedMinuteTrend, talkStopId, standingFillers, trendText, withoutBreaks } from '../src/store/minute';
+import { fillerChips, firstWordSeconds, firstWordText, gapAfterBreak, habitCode, minuteRecord, overruleFiller, pastMinutes, savedMinuteLine, usualFor, standingFillers, trendText, withoutBreaks } from '../src/store/minute';
 
 /** n plain words, one every `stepMs` from `from`. */
 function talk(n: number, from: number, stepMs = 400): { tokens: string[]; times: number[] } {
@@ -325,14 +325,6 @@ describe('trend line', () => {
 
 
 describe('remodel topic talk integration', () => {
-  it('accepts only a known line and a real date for a stop', () => {
-    expect(talkStopId('sharp:2026-11-01')).toBe('sharp:2026-11-01');
-    expect(talkStopId('clear:2028-02-29')).toBe('clear:2028-02-29');
-    for (const bad of [undefined, ['sharp:2026-11-01'], 'sharp:2026-02-30', 'clear:2026-13-01', 'other:2026-11-01', 'sharp:2026-1-1', 'sharp:2026-11-01 extra']) {
-      expect(talkStopId(bad)).toBeUndefined();
-    }
-  });
-
   it('retains derived wording after JSON storage and leaves prompt words out', () => {
     const tokens = tokenise('coffee tastes really warm and coffee smells really rich while coffee feels really comforting because coffee makes really simple mornings feel special and really peaceful for everyone around the table');
     const m = minuteSummary({ tokens, heardTimes: tokens.map((_, i) => 1000 + i * 400), startedAt: 0, prompt: 'Coffee' })!;
@@ -360,9 +352,9 @@ describe('remodel topic talk integration', () => {
       return { ...s, minute: { ...s.minute!, timeToFirstWordSeconds: first } };
     };
     const current = make('now', 2);
-    const trend = savedMinuteTrend(current, [make('a', 4), make('b', 6), make('old', 99, 'old'), make('c', 5), current, make('later', 90)]);
+    const { trend } = usualFor(current, [make('a', 4), make('b', 6), make('old', 99, 'old'), make('c', 5), current, make('later', 90)]);
     expect(trend?.firstWord).toEqual({ median: 5, count: 3, delta: -3, direction: 'faster' });
-    expect(savedMinuteTrend(current, [current])).toBeNull();
+    expect(usualFor(current, [current]).trend).toBeNull();
   });
 
   it('keeps the late-start coaching signal when rebuilding a saved result', () => {

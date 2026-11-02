@@ -18,3 +18,12 @@ Branch: codex/remodel. Base: Claude main 4c88ccc. Work performed in separate Cod
 - Railway currently offers daily topic-talk stops, not a wired pack/read/Glide lesson sequence. Both lines currently use shared prompts.
 - Weekly pooled vocabulary visualization, authored Rive character, and richer character expressions remain future work. No packages or paid services added.
 - This is a completed bounded UI pass, not release sign-off or completion of the entire remodel.
+
+
+## Combined Claude/Codex snapshot — 2026-11-01
+
+Merged origin/main through d18dc60 into Codex history. Uses Claude's coherent numbered railway, shared Drop, 30-second onboarding, topic-talk/results contracts and latest QA fixes. Retains Codex topic-talk Progress/history, separate other practice, context-filtered fillers and initial loading state. Short talks are explicitly excluded from full-minute usual Flow and labelled in history. Removed obsolete duplicate daily-date railway component/helpers. Legacy saved sessions remain intact; date-based stops are not mapped into fabricated numbered completions.
+
+Updated old Codex tests to use the new usualFor API; removed the superseded date-based route validator test (numbered stop contracts have their own tests). Typecheck passed; 44 suites / 791 tests passed. Independent agents reached usage limits during integration review, so this is root-validated integration, not independent QA sign-off.
+
+Remaining review findings: verify recording opt-in actually produces and retains talk audio; remove any onboarding copy encouraging comparison of 30-second Flow with a full minute; check line attribution of historical untagged first talks. Native testing remains outstanding. Earlier unfinished list above describes the prior pass; onboarding and numbered lesson map now come from Claude's merged work.
