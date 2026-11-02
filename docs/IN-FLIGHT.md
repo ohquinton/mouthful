@@ -19,7 +19,9 @@ _Last updated 2026-11-01 wrap-up. Usage then: 5-hour ~60%, weekly ~77% (resets N
 |---|---|---|---|---|---|
 | 3 | Library remodel | mobile-engineer | **`wip/library-remodel`** on GitHub (3 commits on 7e66756; helpers + 4 components + 16 tests; plan in `docs/wip/library.md` on the branch) | **Paused at step 2 of 6.** The tab on screen is unchanged; components exist but aren't wired | Step 3: rewrite `src/app/(tabs)/library.tsx` (header → TopicTalks → PackCards → Your words / Your scripts → ReadAloud → Plan for it row), then Kolkata tests + full lint, web screenshots `library-*.png`, merge |
 
-Nothing else is running (2026-11-01 wrap-up).
+Nothing else is running.
+
+**Rive Drop (2026-11-02):** source in `design/rive/drop/` (README there). Five moves built and verified; not wired into the app.
 
 ## Done recently (for context)
 - 2026-11-01 wrap-up: "If you get stuck" ideas for all 36 prompts (merged); research saved in `docs/research/` (RIVE, WORD-LIST, RETENTION, COMPETITORS-UPDATE-2026-11); marketing saved in `docs/marketing/` (APP-STORE-LISTING, WAITLIST-PAGE). 797 tests.
