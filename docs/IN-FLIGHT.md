@@ -19,7 +19,7 @@ _Last updated 2026-11-01 evening. Usage then: 5-hour 38%, weekly 74% (resets Nov
 |---|---|---|---|---|---|
 | 3 | Library remodel: topic talks by level, packs in line colours, your words/scripts, reading lower, moments as one row | mobile-engineer | `worktree-agent-abb043bc058efa1bc` | Running (restarted after a pause; was reading files) | Build `library.tsx` + `components/library/`, tests, web screenshots `library-*.png` |
 | 4 | "If you get stuck" ideas for all 36 prompts, plus a content test | product-lead as content writer | its worktree branch (owns `src/content/prompts.ts`) | Running (restarted) | Write ideas, test, handoff with the full list |
-| M | App Store listing (name, subtitle, keywords, 6 captions) + waitlist landing copy | marketing-lead (read-only) | report to main → `docs/marketing/` | Running (restarted) | Sections sent to main as done |
+| M | App Store listing (name, subtitle, keywords, 6 captions) + waitlist landing copy | marketing-lead (read-only) | report to main → `docs/marketing/` | **Done** → `docs/marketing/APP-STORE-LISTING.md`, `WAITLIST-PAGE.md` (honesty pass applied) | Quinton's 7 open questions (see the waitlist doc and chat) |
 | R | Research: daily-habit retention, Rive licence/watermark + RN 0.88, word-list licence (NGSL), competitor update | research (read-only) | report to main → `docs/research/` | Running (restarted) | Sections sent to main as done |
 
 ## Done recently (for context)
@@ -27,6 +27,8 @@ _Last updated 2026-11-01 evening. Usage then: 5-hour 38%, weekly 74% (resets Nov
 - Codex's Progress ("Your voice, over time") reviewed and merged; main at 1cd9a39.
 
 ## Queued after these
+- **Clear English promises content that doesn't exist** (marketing): the onboarding card says "Say this, not that / Everyday words, said clearly", but all 7 packs are work-themed and Clear English stop 2 is "Run the Meeting". Decide: write 2–3 everyday packs, or soften the card.
+- **Retention (research, docs/research/RETENTION.md):** smarter reminders (stale `reminders.ts` copy, fires even after practice), a day-2 hook after each talk, a visible rest day + streak repair.
 0. Clear English line on Home (from marketing): `home-day2-clear-light.png` shows a duplicate "Sharp Talk >" chip under the switcher, and a work pack ("Run the Meeting") as Clear English stop 2. Check `content/lines.ts` and HomeMap.
 1. Home polish: the line crossing done labels; today's card sitting low after a long run of done stops.
 2. Progress per-skill trend lines (fillers, repeated words, start time, pace) from the approved mockup.

@@ -6,7 +6,7 @@ SaidClearly helps you practise what you'll say out loud. This page explains what
 
 ## Your voice
 
-- **SaidClearly listens only while you practise**: when a reading, word drill or Free talk session is running.
+- **SaidClearly listens only while you practise**: when a topic talk, reading or word drill is running.
 - **Speech to text.** Your phone's speech recognition turns what you say into text so SaidClearly can follow along.
   - When your phone can do this itself for the English you picked, your voice is not sent anywhere.
   - When it can't, SaidClearly asks you first. If you agree, your audio goes to your phone's speech service while you practise: Apple on iPhone, or your phone's speech service (often Google) on Android. Their own privacy policies apply. You can withdraw this agreement at any time in **You → Privacy**.

@@ -1,6 +1,6 @@
 # App Store listing draft (US + Canada), 2026-11-01
 
-> From marketing-lead. Draft; nothing submitted. Keyword picks come from competitor naming, not measured volume: check them in Apple Search Ads' keyword planner before submitting.
+> From marketing-lead, honesty pass applied. Draft; nothing submitted. Keyword picks come from competitor naming, not measured volume: check them in Apple Search Ads' keyword planner before submitting.
 
 ## Name (29)
 **SaidClearly: Sound Articulate**. "Articulate" is a live, crowded search term (Wellspoken, Vocal Image, Speeko, four apps named "Articulate: …"); it carries the identity pitch and combines with keywords.
@@ -32,7 +32,7 @@ HOW IT WORKS
 
 TWO LINES, ONE APP
 • Sharp Talk: precise words, fewer fillers and repeats, a steady pace.
-• Clear English: for people who speak English as another language and want to be understood the first time. Everyday words, "say this, not that".
+• Clear English: for people who speak English as another language and want to be understood the first time.
 Pick one when you start. Switch any time. Each day is a new stop on your line: a topic talk, a word pack or a read-aloud rehearsal where your words ink in as you say them.
 
 PRIVATE BY DESIGN
