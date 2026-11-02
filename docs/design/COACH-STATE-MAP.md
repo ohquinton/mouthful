@@ -13,7 +13,7 @@ reconciled with DECISIONS 2026-11-01. Not approved for building until Quinton ap
 ## Package and risk
 - `@rive-app/react-native` 0.5.9 (Nitro modules, peer `react-native-nitro-modules`, pre-1.0, updated
   2026-10-29). No stated support for React Native 0.88 / Expo SDK 58 yet: verify in a development build.
-  Not in Expo Go. Web renders through `@rive-app/canvas`.
+  Not in Expo Go. **No web implementation** (corrected 2026-11-01, docs/research/RIVE.md): the browser preview uses the static/Reanimated Drop. Free Rive accounts can't export; one paid month (~$17) to export.
 - Rive free-plan exports may play a splash; check before a commercial launch.
 - Build it behind a fallback: if Rive fails to load, show a static Drop image. Nothing may depend on it.
 
