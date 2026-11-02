@@ -1,5 +1,5 @@
 # Competitors (marketing-lead teardown, 2026-10-29)
-n> **Update 2026-11-01:** see docs/research/COMPETITORS-UPDATE-2026-11.md (Wellspoken now does impromptu + precise words; Vozie and BoldVoice added). It overrides this file where they disagree.
+> **Update 2026-11-01:** see docs/research/COMPETITORS-UPDATE-2026-11.md (Wellspoken now does impromptu + precise words; Vozie and BoldVoice added). It overrides this file where they disagree.
 
 Ratings and dates: iTunes lookup API (US). Prices: each app's In-App Purchases list. Reviews: App Store RSS.
 Links: apps.apple.com/us/app/id<id>.
