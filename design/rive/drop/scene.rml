@@ -8,9 +8,7 @@
     <Artboard defaultStateMachineId="0:200" viewModelId="0:180" viewModelInstanceId="0:182" styleId="0:5" width="300" height="300" name="Drop" id="0:2">
         <LayoutComponentStyle name="Artboard Style" id="0:5"/>
 
-        <Fill name="Background">
-            <SolidColor colorValue="FFF3F4F7" name="Chalk"/>
-        </Fill>
+        <!-- Transparent: the host app supplies its light or dark background. -->
 
         <!-- Drop: position, nod and hop. Origin at the bottom of the body. -->
         <Node x="150" y="240" name="Drop" id="0:20">

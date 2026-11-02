@@ -21,9 +21,9 @@ _Last updated 2026-11-01 wrap-up. Usage then: 5-hour ~60%, weekly ~77% (resets N
 
 Codex checkpoint (2026-11-02): synced main through `845e332` into `codex/remodel`.
 Library wiring remains unfinished in `C:/Users/ohqui/Downloads/Codex Library`
-(`codex/library-finish`); talk layout remains unfinished in `C:/Users/ohqui/Downloads/Codex Recording`
-(`codex/talk-recording`). Preserve their local edits. Agents stopped at usage limits.
-These unfinished changes are not included in this checkpoint.
+(`codex/library-finish`); the talk layout from `C:/Users/ohqui/Downloads/Codex Recording`
+(`codex/talk-recording`) was reviewed and copied into the current Rive integration slice.
+The original worktree is preserved. Library remains unfinished and is not included.
 
 **Rive Drop (2026-11-02):** source in `design/rive/drop/` (README there). Five moves built and verified; not wired into the app.
 
@@ -46,3 +46,20 @@ These unfinished changes are not included in this checkpoint.
 - Rive CLI verify/build: no errors or warnings; rendered happy, thinking and happy-to-idle reset.
 - First talk retains its selected line; onboarding hook scrolls; Progress shows prompt titles.
 - Rive Coach modes are controllable, with interrupted-pose resets. Native integration, live audio, reduced-motion handling and device checks remain outstanding.
+
+## Rive integration slice, 2026-11-02
+
+- Native topic-talk footer now uses the bundled script-free Rive Drop. Web remains SVG.
+- Native fallback covers missing module, file/instance/property/view errors, reduced motion,
+  background and lost focus. Reduced Motion is observed live. No new audio/data flow.
+- Rive 0.5.10 and Nitro 0.36.5 pinned; Metro includes .riv; local build script in scripts/build-coach.ps1.
+- Talk-screen scroll, level-3 ideas and direct-link Close recovery integrated from the paused worktree.
+- TypeScript and lint passed (13 existing warnings). All 46 suites / 801 tests passed;
+  Jest printed its existing open-handle warning but the root command exited successfully.
+- Expo export succeeded for iOS, Android and web, including the 3.8KB asset. Export warned about
+  expo-router's existing router-store package export and used file-based resolution.
+- Independent QA found no blocking static issue. CLI verify/inspect/render passed; bundled asset matches.
+- Browser layout check was blocked by automatic approval review with no detailed reason;
+  the expected browser automation tools were unavailable. No fresh browser sign-off is claimed.
+- Native compilation and phone rendering remain unverified. No EAS build, release or OTA was sent.
+- Native integration checklist and limitations: design/rive/drop/README.md.

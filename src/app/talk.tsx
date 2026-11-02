@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -14,7 +14,8 @@ import { forLength, gapAfterBreak, minuteCompleteProps, minuteRecord, talkLength
 import { stopNumber } from '../content/lines';
 import { listenLocale, useListener } from '../speech/useListener';
 import { PrimaryButton } from '../components/ui';
-import { Drop } from '../components/Drop';
+import { Coach } from '../components/Coach';
+import { talkCoachState } from '../components/coachState';
 import { useProfile } from '../store/profile';
 import { track } from '../analytics';
 import { noteRoughPatch } from '../rating';
@@ -280,7 +281,7 @@ export default function TopicTalk() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top, paddingBottom: insets.bottom + space(2) }]}>
       <View style={styles.top}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={styles.close} accessibilityRole="button" accessibilityLabel="Close">
           <Ionicons name="close" size={26} color={colors.muted} />
         </Pressable>
         <Text style={[styles.topTitle, { color: colors.muted }]} numberOfLines={1}>
@@ -297,7 +298,7 @@ export default function TopicTalk() {
         <View style={[styles.fill, { backgroundColor: colors.signal, width: `${progress * 100}%` }]} />
       </View>
 
-      <View style={styles.body}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
         <Text style={[styles.eyebrow, { color: colors.muted }]}>{eyebrow}</Text>
         <Text style={[long ? styles.promptLong : styles.prompt, { color: colors.ink }]}>{prompt.text}</Text>
         {ready && (
@@ -306,7 +307,7 @@ export default function TopicTalk() {
           </Text>
         )}
         {running && <Text style={[styles.hint, { color: colors.muted }]}>Keep going. If you get stuck, say the word again.</Text>}
-        {!long && prompt.ideas && prompt.ideas.length > 0 && !failed && !notice && (
+        {prompt.ideas && prompt.ideas.length > 0 && !failed && !notice && (
           <View style={styles.ideas}>
             <Text style={[styles.ideasTitle, { color: colors.muted }]}>If you get stuck</Text>
             {prompt.ideas.map((idea) => (
@@ -321,13 +322,13 @@ export default function TopicTalk() {
         ) : (
           notice && <Text style={[styles.notice, { color: colors.ink }]}>{notice}</Text>
         )}
-      </View>
+      </ScrollView>
 
       <View style={[styles.footer, { borderTopColor: colors.line }]}>
         {running ? (
           // The calm start: the button gives way to the Drop looking up at the topic, the ribbon and Finish.
           <Animated.View entering={still ? undefined : FadeIn.duration(200)} style={styles.liveFooter}>
-            <Drop height={44} pose="up" />
+            <Coach height={44} state={talkCoachState(running, listener.lastHeardAt, now)} />
             <View style={styles.ribbon}>
               <VoiceRibbon level={level} color={colors.signal} height={22} />
             </View>
@@ -372,7 +373,9 @@ const styles = StyleSheet.create({
   timer: { fontSize: 20, fontWeight: '700', fontVariant: ['tabular-nums'] },
   track: { height: 4, borderRadius: 2, overflow: 'hidden' },
   fill: { height: 4, borderRadius: 2 },
-  body: { flex: 1, justifyContent: 'center', gap: space(2) },
+  scroll: { flex: 1 },
+  body: { flexGrow: 1, justifyContent: 'center', gap: space(2), paddingVertical: space(3) },
+  close: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   eyebrow: { fontSize: 13, fontWeight: '800', letterSpacing: 1.3 },
   // The topic is a word you say, so it's in the reading serif (remodel-screens §0.4).
   prompt: { fontFamily: fonts.readingBold, fontSize: 52, lineHeight: 64 },
