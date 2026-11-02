@@ -19,7 +19,11 @@ _Last updated 2026-11-01 wrap-up. Usage then: 5-hour ~60%, weekly ~77% (resets N
 |---|---|---|---|---|---|
 | 3 | Library remodel | mobile-engineer | **`wip/library-remodel`** on GitHub (3 commits on 7e66756; helpers + 4 components + 16 tests; plan in `docs/wip/library.md` on the branch) | **Paused at step 2 of 6.** The tab on screen is unchanged; components exist but aren't wired | Step 3: rewrite `src/app/(tabs)/library.tsx` (header → TopicTalks → PackCards → Your words / Your scripts → ReadAloud → Plan for it row), then Kolkata tests + full lint, web screenshots `library-*.png`, merge |
 
-Nothing else is running.
+Codex checkpoint (2026-11-02): synced main through `845e332` into `codex/remodel`.
+Library wiring remains unfinished in `C:/Users/ohqui/Downloads/Codex Library`
+(`codex/library-finish`); talk layout remains unfinished in `C:/Users/ohqui/Downloads/Codex Recording`
+(`codex/talk-recording`). Preserve their local edits. Agents stopped at usage limits.
+These unfinished changes are not included in this checkpoint.
 
 **Rive Drop (2026-11-02):** source in `design/rive/drop/` (README there). Five moves built and verified; not wired into the app.
 
@@ -36,3 +40,9 @@ Nothing else is running.
 0. Clear English line on Home (from marketing): `home-day2-clear-light.png` shows a duplicate "Sharp Talk >" chip under the switcher, and a work pack ("Run the Meeting") as Clear English stop 2. Check `content/lines.ts` and HomeMap.
 1. Home polish: the line crossing done labels; today's card sitting low after a long run of done stops.
 2. Progress per-skill trend lines (fillers, repeated words, start time, pace) from the approved mockup.
+
+## Codex validation, 2026-11-02
+- TypeScript passed; onboarding tests: 28 passed; lint: no errors, 13 existing warnings.
+- Rive CLI verify/build: no errors or warnings; rendered happy, thinking and happy-to-idle reset.
+- First talk retains its selected line; onboarding hook scrolls; Progress shows prompt titles.
+- Rive Coach modes are controllable, with interrupted-pose resets. Native integration, live audio, reduced-motion handling and device checks remain outstanding.

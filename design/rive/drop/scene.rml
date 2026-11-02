@@ -237,7 +237,7 @@
                     <KeyFrameDouble value="1" frame="150"/>
                 </KeyedProperty>
             </KeyedObject>
-        
+
             <KeyedObject objectId="0:20">
                 <KeyedProperty propertyKey="14"><KeyFrameDouble value="240" frame="0"/></KeyedProperty>
                 <KeyedProperty propertyKey="15"><KeyFrameDouble value="0" frame="0"/></KeyedProperty>
@@ -275,7 +275,7 @@
                     <KeyFrameDouble value="0" frame="120"/>
                 </KeyedProperty>
             </KeyedObject>
-        
+
             <KeyedObject objectId="0:20">
                 <KeyedProperty propertyKey="14"><KeyFrameDouble value="240" frame="0"/></KeyedProperty>
                 <KeyedProperty propertyKey="15"><KeyFrameDouble value="0" frame="0"/></KeyedProperty>
@@ -310,10 +310,10 @@
                     <KeyFrameDouble value="0.09" frame="12" interpolationType="cubic"><CubicEaseInterpolator x1="0.3" y1="0" x2="0.3" y2="1"/></KeyFrameDouble>
                     <KeyFrameDouble value="0" frame="30"/>
                 </KeyedProperty>
-            
+
                 <KeyedProperty propertyKey="16"><KeyFrameDouble value="1" frame="0"/></KeyedProperty>
                 <KeyedProperty propertyKey="17"><KeyFrameDouble value="1" frame="0"/></KeyedProperty></KeyedObject>
-        
+
             <KeyedObject objectId="0:22">
                 <KeyedProperty propertyKey="16"><KeyFrameDouble value="1" frame="0"/></KeyedProperty>
                 <KeyedProperty propertyKey="17"><KeyFrameDouble value="1" frame="0"/></KeyedProperty>
@@ -351,7 +351,7 @@
                     <KeyFrameDouble value="0" frame="115"/>
                 </KeyedProperty>
             </KeyedObject>
-        
+
             <KeyedObject objectId="0:20">
                 <KeyedProperty propertyKey="14"><KeyFrameDouble value="240" frame="0"/></KeyedProperty>
                 <KeyedProperty propertyKey="15"><KeyFrameDouble value="0" frame="0"/></KeyedProperty>
@@ -395,9 +395,9 @@
                     <KeyFrameDouble value="1.08" frame="40" interpolationType="cubic"><CubicEaseInterpolator x1="0.3" y1="0" x2="0.3" y2="1"/></KeyFrameDouble>
                     <KeyFrameDouble value="1" frame="54"/>
                 </KeyedProperty>
-            
+
                 <KeyedProperty propertyKey="15"><KeyFrameDouble value="0" frame="0"/></KeyedProperty></KeyedObject>
-        
+
             <KeyedObject objectId="0:22">
                 <KeyedProperty propertyKey="16"><KeyFrameDouble value="1" frame="0"/></KeyedProperty>
                 <KeyedProperty propertyKey="17"><KeyFrameDouble value="1" frame="0"/></KeyedProperty>
