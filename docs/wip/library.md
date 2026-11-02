@@ -4,7 +4,7 @@ Branch: `worktree-agent-a7359e8ce59d150c7`, from main 7e66756. Owns only `src/ap
 `src/components/library/*`, this file, `test/library*.test.ts`.
 
 ## Plan
-1. [ ] Pure helpers `src/components/library/libraryData.ts` (best Flow per topic, pack line tint, cold-read pick) + `test/library.test.ts`
+1. [x] Pure helpers `src/components/library/libraryData.ts` (best Flow per topic, pack line tint, cold-read pick) + `test/library.test.ts`
 2. [ ] Components: TopicTalks (level switcher + tiles/rows), PackCard, ShelfRow, ReadAloud (collapsed)
 3. [ ] Rewrite `library.tsx` in the new order: topic talks → word packs → your words/scripts → read out loud → plan-for-it row
 4. [ ] Checks: npm test, Kolkata tz, typecheck, lint
@@ -12,4 +12,4 @@ Branch: `worktree-agent-a7359e8ce59d150c7`, from main 7e66756. Owns only `src/ap
 6. [ ] Handoff
 
 ## Next step
-Step 1.
+Step 2: components under src/components/library/ (TopicTalks, PackCard, ShelfRow, ReadAloud).
