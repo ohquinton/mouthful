@@ -50,18 +50,18 @@ export const MINUTE_PROMPTS: readonly Prompt[] = [
   { id: 'p24', level: 2, text: 'Silence', ideas: ['A quiet place you like', 'Silence in a conversation', 'Silence or music, and why'] },
 
   // Level 3 is Free talk's original 12, in their original order (promptOfTheDay still uses them).
-  { id: 'p25', level: 3, text: 'Explain what you do for work to a ten-year-old.' },
-  { id: 'p26', level: 3, text: 'Tell me why I should try your favourite restaurant.' },
-  { id: 'p27', level: 3, text: 'What’s one opinion you hold that most people disagree with?' },
-  { id: 'p28', level: 3, text: 'Describe the best meal you’ve ever had.' },
-  { id: 'p29', level: 3, text: 'Teach me something you learned this week.' },
-  { id: 'p30', level: 3, text: 'What would you do with an extra hour every day?' },
-  { id: 'p31', level: 3, text: 'Give a short update on a project you’re working on.' },
-  { id: 'p32', level: 3, text: 'Tell me about a time a plan went wrong, and what you did.' },
-  { id: 'p33', level: 3, text: 'Introduce yourself as if it’s your first day at a new job.' },
-  { id: 'p34', level: 3, text: 'Convince me to visit the city you live in.' },
-  { id: 'p35', level: 3, text: 'Explain a hobby of yours to someone who has never tried it.' },
-  { id: 'p36', level: 3, text: 'What advice would you give yourself five years ago?' },
+  { id: 'p25', level: 3, text: 'Explain what you do for work to a ten-year-old.', ideas: ['Your work or studies, simply', 'One thing you did today', 'Why it helps people'] },
+  { id: 'p26', level: 3, text: 'Tell me why I should try your favourite restaurant.', ideas: ['What you always order there', 'What the place feels like', 'What makes it different'] },
+  { id: 'p27', level: 3, text: 'What’s one opinion you hold that most people disagree with?', ideas: ['Your opinion, simply', 'Why you think it', 'What most people say instead'] },
+  { id: 'p28', level: 3, text: 'Describe the best meal you’ve ever had.', ideas: ['Where you were', 'What you ate', 'Why you still remember it'] },
+  { id: 'p29', level: 3, text: 'Teach me something you learned this week.', ideas: ['What it is, simply', 'Where you learned it', 'Why it is useful'] },
+  { id: 'p30', level: 3, text: 'What would you do with an extra hour every day?', ideas: ['What you would do first', 'Why that matters to you', 'How your week would change'] },
+  { id: 'p31', level: 3, text: 'Give a short update on a project you’re working on.', ideas: ['What the project is', 'What is done so far', 'What comes next'] },
+  { id: 'p32', level: 3, text: 'Tell me about a time a plan went wrong, and what you did.', ideas: ['What the plan was', 'The moment it went wrong', 'What you did next'] },
+  { id: 'p33', level: 3, text: 'Introduce yourself as if it’s your first day at a new job.', ideas: ['Your name and your background', 'Something you enjoy doing', 'What you hope to learn'] },
+  { id: 'p34', level: 3, text: 'Convince me to visit the city you live in.', ideas: ['The best thing about it', 'One place to see first', 'The food you can try there'] },
+  { id: 'p35', level: 3, text: 'Explain a hobby of yours to someone who has never tried it.', ideas: ['What the hobby is', 'How you got started', 'The first step to try it'] },
+  { id: 'p36', level: 3, text: 'What advice would you give yourself five years ago?', ideas: ['Where you were five years ago', 'The advice, simply', 'How it would have helped'] },
 ];
 
 /** A prompt by id (a route param or a saved session's promptId), or undefined for an unknown id. */
