@@ -56,14 +56,15 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
   - `wording.ts` — One Minute's repeated words (content words only; prompt words, hesitations and habit words never counted) (prompt word families, habit forms, number words and restart-seam repeats never counted) and vocabulary variety (MATTR over 50-word windows; a per-talk record, shown only as `pooledVariety` over 3+ talks and 250+ words). Shown, not scored; Flow unchanged
   - `locale.ts` — which English the recogniser listens for (reader's choice in You, else the phone's region)
   - `habits.ts` — habit-word classifier: each like/so/you know/actually/basically/literally/i mean/kind of/sort of/right labelled filler, real or unsure (context rules, bursts, pauses); corpus + holdout in `__tests__/fixtures/habits-*.json`. Not wired into scoring yet
-  - `minute.ts` — One Minute engine: long pauses (> 2.5 s after the first word), Flow slots (kept going, pauses, pace scored; um/uh and habit fillers shown), coaching line, own-history trend (`FLOW_SCORED` is the one switch, `FLOW_VERSION` tags sessions). Wired into `talk.tsx` (One Minute when tester mode is on; Free talk otherwise), Flow on the Tape (docs/briefs/one-minute.md)
+  - `minute.ts` — One Minute engine: long pauses (> 2.5 s after the first word), Flow slots (kept going, pauses, pace scored; um/uh and habit fillers shown), coaching line, own-history trend (`FLOW_SCORED` is the one switch, `FLOW_VERSION` tags sessions). Wired into `talk.tsx` for everyone (topic talk, the remodel's front door; route params `prompt`, `stop`, `seconds` 30|60, `from`), results via `MinuteResult` on the Tape. 30-second talks (onboarding) carry `limitSeconds` and a `-s30` Flow version and never join 60-second trends; their Flow is scaled app-side (`forLength` in store/minute.ts) until the engine takes the talk length as a parameter
   - `days.ts` — calendar-day maths (`daysBetween`, `calendarDay`), safe across clock changes
 - `src/speech/gate.ts` — when speech counts as on-device (Android only from API 33) and whether a variety is supported
 - `src/speech/useListener.ts` — recogniser wrapper: on-device/consent, restarts, voice level, optional recording, `reset()` for retries
 - `src/store/recordings.ts` — the recordings folder; delete-all sweeps strays from older builds too
+- `src/content/lines.ts` — the two lines as 14 ordered stops each (ids `sharp-01`… and `clear-01`…, never rename), one stop a day, each an optional lesson then a topic talk; pure helpers for current stop, done today, start route
 - `src/content/` — passages, Word Packs (7, including the free Make your point pack with self-guided speaking prompts), moments (interview, presentation, raise, meeting), scripts
-- `src/app/` — Expo Router screens: `(tabs)/` Today, Library, Progress, You; `session/[id]`, `tape`, `fixit`, `talk`, `moment`, `pack/[id]`, `words`, `scripts/*`, `onboarding/*`, `paywall`, `review` (tester mode only)
-- `src/components/` — `InkCursor` and `VoiceRibbon` (Reanimated), `GlideWord`, `PlanCard`, `MicGate`, `Replay` (expo-audio), `Charts`
+- `src/app/` — Expo Router screens: `(tabs)/` Home (the two-line train map), Library, Progress, You; `session/[id]`, `tape`, `fixit`, `talk`, `moment`, `pack/[id]`, `words`, `scripts/*`, `onboarding/*`, `paywall`, `review` (tester mode only)
+- `src/components/` — `HomeMap` (the line, stops, the Drop hopping) and `Drop` (the flat mascot; two more copies live in `onboarding/index.tsx` and `MinuteResult.tsx` until they're merged), `InkCursor` and `VoiceRibbon` (Reanimated), `GlideWord`, `PlanCard`, `MicGate`, `Replay` (expo-audio), `Charts`
 - `src/purchases.native.ts` — RevenueCat (phones). `src/purchases.ts` — web/test stub.
 - `src/analytics.ts` — PostHog batch client. Event names, numbers and allowlisted short codes only; free text is dropped before sending.
 
@@ -90,12 +91,12 @@ Hidden: tap the version line on the You tab 7 times, or build with `EXPO_PUBLIC_
 
 ## Moments (optional destinations since the remodel; not the main flow)
 
-Today currently shows the active moment's plan (`PlanCard`): learn the words → say them in context → add your real words → rehearse it (first run free, then Pro) → final run-through (cold read). Steps are marked done via `markStep` when the screen they launch finishes (`step` route param).
+Home shows an active moment only as a compact `PlanCard` row under the map ("Got something coming up? Plan for it" otherwise). The plan's steps: learn the words → say them in context → add your real words → rehearse it (first run free, then Pro) → final run-through (cold read). Steps are marked done via `markStep` when the screen they launch finishes (`step` route param).
 
 ## Commands
 
 ```bash
-npm test                  # engine + store tests (699); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
+npm test                  # engine + store tests (735); MOUTHFUL_TEST_TZ=Asia/Kolkata npm test for a zone without DST
 npm run typecheck
 npx expo lint             # first run sets up ESLint
 npx expo start            # dev server (needs the development build, not Expo Go)
@@ -114,7 +115,7 @@ npx eas-cli@latest build --profile development --platform ios
 
 ## Known limits
 
-- Repeated words and vocabulary variety (`wording.ts`) are unvalidated: thresholds `MIN_REPEATS` 4 and `MIN_REPEAT_SHARE` 0.04 come from our own fixtures, and variety is never shown per talk (too noisy at one minute); only `pooledVariety` (3+ talks, 250+ words). Realistic learner speech reads about 8 points lower, a real difference, so only ever compare a person with their own past. Names are still counted as repeated words. Prompt synonyms need `related` lists in `prompts.ts` (proposed, not added). Topic synonyms (bike for bicycle) can be flagged. "Precise words" is built but hidden until a licensed everyday-word list is bundled (candidate: NGSL 1.2, CC BY-SA 4.0, needs attribution and a licence check).
+- Repeated words and vocabulary variety (`wording.ts`) are unvalidated: thresholds `MIN_REPEATS` 4 and `MIN_REPEAT_SHARE` 0.04 come from our own fixtures, and variety is never shown per talk (too noisy at one minute); only `pooledVariety` (3+ talks, 250+ words). Realistic learner speech reads about 8 points lower, a real difference, so only ever compare a person with their own past. Names are still counted as repeated words. Prompt synonyms come from `related` lists in `prompts.ts` (8 prompts so far); synonyms not listed can still be flagged. "Precise words" is built but hidden until a licensed everyday-word list is bundled (candidate: NGSL 1.2, CC BY-SA 4.0, needs attribution and a licence check).
 
 - The habit classifier's precision (100% dev, 100% holdout, 0 false accusations) is measured only on corpora we wrote; qa's independent set (habits-qa.json) went 86% → 100% after fixes made against it (recall 59%: like 58%, you know 44%), so it's now a regression bar, not an outside estimate. No habit word is scored yet; decide with the beta tally. um/uh never decide a habit label (they're stripped before the rules run). Recommended to score first: like, you know; the rest stay shown-only.
 - One Minute pauses use recogniser result times, not audio, so server bursts may invent pauses; per-minute rates use talk time with a 30 s floor. The first 8 s before the first word are free (`FREE_THINK_MS`); thinking time past that counts against kept going, and time to first word is shown and trended (FLOW_VERSION 2).

@@ -30,7 +30,8 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('git-branch-outline', 'git-branch') }} />
+      {/* Home is the train map (remodel): a route icon, not a sun. */}
+      <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('git-commit-outline', 'git-commit') }} />
       <Tabs.Screen name="library" options={{ title: 'Library', tabBarIcon: icon('library-outline', 'library') }} />
       <Tabs.Screen name="progress" options={{ title: 'Progress', tabBarIcon: icon('stats-chart-outline', 'stats-chart') }} />
       <Tabs.Screen name="you" options={{ title: 'You', tabBarIcon: icon('person-circle-outline', 'person-circle') }} />

@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { FLOW_VERSION, minuteTrend } from '../engine/minute';
+import { isShortTalk } from '../store/minute';
 import type { SavedSession } from '../store/sessions';
 import { fonts, space, useColors } from '../theme';
 import { PrimaryButton } from './ui';
@@ -9,7 +10,7 @@ import { PrimaryButton } from './ui';
 export function TalkProgress({ sessions, limit }: { sessions: SavedSession[]; limit: number }) {
   const colors = useColors();
   const talks = sessions.filter((s) => s.kind === 'minute' && Number.isFinite(s.flow)).sort((a, b) => a.at - b.at);
-  const current = talks.filter((s) => s.flowVersion === FLOW_VERSION);
+  const current = talks.filter((s) => s.flowVersion === FLOW_VERSION && !isShortTalk(s));
   const trend = minuteTrend(current.map((s) => ({ ...s, timeToFirstWordSeconds: s.minute?.timeToFirstWordSeconds })), FLOW_VERSION);
   const latest = current.at(-1);
   const recent = talks.slice(-limit).reverse();

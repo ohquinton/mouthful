@@ -158,13 +158,13 @@ from the sideline or a teacher marking homework.
 | Screen | Its one job | Primary action |
 |---|---|---|
 | Onboarding hook | Make them feel "this is for me" in 5 seconds | Get started |
-| Moment picker | Turn a vague worry into a dated plan | Continue |
-| Mic + Day 1 | Get permission without fear; recording stays opt-in (switch **off** by default) | Start my Day 1 read |
+| Which train? | Pick Sharp Talk or Clear English in 5 seconds; changeable later | Get on Sharp Talk |
+| First topic talk | Get permission without fear; recording stays opt-in (switch **off** by default) | Start talking |
 | Glide session | Read, with nothing else competing | (none: reading *is* the action; Finish is quiet) |
 | Too-short card | Get them back in without shame | Try again |
-| Tape | One honest picture + one next step | Practise them / Back to your plan |
+| Results (Tape) | The rating, the one most useful finding, the line moving | Back to the map |
 | Fix-it | Say the hard words alone, then in a sentence | (automatic flow) |
-| Today | What should I do right now? | The next plan step |
+| Home (the map) | Today's stop on your line, the Drop, the streak | Start today's stop |
 | Progress | Am I getting better *at the same kind of speaking*? | (read-only; re-test when due) |
 | You | Control: reminders, privacy, recordings, restore, reset | (settings) |
 | Paywall | Clear price, clear trial, easy exit | Start free trial |
