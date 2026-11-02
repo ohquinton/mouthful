@@ -117,7 +117,7 @@ export default function Onboarding() {
       setStep('denied');
       return;
     }
-    router.push(firstTalkRoute());
+    router.push(firstTalkRoute(line));
   };
 
   // A "no" to the mic must never trap anyone (principle 8): finish onboarding and open Home, where
@@ -138,7 +138,7 @@ export default function Onboarding() {
 
       {step === 'hook' && (
         <>
-          <View style={styles.center}>
+          <ScrollView style={styles.flex} contentContainerStyle={styles.hookScroll}>
             <HookArt reduceMotion={reduceMotion} />
             <View style={styles.hookWords}>
               <Text style={[styles.brand, { color: colors.ink }]}>{BRAND.name}</Text>
@@ -154,7 +154,7 @@ export default function Onboarding() {
               </Text>
               <Text style={[styles.lead, { color: colors.muted }]}>Talk for one minute a day. Get a little sharper every week.</Text>
             </View>
-          </View>
+          </ScrollView>
           <View style={styles.foot}>
             <PrimaryButton label="Get started" onPress={() => setStep('line')} />
             <Text style={[styles.small, { color: colors.muted }]}>No account needed.</Text>
@@ -213,7 +213,7 @@ export default function Onboarding() {
           <View style={styles.foot}>
             {/* One plain line before the system dialog, so it isn't a surprise. */}
             <Text style={[styles.small, { color: colors.muted }]}>Your phone will ask to use the microphone.</Text>
-            <PrimaryButton label="Start talking" onPress={startTalking} busy={busy} />
+            <PrimaryButton label="Continue" onPress={startTalking} busy={busy} />
           </View>
         </>
       )}
@@ -400,6 +400,7 @@ const styles = StyleSheet.create({
   dots: { flex: 1, flexDirection: 'row', gap: 6, justifyContent: 'center' },
   dot: { width: 24, height: 4, borderRadius: 2 },
   center: { flex: 1, justifyContent: 'center', gap: space(2.5) },
+  hookScroll: { flexGrow: 1, justifyContent: 'center', gap: space(2.5), paddingBottom: space(2) },
   centerText: { textAlign: 'center' },
   deniedBody: { alignItems: 'center', gap: space(2) },
   hookWords: { gap: space(2) },

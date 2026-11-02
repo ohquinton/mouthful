@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { FLOW_VERSION, minuteTrend } from '../engine/minute';
+import { promptById } from '../content/prompts';
 import { isShortTalk } from '../store/minute';
 import type { SavedSession } from '../store/sessions';
 import { fonts, space, useColors } from '../theme';
@@ -36,11 +37,11 @@ export function TalkProgress({ sessions, limit }: { sessions: SavedSession[]; li
         <View style={[styles.history, { borderColor: colors.line, backgroundColor: colors.surface }]}>
           <Text style={[styles.eyebrow, { color: colors.muted }]}>{talks.length > limit ? `LATEST ${limit} TOPIC TALKS` : 'RECENT TOPIC TALKS'}</Text>
           {recent.map((s) => (
-            <Pressable key={s.id} accessibilityRole="button" accessibilityLabel={`${s.title}, Flow ${s.flow}. View this talk.`}
+            <Pressable key={s.id} accessibilityRole="button" accessibilityLabel={`${promptById(s.promptId)?.text ?? s.title}, Flow ${s.flow}. View this talk.`}
               onPress={() => router.push({ pathname: '/tape', params: { id: s.id } })}
               style={({ pressed }) => [styles.row, { borderTopColor: colors.line, opacity: pressed ? 0.65 : 1 }]}>
               <View style={styles.rowText}>
-                <Text style={[styles.topic, { color: colors.ink }]}>{s.title}</Text>
+                <Text style={[styles.topic, { color: colors.ink }]}>{promptById(s.promptId)?.text ?? s.title}</Text>
                 <Text style={[styles.date, { color: colors.muted }]}>{new Date(s.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}{isShortTalk(s) ? ' · 30-second first talk' : s.flowVersion !== FLOW_VERSION ? ' · Earlier Flow version' : ''}</Text>
               </View>
               <Text style={[styles.flow, { color: colors.ink }]}>{s.flow}<Text style={styles.flowUnit}> Flow</Text></Text>

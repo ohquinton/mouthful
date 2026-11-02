@@ -101,7 +101,12 @@ describe('the first topic talk', () => {
   });
 
   it('follows the route contract with talk.tsx (string params)', () => {
-    expect(firstTalkRoute()).toEqual({ pathname: '/talk', params: { prompt: 'p01', seconds: '30', from: 'onboarding' } });
+    expect(firstTalkRoute()).toEqual({ pathname: '/talk', params: { prompt: 'p01', seconds: '30', from: 'onboarding', stop: 'sharp-01' } });
+  });
+
+  it('tags the selected line even after a changed selection', () => {
+    expect(firstTalkRoute('clear').params.stop).toBe('clear-01');
+    expect(firstTalkRoute('sharp').params.stop).toBe('sharp-01');
   });
 
   it('says plainly where the speech goes', () => {

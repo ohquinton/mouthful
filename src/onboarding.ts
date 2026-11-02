@@ -101,10 +101,10 @@ export const FIRST_TALK = {
  * The route contract with talk.tsx: it runs a 30-second topic talk on this prompt, and when it's
  * done it replaces itself with /onboarding/day1?id=<sessionId>. Params are strings (expo-router).
  */
-export function firstTalkRoute() {
+export function firstTalkRoute(line: Line = 'sharp') {
   return {
     pathname: '/talk' as const,
-    params: { prompt: FIRST_TALK.promptId, seconds: String(FIRST_TALK.seconds), from: 'onboarding' },
+    params: { prompt: FIRST_TALK.promptId, seconds: String(FIRST_TALK.seconds), from: 'onboarding', stop: `${lineOrDefault(line)}-01` },
   };
 }
 
