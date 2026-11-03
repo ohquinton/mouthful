@@ -2,6 +2,8 @@ import { Redirect, Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useProfile } from '../../store/profile';
 import { useColors } from '../../theme';
+import { useExperience } from '../../store/experience';
+import { EXPERIENCES } from '../../content/experiences';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -15,6 +17,7 @@ const icon = (name: IconName, active: IconName) => {
 export default function TabsLayout() {
   const colors = useColors();
   const { profile, ready } = useProfile();
+  const { mode } = useExperience();
 
   if (!ready) return null;
   if (!profile.onboarded) return <Redirect href="/onboarding" />;
@@ -23,15 +26,14 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.ink,
+        tabBarActiveTintColor: mode ? colors[EXPERIENCES[mode].line] : colors.ink,
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
-      {/* Home is the train map (remodel): a route icon, not a sun. */}
-      <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('git-commit-outline', 'git-commit') }} />
+      <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('home-outline', 'home') }} />
       <Tabs.Screen name="library" options={{ title: 'Library', tabBarIcon: icon('library-outline', 'library') }} />
       <Tabs.Screen name="progress" options={{ title: 'Progress', tabBarIcon: icon('stats-chart-outline', 'stats-chart') }} />
       <Tabs.Screen name="you" options={{ title: 'You', tabBarIcon: icon('person-circle-outline', 'person-circle') }} />

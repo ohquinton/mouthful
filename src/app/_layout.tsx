@@ -10,6 +10,8 @@ import { customerState, initPurchases, onCustomerChange, type CustomerState } fr
 import { syncTrialReminder } from '../reminders';
 import { useColors } from '../theme';
 import { wrapRoot } from '../sentry';
+import { ExperienceProvider } from '../store/experience';
+import { ExperienceGate } from '../components/ExperienceGate';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -30,8 +32,10 @@ function RootLayout() {
 
   return (
     <ProfileProvider>
+      <ExperienceProvider>
       <EntitlementSync />
       <StatusBar style="auto" />
+      <ExperienceGate>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding/index" options={{ animation: 'fade', gestureEnabled: false }} />
@@ -47,6 +51,8 @@ function RootLayout() {
         <Stack.Screen name="moment" options={{ presentation: 'modal' }} />
         <Stack.Screen name="review" />
       </Stack>
+      </ExperienceGate>
+      </ExperienceProvider>
     </ProfileProvider>
   );
 }

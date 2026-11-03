@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, BackHandler, Linking, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AppState, BackHandler, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import { useProfile } from '../../store/profile';
+import { useExperience } from '../../store/experience';
 import { listenLocale, onDeviceSupported } from '../../speech/useListener';
 import { MINUTE_PROMPTS } from '../../content/prompts';
 import { track } from '../../analytics';
@@ -16,9 +16,6 @@ import {
   FIRST_TALK,
   firstTalkRoute,
   Line,
-  LINE_CARDS,
-  lineButtonLabel,
-  lineOrDefault,
   ONBOARDING_DASHES,
   OnboardingStep,
   parseStep,
@@ -27,7 +24,7 @@ import {
 } from '../../onboarding';
 import { PrimaryButton } from '../../components/ui';
 import { Drop } from '../../components/Drop';
-import { Colors, fonts, space, useColors } from '../../theme';
+import { fonts, space, useColors } from '../../theme';
 
 const HOOK = BRAND.tagline.split(' ');
 const TOPIC = MINUTE_PROMPTS.find((p) => p.id === FIRST_TALK.promptId)?.text ?? 'Coffee';
@@ -40,11 +37,12 @@ export default function Onboarding() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
-  const params = useLocalSearchParams<{ step?: string }>();
+  const params = useLocalSearchParams<{ step?: string; reminderCleanup?: string }>();
   const { profile, update } = useProfile();
-  const [step, setStep] = useState<OnboardingStep>(() => parseStep(params.step));
-  // Sharp Talk for everyone until they choose; never guessed from the phone's language.
-  const [line, setLine] = useState<Line>(() => lineOrDefault(profile.line));
+  const { mode, showChoices } = useExperience();
+  const [step, setStep] = useState<OnboardingStep>(() => params.step === 'line' ? 'hook' : parseStep(params.step));
+  // The launch choice sets the first-practice context; never infer it from language.
+  const line: Line = mode === 'english' ? 'clear' : 'sharp';
   // No recording switch here: topic talks don't record, and keepRecordings (reading re-tests) is
   // only ever changed in You, where it says what it's for.
   const [busy, setBusy] = useState(false);
@@ -74,7 +72,7 @@ export default function Onboarding() {
     return () => sub.remove();
   }, [step]);
 
-  const back = previousStep(step);
+  const back = step === 'talk' ? 'hook' : previousStep(step);
   const goBack = useCallback(() => {
     if (back) setStep(back);
   }, [back]);
@@ -95,7 +93,7 @@ export default function Onboarding() {
   const getOn = async () => {
     // The line choice isn't sent to analytics: "Clear English" is a self-described second-language
     // speaker, close to the locale rule (DECISIONS 2026-10-27). Only that the step was passed.
-    await update({ line });
+    if (!profile.onboarded) await update({ line });
     setStep('talk');
   };
 
@@ -139,7 +137,12 @@ export default function Onboarding() {
       {step === 'hook' && (
         <>
           <ScrollView style={styles.flex} contentContainerStyle={styles.hookScroll}>
-            <HookArt reduceMotion={reduceMotion} />
+            {params.reminderCleanup === 'failed' && (
+              <Text accessibilityLiveRegion="polite" style={[styles.small, { color: colors.ink }]}>
+                A reminder could not be cleared. You can turn off SaidClearly notifications in your phone’s Settings.
+              </Text>
+            )}
+            <View style={{ alignItems: 'center' }}><Drop height={100} /></View>
             <View style={styles.hookWords}>
               <Text style={[styles.brand, { color: colors.ink }]}>{BRAND.name}</Text>
               <Text style={styles.hookText} accessibilityLabel={BRAND.tagline}>
@@ -152,37 +155,13 @@ export default function Onboarding() {
                   );
                 })}
               </Text>
-              <Text style={[styles.lead, { color: colors.muted }]}>Talk for one minute a day. Get a little sharper every week.</Text>
+              <Text style={[styles.lead, { color: colors.muted }]}>{mode === 'english' ? 'Practise everyday English, read aloud, and build useful vocabulary.' : 'Practise expressing your ideas, notice speaking habits, and build precise vocabulary.'}</Text>
             </View>
           </ScrollView>
           <View style={styles.foot}>
-            <PrimaryButton label="Get started" onPress={() => setStep('line')} />
+            <PrimaryButton label="Try a short talk" onPress={getOn} />
+            <Pressable accessibilityRole="button" onPress={showChoices} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={[styles.small, { color: colors.ink }]}>Choose a different experience</Text></Pressable>
             <Text style={[styles.small, { color: colors.muted }]}>No account needed.</Text>
-          </View>
-        </>
-      )}
-
-      {step === 'line' && (
-        <>
-          {/* Scrolls above the pinned button on small screens and large text. */}
-          <ScrollView style={styles.flex} contentContainerStyle={styles.body}>
-            <Animated.View key="line" entering={enter} style={styles.bodyInner}>
-              <View style={styles.titleRow}>
-                <Text style={[styles.h1, styles.flex, { color: colors.ink }]} accessibilityRole="header">
-                  Which train are you getting on?
-                </Text>
-                <Drop height={72} pose="down" tilt={-10} />
-              </View>
-              <Text style={[styles.lead, { color: colors.muted }]}>Both lines practise the same thing: talking clearly. You can switch any time.</Text>
-              <View style={styles.cards} accessibilityRole="radiogroup">
-                {LINE_CARDS.map((c, i) => (
-                  <LineCardView key={c.id} card={c} index={i} selected={line === c.id} onPress={() => setLine(c.id)} colors={colors} />
-                ))}
-              </View>
-            </Animated.View>
-          </ScrollView>
-          <View style={styles.foot}>
-            <PrimaryButton label={lineButtonLabel(line)} onPress={getOn} />
           </View>
         </>
       )}
@@ -228,7 +207,7 @@ export default function Onboarding() {
             <Text style={[styles.lead, styles.centerText, { color: colors.muted }]}>
               It needs the microphone to hear your talk. Turn on Microphone and Speech Recognition in Settings.
             </Text>
-            <Text style={[styles.note, styles.centerText, { color: colors.muted }]}>Your line is saved. You can do your first talk later from Home.</Text>
+            <Text style={[styles.note, styles.centerText, { color: colors.muted }]}>Your choice is saved. You can do your first talk later from Home.</Text>
           </Animated.View>
           <View style={styles.foot}>
             <PrimaryButton label="Open Settings" onPress={openSettings} />
@@ -273,125 +252,6 @@ export function TopBar({ onBack, active }: { onBack?: () => void; active: number
   );
 }
 
-// ---------------------------------------------------------------- the hook's picture
-
-// The Drop's shape is 112 × 156 (components/Drop.tsx): its width at a given height.
-const DROP_ASPECT = 112 / 156;
-
-const ART_H = 230;
-const STATION_Y = 168;
-
-/**
- * The Drop standing on the station where the two lines meet: Sharp Talk runs off the left edge,
- * Clear English off the right. The lines draw out from the station (400 ms, after 200 ms), then the
- * Drop blinks. Reduce Motion: everything drawn, no blink.
- */
-function HookArt({ reduceMotion }: { reduceMotion: boolean }) {
-  const colors = useColors();
-  const { width: screenW } = useWindowDimensions();
-  const half = screenW / 2;
-  const drawn = useSharedValue(reduceMotion ? 1 : 0);
-
-  useEffect(() => {
-    if (reduceMotion) {
-      drawn.value = 1;
-      return;
-    }
-    drawn.value = withDelay(200, withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) }));
-  }, [reduceMotion, drawn]);
-
-  // Each half is revealed from the station outwards by widening a clipping box.
-  const reveal = useAnimatedStyle(() => ({ width: drawn.value * half }));
-  const y = STATION_Y;
-  // Left half, drawn in its own box (x 0..half), from the station down and out to the left edge.
-  const leftPath = `M${half},${y} C${half - 30},${y + 44} ${half * 0.45},${y + 38} -12,${y + 52}`;
-  const rightPath = `M0,${y} C30,${y + 44} ${half * 0.55},${y + 38} ${half + 12},${y + 52}`;
-
-  return (
-    <View style={[styles.art, { height: ART_H }]} accessible={false} importantForAccessibility="no-hide-descendants">
-      <Animated.View style={[styles.clip, { right: half }, reveal]}>
-        <Svg width={half} height={ART_H} style={styles.clipLeftSvg}>
-          <Path d={leftPath} stroke={colors.sharp} strokeWidth={11} fill="none" strokeLinecap="round" />
-        </Svg>
-      </Animated.View>
-      <Animated.View style={[styles.clip, { left: half }, reveal]}>
-        <Svg width={half} height={ART_H} style={styles.clipRightSvg}>
-          <Path d={rightPath} stroke={colors.clear} strokeWidth={11} fill="none" strokeLinecap="round" />
-        </Svg>
-      </Animated.View>
-      <Svg width={screenW} height={ART_H} style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Circle cx={half} cy={y} r={17} fill={colors.surface} stroke={colors.ink} strokeWidth={6} />
-      </Svg>
-      <View style={[styles.artDrop, { top: y - 17 - 132, left: half - (132 * DROP_ASPECT) / 2 }]}>
-        <Drop height={132} />
-      </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------- a "which train?" card
-
-function LineCardView({
-  card,
-  index,
-  selected,
-  onPress,
-  colors,
-}: {
-  card: (typeof LINE_CARDS)[number];
-  index: number;
-  selected: boolean;
-  onPress: () => void;
-  colors: Colors;
-}) {
-  const lineColour = card.id === 'sharp' ? colors.sharp : colors.clear;
-  const tint = card.id === 'sharp' ? colors.sharpSoft : colors.clearSoft;
-  const fill = selected ? tint : colors.surface;
-  return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ selected, checked: selected }}
-      accessibilityLabel={`${card.name}. ${card.who}`}
-      accessibilityHint={`${index + 1} of ${LINE_CARDS.length}`}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        { backgroundColor: fill, borderColor: selected ? lineColour : colors.line, transform: [{ scale: pressed ? 0.985 : 1 }] },
-      ]}
-    >
-      {/* The line itself down the left edge: one stop reached, two ahead. Decoration; the name says which line. */}
-      <View style={styles.rail}>
-        <View style={[styles.railBar, { backgroundColor: lineColour }]} />
-        <View style={[styles.stop, { top: 30, backgroundColor: lineColour, borderColor: lineColour }]} />
-        <View style={[styles.stop, { top: 74, backgroundColor: fill, borderColor: lineColour }]} />
-        <View style={[styles.stop, { top: 118, backgroundColor: fill, borderColor: lineColour }]} />
-      </View>
-      <View style={styles.cardBody}>
-        <View style={styles.cardHead}>
-          <Text style={[styles.cardName, { color: colors.ink }]}>{card.name}</Text>
-          {/* Selected has a border, a tint and a filled check: never colour alone. */}
-          {selected ? (
-            <View style={[styles.check, { backgroundColor: lineColour }]}>
-              <Ionicons name="checkmark" size={18} color={colors.onLine} />
-            </View>
-          ) : (
-            <View style={[styles.check, styles.checkOff, { borderColor: colors.unread }]} />
-          )}
-        </View>
-        <Text style={[styles.cardWho, { color: colors.ink }]}>{card.who}</Text>
-        <View style={styles.practise}>
-          {card.practise.map((p) => (
-            // ink on the tint: muted on the soft tints is under 4.5:1.
-            <Text key={p} style={[styles.practiseText, { color: selected ? colors.ink : colors.muted }]}>
-              {p}
-            </Text>
-          ))}
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, paddingHorizontal: space(3), gap: space(2) },
   flex: { flex: 1 },
@@ -425,7 +285,7 @@ const styles = StyleSheet.create({
   privacyText: { flex: 1, fontSize: 15, lineHeight: 21 },
   // Hook picture: full bleed, so the lines run off both edges of the screen.
   art: { marginHorizontal: -space(3) },
-  clip: { position: 'absolute', top: 0, height: ART_H, overflow: 'hidden' },
+  clip: { position: 'absolute', top: 0, height: 230, overflow: 'hidden' },
   clipLeftSvg: { position: 'absolute', top: 0, right: 0 },
   clipRightSvg: { position: 'absolute', top: 0, left: 0 },
   artDrop: { position: 'absolute' },

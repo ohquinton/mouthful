@@ -1,3 +1,4 @@
+import { useExperience } from '../../store/experience';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -20,12 +21,13 @@ const CONTEXT_PHRASE: Record<SpeakingContext, string> = { reading: 'reading alou
 
 export default function Progress() {
   const colors = useColors();
+  const { mode } = useExperience();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { profile } = useProfile();
   const [sessions, setSessions] = useState<SavedSession[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [showReading, setShowReading] = useState(false);
+  const [showReading, setShowReading] = useState(mode === 'english');
   const [paceCtx, setPaceCtx] = useState<SpeakingContext | null>(null);
 
   useFocusEffect(
@@ -61,9 +63,10 @@ export default function Progress() {
   if (sessions.length === 0) {
     return (
       <View style={[styles.empty, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
-        <Text style={[styles.h1, { color: colors.ink }]}>Progress</Text>
+        <Text style={[styles.h1, { color: colors.ink }]}>Your progress</Text>
+      <Text style={[styles.lead, { color: colors.muted }]}>Your history across Articulation and English Speaking. Reading and topic talks are tracked separately.</Text>
         <Text style={[styles.lead, { color: colors.muted }]}>Your voice has a starting point. One topic, one minute, then something to build on.</Text>
-        <PrimaryButton label="Start today’s stop" onPress={() => router.navigate('/')} />
+        <PrimaryButton label="Choose a practice" onPress={() => router.navigate('/')} />
       </View>
     );
   }
@@ -80,7 +83,8 @@ export default function Progress() {
       style={{ backgroundColor: colors.bg }}
       contentContainerStyle={[styles.wrap, { paddingTop: insets.top + space(2), paddingBottom: space(4) }]}
     >
-      <Text style={[styles.h1, { color: colors.ink }]}>Progress</Text>
+      <Text style={[styles.h1, { color: colors.ink }]}>Your progress</Text>
+      <Text style={[styles.lead, { color: colors.muted }]}>Your history across Articulation and English Speaking. Reading and topic talks are tracked separately.</Text>
 
       <TalkProgress sessions={sessions} limit={profile.pro ? 30 : FREE_HISTORY} />
       {readings.length > 0 && <Pressable accessibilityRole="button" accessibilityState={{ expanded: showReading }} onPress={() => setShowReading((v) => !v)} style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.line }]}>

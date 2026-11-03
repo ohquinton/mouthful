@@ -1,34 +1,58 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import { AndroidImportance, IosAuthorizationStatus, SchedulableTriggerInputTypes, getPermissionsAsync, requestPermissionsAsync, setNotificationChannelAsync, scheduleNotificationAsync, cancelScheduledNotificationAsync } from 'expo-notifications';
 import { TRIAL_REMINDER_TEXT, trialReminderPlan } from './billing';
 import type { TrialStatus } from './purchases.shared';
 
 const REMINDER_ID = 'cadence-daily-read';
 const TRIAL_REMINDER_ID = 'mouthful-trial-ends';
+const DAILY_CHANNEL = 'practice-reminders';
 
-/** Turns on the daily nudge. Returns false if the user said no to notifications. */
-export async function scheduleDailyReminder(hour: number, minute: number): Promise<boolean> {
-  if (Platform.OS === 'web') return false;
-  let perm = await Notifications.getPermissionsAsync();
-  if (!perm.granted) perm = await Notifications.requestPermissionsAsync();
-  if (!perm.granted) return false;
-
-  await Notifications.cancelScheduledNotificationAsync(REMINDER_ID).catch(() => {});
-  await Notifications.scheduleNotificationAsync({
-    identifier: REMINDER_ID,
-    content: {
-      title: 'Today’s read is ready',
-      body: 'About a minute. Read it out loud.',
-      sound: false,
-    },
-    trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute },
-  });
-  return true;
+// Schedule and Off must finish in tap order, including across different screens.
+// A rejected operation must not poison the queue or prevent a later Off attempt.
+let dailyWork: Promise<unknown> = Promise.resolve();
+function dailyOperation<T>(work: () => Promise<T>): Promise<T> {
+  const next = dailyWork.then(work);
+  dailyWork = next.catch(() => {});
+  return next;
 }
 
-export async function cancelDailyReminder(): Promise<void> {
-  if (Platform.OS === 'web') return;
-  await Notifications.cancelScheduledNotificationAsync(REMINDER_ID).catch(() => {});
+/** Turns on the daily nudge. Returns false if the user said no to notifications. */
+export function scheduleDailyReminder(hour: number, minute: number): Promise<boolean> {
+  return dailyOperation(async () => {
+    if (Platform.OS === 'web') return false;
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23 || !Number.isInteger(minute) || minute < 0 || minute > 59) {
+      throw new Error('Invalid reminder time');
+    }
+    // Android 13+ needs a channel before requesting notification permission.
+    if (Platform.OS === 'android') await setNotificationChannelAsync(DAILY_CHANNEL, {
+      name: 'Practice reminders', importance: AndroidImportance.LOW,
+      sound: null, enableVibrate: false,
+    });
+    let perm = await getPermissionsAsync();
+    const allowed = () => perm.granted || perm.ios?.status === IosAuthorizationStatus.PROVISIONAL;
+    if (!allowed() && perm.canAskAgain) perm = await requestPermissionsAsync();
+    if (!allowed()) return false;
+
+    // Reuse the identifier to replace the request. Do not cancel the old reminder first:
+    // a failed replacement should not needlessly remove the user's existing schedule.
+    await scheduleNotificationAsync({
+      identifier: REMINDER_ID,
+      content: {
+        title: 'A minute to find your words',
+        body: 'Pick a topic and say what you think.',
+        sound: false,
+      },
+      trigger: { type: SchedulableTriggerInputTypes.DAILY, hour, minute, channelId: DAILY_CHANNEL },
+    });
+    return true;
+  });
+}
+
+export function cancelDailyReminder(): Promise<void> {
+  return dailyOperation(async () => {
+    if (Platform.OS === 'web') return;
+    await cancelScheduledNotificationAsync(REMINDER_ID);
+  });
 }
 
 /**
@@ -42,15 +66,15 @@ export async function syncTrialReminder(trial: TrialStatus, { ask }: { ask: bool
   if (Platform.OS === 'web') return false;
   try {
     const plan = trialReminderPlan(trial, Date.now());
-    await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID).catch(() => {});
+    await cancelScheduledNotificationAsync(TRIAL_REMINDER_ID).catch(() => {});
     if (plan.action === 'cancel') return false;
-    let perm = await Notifications.getPermissionsAsync();
-    if (!perm.granted && ask) perm = await Notifications.requestPermissionsAsync();
+    let perm = await getPermissionsAsync();
+    if (!perm.granted && ask) perm = await requestPermissionsAsync();
     if (!perm.granted) return false;
-    await Notifications.scheduleNotificationAsync({
+    await scheduleNotificationAsync({
       identifier: TRIAL_REMINDER_ID,
       content: { ...TRIAL_REMINDER_TEXT, sound: false },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: plan.at },
+      trigger: { type: SchedulableTriggerInputTypes.DATE, date: plan.at },
     });
     return true;
   } catch {

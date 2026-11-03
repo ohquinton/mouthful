@@ -1,506 +1,125 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { ScrollViewInstance } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
-import {
-  bestFlow,
-  currentStopIndex,
-  dailyTalkDoneToday,
-  headerTitle,
-  LESSON_KIND,
-  lessonDoneToday,
-  lessonIsPro,
-  lessonTitle,
-  LINE_NAME,
-  LineId,
-  lineOf,
-  LINES,
-  lineStarted,
-  promptFor,
-  startRoute,
-  Stop,
-  stopDoneToday,
-  stopKind,
-  withFirstTalk,
-} from '../../content/lines';
-import { minutePromptOfTheDay, Prompt } from '../../content/prompts';
-import { FLOW_VERSION } from '../../engine/minute';
-import type { WordBook } from '../../engine/vocab';
-import { loadSessions, SavedSession, streak, thisWeek } from '../../store/sessions';
-import { loadBook } from '../../store/words';
 import { useProfile } from '../../store/profile';
+import { useExperience } from '../../store/experience';
+import { EXPERIENCES, experienceTopic } from '../../content/experiences';
+import { loadBook } from '../../store/words';
+import { loadSessions, type SavedSession } from '../../store/sessions';
+import { summarise, type WordBook } from '../../engine/vocab';
 import { ahaPaywallRoute, ahaPending, claimAhaPaywall } from '../../pro';
+import { ShelfRow } from '../../components/library/ShelfRow';
+import { PrimaryButton } from '../../components/ui';
 import { PlanCard } from '../../components/PlanCard';
-import { HomeMap } from '../../components/HomeMap';
-import { PrimaryButton, ProBadge, SecondaryButton } from '../../components/ui';
 import { fonts, space, useColors } from '../../theme';
-
-// Home: the two-line train map (docs/briefs/remodel-screens.md §2, DECISIONS 2026-11-01).
-// "What do I do today?" is answered by one place on a line and one button. Progress is worked out
-// from saved sessions (a stop is done when a session carries its stopId), so nothing new is stored.
-
-/** "rain", "your phone": a level 1–2 topic reads as part of the sentence. */
-const topicInline = (p: Prompt | undefined) => (p ? p.text.charAt(0).toLowerCase() + p.text.slice(1) : 'today’s topic');
-
-/** Space above the map's first row, so the row scrolled to the top is never cut by the switcher. */
-const MAP_TOP_INSET = space(1.5);
-/** How long Home keeps today's stop anchored while the map's rows finish measuring. */
-const SETTLE_MS = 1500;
-
-type WebPermissions = { permissions?: { query: (d: { name: string }) => Promise<{ state: string }> } };
-
-/**
- * Has the microphone been refused for good (a "no" in onboarding, or turned off in Settings)?
- * Then stop 1 says so and offers Settings, rather than a Start that can only fail. On phones it's
- * the speech module's permission; on web (our test harness) the browser's microphone permission,
- * since the module's web build always says yes. Any error means "don't know": no notice.
- */
-async function micBlocked(): Promise<boolean> {
-  if (Platform.OS === 'web') {
-    try {
-      const nav = (globalThis as { navigator?: WebPermissions }).navigator;
-      const p = await nav?.permissions?.query({ name: 'microphone' });
-      return p?.state === 'denied';
-    } catch {
-      return false;
-    }
-  }
-  try {
-    const p = await ExpoSpeechRecognitionModule.getPermissionsAsync();
-    return !p.granted && p.canAskAgain === false;
-  } catch {
-    return false;
-  }
-}
-
-/** Settings can't open on web (and may throw on some platforms): fail quietly. */
-function openSettings() {
-  try {
-    Linking.openSettings().catch(() => {});
-  } catch {}
-}
 
 export default function Home() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const reduceMotion = useReducedMotion();
+  const { mode, showChoices } = useExperience();
   const { profile, ready, update } = useProfile();
-  const [saved, setSaved] = useState<SavedSession[]>([]);
+  const [sessions, setSessions] = useState<SavedSession[]>([]);
   const [book, setBook] = useState<WordBook>({});
   const [loaded, setLoaded] = useState(false);
   const [now, setNow] = useState(() => new Date());
-  // Which line is on screen. Starts on the one chosen in onboarding; the other is one tap away.
-  const [shownLine, setShownLine] = useState<LineId | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      let live = true;
-      Promise.all([loadSessions(), loadBook()]).then(([s, b]) => {
-        if (!live) return;
-        setSaved(s);
-        setBook(b);
-        setNow(new Date()); // the day may have changed while the app sat in the background
-        setLoaded(true);
-      });
-      return () => {
-        live = false;
-      };
-    }, []),
-  );
-
-  // The aha paywall, if the free run's Tape never got to open it (the app was killed there).
-  // Once: claimAhaPaywall() for this launch (the Tape's Done lands here and has claimed it
-  // already), ahaPaywallShown for good. Waits for the saved profile, so Pro isn't misread.
-  const { pro, ahaPaywallShown, moment } = profile;
-  useFocusEffect(
-    useCallback(() => {
-      if (!ready || pro || ahaPaywallShown) return;
-      let live = true;
-      loadSessions().then((all) => {
-        const run = ahaPending({ profile: { pro, ahaPaywallShown }, sessions: all });
-        if (!live || !run || !claimAhaPaywall()) return;
-        update({ ahaPaywallShown: true });
-        router.push(ahaPaywallRoute(run, moment));
-      });
-      return () => {
-        live = false;
-      };
-    }, [ready, pro, ahaPaywallShown, moment, update]),
-  );
-
-  const chosen = lineOf(profile.line);
-  // Onboarding's first talk is stop 1 of the line you picked (it's saved without a stopId).
-  const sessions = useMemo(() => withFirstTalk(saved, chosen), [saved, chosen]);
-  const line = shownLine ?? chosen;
-  const other: LineId = line === 'sharp' ? 'clear' : 'sharp';
-  // The Drop and the progress colour live on your line, and on the other one once you've started it.
-  const active = line === chosen || lineStarted(line, sessions);
-  const currentIndex = currentStopIndex(line, sessions);
-  const stop: Stop | undefined = LINES[line][currentIndex];
-  // Past the last stop, a full-minute talk on the topic of the day is today's stop.
-  const lineComplete = !stop;
-  const todayDone = stopDoneToday(line, sessions, now) || (lineComplete && dailyTalkDoneToday(sessions, minutePromptOfTheDay(now).id, now));
-  const lessonDone = !!stop?.lesson && lessonDoneToday(stop.lesson, { sessions, book }, now);
-  const best = bestFlow(sessions, FLOW_VERSION);
-
-  // The microphone, refused for good: checked on focus and when the app comes back (from Settings).
-  const [blocked, setBlocked] = useState(false);
-  useFocusEffect(
-    useCallback(() => {
-      let live = true;
-      micBlocked().then((b) => live && setBlocked(b));
-      return () => {
-        live = false;
-      };
-    }, []),
-  );
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') micBlocked().then(setBlocked);
+  useFocusEffect(useCallback(() => {
+    let live = true;
+    setLoaded(false);
+    Promise.all([loadSessions(), loadBook()]).then(([saved, words]) => {
+      if (!live) return;
+      setSessions(saved);
+      setBook(words);
+      setNow(new Date());
+      setLoaded(true);
     });
-    return () => sub.remove();
-  }, []);
-  // Only on stop 1 with nothing done yet: after a mic-denied skip, the first talk is still waiting.
-  const micNeeded = blocked && active && currentIndex === 0 && !todayDone;
+    return () => { live = false; };
+  }, []));
 
-  const { days, freezeUsed } = streak(sessions, now.getTime());
-  const week = thisWeek(sessions, now);
-  const weekDone = week.filter((d) => d.done).length;
+  // Keep the existing one-time free-rehearsal handoff when its result screen was interrupted.
+  const { pro, ahaPaywallShown, moment } = profile;
+  useFocusEffect(useCallback(() => {
+    if (!ready || pro || ahaPaywallShown) return;
+    let live = true;
+    loadSessions().then((all) => {
+      const run = ahaPending({ profile: { pro, ahaPaywallShown }, sessions: all });
+      if (!live || !run || !claimAhaPaywall()) return;
+      update({ ahaPaywallShown: true });
+      router.push(ahaPaywallRoute(run, moment));
+    });
+    return () => { live = false; };
+  }, [ready, pro, ahaPaywallShown, moment, update]));
 
-  const start = useCallback(
-    (s: Stop | undefined) => {
-      if (!s) {
-        // Past the last stop: topic talks keep coming daily, so the loop never stops.
-        router.push({ pathname: '/talk', params: { prompt: minutePromptOfTheDay(now).id, seconds: '60', from: 'home' } });
-        return;
-      }
-      router.push(startRoute(s, { pro: profile.pro, lessonDone }));
-    },
-    [now, profile.pro, lessonDone],
-  );
-
-  // Keep the current stop in view: scroll once each time the line or the stop changes. The map
-  // reports the top of the row before today's; scrolling to it puts that whole row at the top, the
-  // MAP_TOP_INSET below the switcher, with today's stop and its card under it. Never a cut label.
-  const scroll = useRef<ScrollViewInstance>(null);
-  const viewport = useRef(0);
-  const scrolledFor = useRef('');
-  // Room under the end of the line, so the anchor row can reach the top even near the end (Line
-  // complete). Without it the scroll stops short and the row at the top is cut in half.
-  const [tailPad, setTailPad] = useState(space(2));
-  const tailRef = useRef(tailPad);
-  const pending = useRef<{ y: number; animated: boolean } | null>(null);
-  // Rows re-measure for a moment after the first layout (fonts arrive, labels re-wrap), which
-  // moves the anchor. Follow it until the reader scrolls themselves, or for SETTLE_MS at most.
-  const anchoredAt = useRef(0);
-  const touched = useRef(false);
-  /** Scroll back to the anchor once the content has grown, unless the reader has taken over. */
-  const onContentSize = useCallback(() => {
-    const to = pending.current;
-    if (!to || touched.current || Date.now() - anchoredAt.current > SETTLE_MS) return;
-    scroll.current?.scrollTo({ y: to.y, animated: false });
-  }, []);
-  const onScrollAnchor = useCallback(
-    (y: number, mapHeight: number) => {
-      if (!viewport.current) return;
-      const tail = Math.max(space(2), Math.ceil(viewport.current - (mapHeight - y) - MAP_TOP_INSET));
-      const grows = tail !== tailRef.current;
-      tailRef.current = tail;
-      if (grows) setTailPad(tail);
-      const key = `${line}:${currentIndex}`;
-      const settling = scrolledFor.current === key && !touched.current && Date.now() - anchoredAt.current < SETTLE_MS;
-      if (scrolledFor.current === key && !settling) return;
-      const first = scrolledFor.current === '';
-      if (!settling) {
-        scrolledFor.current = key;
-        anchoredAt.current = Date.now();
-        touched.current = false;
-      }
-      const to = { y: Math.max(0, y), animated: !first && !settling && !reduceMotion };
-      scroll.current?.scrollTo(to);
-      // If the padding is changing, the scroll above may stop short at the old end: go again once
-      // the content has its new size (and after two frames, where onContentSizeChange is late).
-      pending.current = to;
-      if (grows) requestAnimationFrame(() => requestAnimationFrame(onContentSize));
-    },
-    [line, currentIndex, reduceMotion, onContentSize],
-  );
-
-  const card = (
-    <TodayCard
-      stop={stop}
-      index={currentIndex}
-      active={active}
-      line={line}
-      chosen={chosen}
-      todayDone={todayDone}
-      lessonDone={lessonDone}
-      best={best}
-      pro={profile.pro}
-      micNeeded={micNeeded}
-      now={now}
-      onPress={micNeeded ? openSettings : () => start(stop)}
-    />
-  );
+  if (!mode) return null;
+  const experience = EXPERIENCES[mode];
+  const english = mode === 'english';
+  const topic = experienceTopic(mode, now);
+  const accent = colors[experience.line];
+  const { learning, comfortable } = summarise(book);
+  const wordCount = learning.length + comfortable.length;
+  const startTalk = () => router.push({ pathname: '/talk', params: { prompt: topic.id, seconds: '60', from: 'home' } });
+  const openReading = () => router.push({ pathname: '/session/[id]', params: { id: 'w.meetings.0' } });
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + space(1.5) }]}>
-      {/* Date, this week, and the streak in words. No emoji, no amber (Taste rule). */}
-      <View style={styles.head}>
-        <View style={styles.headTop}>
-          <Text style={[styles.date, { color: colors.muted }]}>
-            {now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
-          </Text>
-          <View style={styles.week} accessible accessibilityLabel={`${weekDone} of 7 days this week`}>
-            {week.map((d, i) => (
-              <View key={i} style={styles.day}>
-                <View
-                  style={[
-                    styles.dayDot,
-                    d.done
-                      ? { backgroundColor: colors.ink, borderColor: colors.ink }
-                      : { borderColor: d.today ? colors.ink : colors.line, borderWidth: d.today ? 2 : 1.5 },
-                  ]}
-                >
-                  {d.done && <Ionicons name="checkmark" size={14} color={colors.bg} />}
-                </View>
-                <Text style={[styles.dayLabel, { color: d.today ? colors.ink : colors.muted }]}>{d.label}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-        <Text style={[styles.title, { color: colors.ink }]} accessibilityRole="header">
-          {headerTitle(sessions, days, now)}
-        </Text>
-        {freezeUsed && <Text style={[styles.freeze, { color: colors.muted }]}>Streak freeze used this week. You’re still on {days}.</Text>}
+    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={[styles.wrap, { paddingTop: insets.top + space(2), paddingBottom: space(4) }]}>
+      <View style={styles.header}>
+        <Text style={[styles.brand, { color: accent }]}>SaidClearly · {experience.name}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Switch between Articulation and English Speaking" onPress={showChoices} style={({ pressed }) => [styles.switch, { opacity: pressed ? 0.65 : 1 }]}>
+          <Text style={[styles.switchText, { color: colors.ink }]}>Switch experience</Text>
+        </Pressable>
       </View>
-
-      {/* Which line is on screen. A tab list to VoiceOver. */}
-      <View style={[styles.switcher, { backgroundColor: colors.line }]} accessibilityRole="tablist">
-        {(['sharp', 'clear'] as const).map((l, i) => {
-          const on = l === line;
-          return (
-            <Pressable
-              key={l}
-              onPress={() => setShownLine(l)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: on }}
-              accessibilityLabel={`${LINE_NAME[l]}, ${i + 1} of 2`}
-              style={[styles.segment, on && { backgroundColor: colors.surface }]}
-            >
-              <View style={[styles.lineDot, { backgroundColor: colors[l] }]} />
-              <Text style={[styles.segmentText, { color: on ? colors.ink : colors.muted }]} numberOfLines={1}>
-                {LINE_NAME[l]}
-              </Text>
-            </Pressable>
-          );
-        })}
+      <View style={styles.section}>
+        <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>{experience.promise}</Text>
+        <Text style={[styles.lead, { color: colors.muted }]}>{english ? 'Start with words in a sentence. Then try speaking in your own words.' : 'Put an idea into words. Review your delivery, then try one useful adjustment.'}</Text>
       </View>
-
-      <ScrollView
-        ref={scroll}
-        style={styles.mapScroll}
-        onLayout={(e) => (viewport.current = e.nativeEvent.layout.height)}
-        onContentSizeChange={onContentSize}
-        onScrollBeginDrag={() => (touched.current = true)}
-        contentContainerStyle={{ paddingTop: MAP_TOP_INSET, paddingBottom: tailPad }}
-      >
-        {loaded && (
-          <Animated.View key={line} entering={reduceMotion ? undefined : FadeIn.duration(200)}>
-            <HomeMap
-              line={line}
-              sessions={sessions}
-              book={book}
-              currentIndex={currentIndex}
-              todayDone={todayDone}
-              active={active}
-              dropPose={todayDone ? 'happy' : micNeeded ? 'up' : 'rest'}
-              card={card}
-              onSwitchLine={() => setShownLine(other)}
-              onOpenSession={(id) => router.push({ pathname: '/tape', params: { id } })}
-              onScrollAnchor={onScrollAnchor}
-              now={now}
-            />
-          </Animated.View>
-        )}
-      </ScrollView>
-
-      {/* Pinned: one button for today, then moments as a quiet row (or the active plan, small). */}
-      <View style={[styles.bottom, { borderTopColor: colors.line }]}>
-        {!active ? (
-          <PrimaryButton label="Start this line" onPress={() => start(stop)} />
-        ) : micNeeded ? (
-          <PrimaryButton label="Open Settings" onPress={openSettings} />
-        ) : todayDone ? (
+      <View style={[styles.hero, { backgroundColor: colors.surface, borderColor: accent }]}>
+        <Text style={[styles.eyebrow, { color: accent }]}>{english ? 'GUIDED ENGLISH PRACTICE' : 'TODAY’S TOPIC · 1 MINUTE'}</Text>
+        <Text accessibilityRole="header" style={[styles.h2, { color: colors.ink }]}>{english ? 'Opening a meeting' : topic.text}</Text>
+        <Text style={[styles.lead, { color: colors.muted }]}>{english ? 'Read useful phrases aloud and follow the words the phone hears. Free guided practice.' : 'Speak without a script. Afterwards, review fillers the phone heard, repeated words and pace.'}</Text>
+        <PrimaryButton label={english ? 'Read aloud' : 'Start a topic talk'} onPress={english ? openReading : startTalk} />
+      </View>
+      <View style={styles.section}>
+        <Text accessibilityRole="header" style={[styles.h2, { color: colors.ink }]}>{english ? 'Build your everyday English' : 'Practise with a purpose'}</Text>
+        {english ? (
           <>
-            <View style={styles.doneRow} accessible accessibilityLabel={`${lineComplete ? 'Today’s talk' : 'Today’s stop'} is done. See you tomorrow.`}>
-              <Ionicons name="checkmark" size={22} color={colors.good} />
-              <Text style={[styles.doneText, { color: colors.ink }]}>{lineComplete ? 'Today’s talk' : 'Today’s stop'} is done. See you tomorrow.</Text>
-            </View>
-            <SecondaryButton label={stop ? 'Do the next stop now' : 'Talk again'} onPress={() => start(stop)} />
+            <ShelfRow icon="chatbubble-outline" title="Speak in your own words" meta={`Today’s everyday topic: ${topic.text}. One minute, with optional starter ideas.`} onPress={startTalk} />
+            <ShelfRow icon="book-outline" title="Useful words in context" meta="Explore meanings and examples, then practise the words in sentences." onPress={() => router.push({ pathname: '/pack/[id]', params: { id: 'meetings' } })} />
+            <ShelfRow icon="library-outline" title="English practice library" meta="Everyday topics, guided passages and word packs." onPress={() => router.push('/library')} />
           </>
         ) : (
-          <PrimaryButton label={stop ? 'Start today’s stop' : 'Start today’s talk'} onPress={() => start(stop)} />
+          <>
+            <ShelfRow icon="chatbubbles-outline" title="Think on your feet" meta="Explain an idea, tell a story or make a case. Choose a topic to practise." onPress={() => router.push('/library')} />
+            <ShelfRow icon="book-outline" title="Find a more precise word" meta="Make your point: learn useful vocabulary, then express your own thought." onPress={() => router.push({ pathname: '/pack/[id]', params: { id: 'precision' } })} />
+            <ShelfRow icon="document-text-outline" title="Rehearse your real words" meta="Practise a script and review your pace and delivery. Your first script is free." onPress={() => router.push('/scripts')} />
+          </>
         )}
-        {moment ? (
-          <PlanCard sessions={sessions} />
-        ) : (
-          <Pressable
-            onPress={() => router.push('/moment')}
-            accessibilityRole="button"
-            accessibilityLabel="Got something coming up? Plan for it"
-            style={({ pressed }) => [styles.planRow, { opacity: pressed ? 0.7 : 1 }]}
-          >
-            <Ionicons name="calendar-outline" size={18} color={colors.muted} />
-            <Text style={[styles.planText, { color: colors.muted }]}>
-              Got something coming up? <Text style={[styles.planLink, { color: colors.ink }]}>Plan for it</Text>
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.ink} />
-          </Pressable>
-        )}
+        <ShelfRow icon="bookmark-outline" title={english ? 'Practise your saved words' : 'Keep your vocabulary active'}
+          meta={!loaded ? 'Loading your words…' : wordCount ? `${wordCount} saved ${wordCount === 1 ? 'word' : 'words'} across both experiences. Revisit one or practise words due today.` : 'Words you practise collect here. Start with a word pack.'}
+          onPress={() => router.push('/words')} />
+        {english && <ShelfRow icon="document-text-outline" title="Practise something you will say" meta="Add your own English sentences or a short script. Your first script is free." onPress={() => router.push('/scripts')} />}
       </View>
-    </View>
-  );
-}
-
-/** The card beside the current stop: what today's stop is, in one line, and a tap to start it. */
-function TodayCard({
-  stop,
-  index,
-  active,
-  line,
-  chosen,
-  todayDone,
-  lessonDone,
-  best,
-  pro,
-  micNeeded,
-  now,
-  onPress,
-}: {
-  stop: Stop | undefined;
-  index: number;
-  active: boolean;
-  line: LineId;
-  chosen: LineId;
-  todayDone: boolean;
-  lessonDone: boolean;
-  best: number | undefined;
-  pro: boolean;
-  /** The microphone was refused for good: stop 1 says so, and a tap opens Settings. */
-  micNeeded: boolean;
-  now: Date;
-  onPress: () => void;
-}) {
-  const colors = useColors();
-  let eyebrow: string;
-  let kind: string;
-  let name: string;
-  let sub: string;
-  let proBadge = false;
-
-  if (!active) {
-    // The other line, never started. Its progress never takes from yours. Its stop 1 is a normal
-    // full-minute talk on its own topic (lines.ts talkSeconds); only onboarding's talk is 30 s.
-    eyebrow = 'STOP 1';
-    kind = '';
-    name = LINE_NAME[line];
-    sub = `Your ${LINE_NAME[chosen]} progress stays where it is.`;
-  } else if (!stop) {
-    // Past the last stop: a talk on the topic of the day, every day, counts as the day's stop.
-    eyebrow = `LINE COMPLETE · ${todayDone ? 'TOMORROW' : 'TODAY'}`;
-    kind = 'Topic talk';
-    name = minutePromptOfTheDay(now).text;
-    sub = todayDone ? 'Line complete. Today’s talk is done.' : 'Line complete. Keep going with today’s topic.';
-  } else {
-    const prompt = promptFor(stop);
-    eyebrow = `${todayDone ? 'TOMORROW' : 'TODAY'} · STOP ${index + 1}`;
-    kind = LESSON_KIND[stopKind(stop)];
-    // Every stop from Home is a full minute, stop 1 included.
-    // A long topic (level 3) is a whole question, so it isn't folded into a sentence.
-    const talkPart = prompt && prompt.level < 3 ? `1 minute on ${topicInline(prompt)}` : 'a 1-minute topic talk';
-    if (!stop.lesson) {
-      name = prompt?.text ?? 'Today’s topic';
-      if (micNeeded) sub = 'The phone needs the microphone first.';
-      else sub = best !== undefined ? `1 minute. Your best is ${best}.` : '1 minute. Keep talking until the time is up.';
-    } else {
-      name = lessonTitle(stop.lesson);
-      const locked = !pro && lessonIsPro(stop.lesson);
-      proBadge = locked;
-      if (locked) sub = `Today: ${talkPart}. The ${kind.toLowerCase()} comes with Pro.`;
-      else if (lessonDone) sub = `${kind} done. Now ${talkPart}.`;
-      else if (stop.lesson.kind === 'pack') sub = `Learn the words, then ${talkPart}.`;
-      else sub = `Then ${talkPart}.`;
-    }
-  }
-
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${eyebrow.toLowerCase()}, ${kind ? `${kind}: ${name}` : `Start ${name} here`}. ${sub}`}
-      accessibilityHint={micNeeded ? 'Opens Settings' : undefined}
-      style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.85 : 1 }]}
-    >
-      <View style={styles.eyebrowRow}>
-        <Text style={[styles.eyebrow, { color: colors.muted }]}>{eyebrow}</Text>
-        {proBadge && <ProBadge />}
+      <View style={styles.section}>
+        <Text accessibilityRole="header" style={[styles.h2, { color: colors.ink }]}>See what changes</Text>
+        <ShelfRow icon="stats-chart-outline" title="Your practice history" meta="Review results and compare compatible attempts. History is shared across both experiences." onPress={() => router.push('/progress')} />
+        <Text style={[styles.note, { color: colors.muted }]}>{english ? 'The phone shows what it heard. It does not grade your accent or pronunciation, and you can correct missed words.' : 'Filler counts depend on what the phone transcribes. Flow describes continuity and pace, not the quality of your ideas.'}</Text>
       </View>
-      {kind ? (
-        <Text style={[styles.cardTitle, { color: colors.ink }]}>
-          {kind}: <Text style={styles.cardName}>{name}</Text>
-        </Text>
-      ) : (
-        <Text style={[styles.cardTitle, { color: colors.ink }]}>
-          Start <Text style={styles.cardName}>{name}</Text> here.
-        </Text>
-      )}
-      {micNeeded ? (
-        // Its action is the pinned Open Settings button below (one cobalt thing per screen); a tap
-        // on the card opens Settings too.
-        <View style={styles.micRow}>
-          <Ionicons name="mic-off-outline" size={18} color={colors.ink} />
-          <Text style={[styles.cardSub, styles.micText, { color: colors.ink }]}>{sub}</Text>
-        </View>
-      ) : (
-        <Text style={[styles.cardSub, { color: colors.muted }]}>{sub}</Text>
-      )}
-    </Pressable>
+      {!english && (moment ? <PlanCard sessions={sessions} /> : <ShelfRow icon="calendar-outline" title="Prepare for something coming up" meta="A meeting, interview or presentation: practise the words you will need." onPress={() => router.push('/moment')} />)}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  head: { paddingHorizontal: space(2.5), gap: 2 },
-  headTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space(1) },
-  date: { fontSize: 15, flexShrink: 1 },
-  title: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, marginTop: space(0.5) },
-  freeze: { fontSize: 14 },
-  week: { flexDirection: 'row', gap: 5 },
-  day: { alignItems: 'center', gap: 3 },
-  dayDot: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
-  dayLabel: { fontSize: 10, fontWeight: '600' },
-  switcher: { flexDirection: 'row', marginHorizontal: space(2.5), marginTop: space(1.5), borderRadius: 16, padding: 4 },
-  segment: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44, borderRadius: 12 },
-  segmentText: { fontSize: 16, fontWeight: '700' },
-  lineDot: { width: 12, height: 12, borderRadius: 6 },
-  mapScroll: { flex: 1 },
-  bottom: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: space(2.5), paddingTop: space(1.5), paddingBottom: space(1), gap: space(1) },
-  doneRow: { flexDirection: 'row', alignItems: 'center', gap: space(1), paddingHorizontal: space(0.5) },
-  doneText: { flex: 1, fontSize: 16, fontWeight: '600', lineHeight: 21 },
-  planRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44 },
-  planText: { fontSize: 15, flexShrink: 1 },
-  planLink: { fontWeight: '700' },
-  card: { borderWidth: 1, borderRadius: 20, padding: space(2), gap: 4 },
-  eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2 },
-  cardTitle: { fontSize: 19, lineHeight: 25, fontWeight: '600' },
-  cardName: { fontFamily: fonts.readingBold },
-  cardSub: { fontSize: 15, lineHeight: 20 },
-  micRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  micText: { flex: 1, fontWeight: '600' },
+  wrap: { paddingHorizontal: space(2.5), gap: space(3), width: '100%', maxWidth: 620, alignSelf: 'center' },
+  header: { gap: space(0.5), alignItems: 'flex-start' },
+  brand: { fontSize: 15, fontWeight: '700', lineHeight: 22 },
+  switch: { minHeight: 44, justifyContent: 'center' },
+  switchText: { fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
+  title: { fontFamily: fonts.displayBold, fontSize: 32, lineHeight: 39 },
+  h2: { fontFamily: fonts.displayBold, fontSize: 23, lineHeight: 30 },
+  lead: { fontSize: 16, lineHeight: 24 },
+  section: { gap: space(1.25) },
+  hero: { borderWidth: 1.5, borderRadius: 18, padding: space(2.5), gap: space(1.75) },
+  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 0.7, lineHeight: 18 },
+  note: { fontSize: 14, lineHeight: 21 },
 });

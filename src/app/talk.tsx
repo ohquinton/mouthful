@@ -1,3 +1,5 @@
+import { useExperience } from '../store/experience';
+import { experiencePromptAfter } from '../content/experiences';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -54,6 +56,7 @@ function clockText(seconds: number): string {
  */
 export default function TopicTalk() {
   const colors = useColors();
+  const { mode } = useExperience();
   const insets = useSafeAreaInsets();
   const still = useReducedMotion();
   const params = useLocalSearchParams<{ prompt?: string; stop?: string; seconds?: string; from?: string }>();
@@ -80,7 +83,7 @@ export default function TopicTalk() {
   const heardTimes = useRef<number[]>([]);
   const startWall = useRef(0);
   const breaks = useRef<MinuteBreak[]>([]);
-  const prompt = promptAfter(base, shuffle);
+  const prompt = mode ? experiencePromptAfter(mode, base, shuffle) : promptAfter(base, shuffle);
 
   const heard = useMemo(() => tokenise(listener.transcript), [listener.transcript]);
   const counts = useMemo(() => countFreeTalk(heard), [heard]);

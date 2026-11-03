@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,7 +23,10 @@ export default function You() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { profile, update, reset } = useProfile();
+  const reminderLock = useRef(false);
+  const [reminderBusy, setReminderBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [resetNote, setResetNote] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [recCount, setRecCount] = useState(0);
   const [confirmRecDelete, setConfirmRecDelete] = useState(false);
@@ -84,17 +87,50 @@ export default function You() {
   };
 
   const setReminder = async (opt: { hour: number; minute: number } | null) => {
-    if (!opt) {
-      await cancelDailyReminder();
-      await update({ reminder: null });
-      setNote('Reminder off.');
+    if (reminderLock.current) return;
+    if (Platform.OS === 'web') {
+      setNote('Daily reminders are available in the phone app.');
       return;
     }
-    const ok = await scheduleDailyReminder(opt.hour, opt.minute);
-    if (ok) {
-      await update({ reminder: opt });
-      setNote(`Reminder set for ${formatTime(opt.hour, opt.minute)}.`);
-    } else setNote(`Notifications are off for ${BRAND.name}. Turn them on in Settings to get a reminder.`);
+    reminderLock.current = true;
+    setReminderBusy(true);
+    setNote(null);
+    try {
+      if (!opt) {
+        await cancelDailyReminder();
+        await update({ reminder: null });
+        setNote('Reminder off.');
+      } else if (await scheduleDailyReminder(opt.hour, opt.minute)) {
+        await update({ reminder: opt });
+        setNote(`Reminder set for ${formatTime(opt.hour, opt.minute)}.`);
+      } else {
+        setNote(`Notifications are off for ${BRAND.name}. You can turn them on in your phone’s Settings.`);
+      }
+    } catch {
+      setNote(opt ? 'Couldn’t set the reminder. Please try again.' : 'Couldn’t turn the reminder off. Please try again.');
+    } finally {
+      reminderLock.current = false;
+      setReminderBusy(false);
+    }
+  };
+
+  const resetEverything = async () => {
+    if (reminderLock.current) return;
+    setResetNote(null);
+    reminderLock.current = true;
+    setReminderBusy(true);
+    try {
+      // Notification failures must not prevent deleting private practice data.
+      let reminderCleanupFailed = false;
+      try { await cancelDailyReminder(); } catch { reminderCleanupFailed = true; }
+      await reset();
+      router.replace({ pathname: '/onboarding', params: reminderCleanupFailed ? { reminderCleanup: 'failed' } : {} });
+    } catch {
+      setResetNote('Couldn’t finish the reset. Please try again.');
+    } finally {
+      reminderLock.current = false;
+      setReminderBusy(false);
+    }
   };
 
   const onRestore = async () => {
@@ -137,7 +173,7 @@ export default function You() {
         <Text style={[styles.planSub, { color: profile.pro ? colors.muted : colors.cardMuted }]}>
           {profile.pro
             ? 'Everything is unlocked. Thanks for backing a small app.'
-            : 'Plans for your big moments, Glide, the free Word Pack, streaks, and one script with a free first run. Pro adds every script, unlimited rehearsal, word drills, cold reads, every pack and your full history.'}
+            : 'Daily topic talks, your Flow progress, free word packs and one script with a free first run. Pro adds every word pack, word drills, cold reads and unlimited script rehearsal.'}
         </Text>
         {!profile.pro && <PrimaryButton label="See Pro" onPress={() => router.push({ pathname: '/paywall', params: { from: 'you' } })} style={{ marginTop: space(1) }} />}
       </View>
@@ -170,21 +206,30 @@ export default function You() {
       </Pressable>
 
       <SectionTitle>Daily reminder</SectionTitle>
-      <View style={styles.chips}>
+      <Text style={[styles.body, { color: colors.muted }]}>
+        {Platform.OS === 'web' ? 'Daily reminders are available in the phone app.' : 'A quiet nudge to practise at a time that suits you.'}
+      </Text>
+      <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Daily reminder time">
         {REMINDER_OPTIONS.map((o) => {
           const on = profile.reminder?.hour === o.hour && profile.reminder?.minute === o.minute;
           return (
-            <Pressable key={`${o.hour}:${o.minute}`} style={chip(on)} onPress={() => setReminder(o)}>
+            <Pressable key={`${o.hour}:${o.minute}`} style={chip(on)} onPress={() => setReminder(o)}
+              accessibilityRole="radio" accessibilityLabel={formatTime(o.hour, o.minute)}
+              accessibilityState={{ checked: on, disabled: reminderBusy || Platform.OS === 'web' }}
+              disabled={reminderBusy || Platform.OS === 'web'}>
               <Text style={[styles.chipText, { color: colors.ink }]}>{formatTime(o.hour, o.minute)}</Text>
             </Pressable>
           );
         })}
-        <Pressable style={chip(!profile.reminder)} onPress={() => setReminder(null)}>
+        <Pressable style={chip(!profile.reminder)} onPress={() => setReminder(null)}
+          accessibilityRole="radio" accessibilityLabel="Reminder off"
+          accessibilityState={{ checked: !profile.reminder, disabled: reminderBusy || Platform.OS === 'web' }}
+          disabled={reminderBusy || Platform.OS === 'web'}>
           <Text style={[styles.chipText, { color: colors.ink }]}>Off</Text>
         </Pressable>
       </View>
 
-      {note && <Text style={[styles.note, { color: colors.muted }]}>{note}</Text>}
+      {(reminderBusy || note) && <Text accessibilityLiveRegion="polite" style={[styles.note, { color: colors.muted }]}>{reminderBusy ? 'Updating…' : note}</Text>}
 
       <SectionTitle>English the phone listens for</SectionTitle>
       <Text style={[styles.body, { color: colors.muted }]}>
@@ -313,18 +358,18 @@ export default function You() {
         {confirmReset ? (
           <View style={styles.confirm}>
             <Text style={[styles.body, { color: colors.ink }]}>Delete every session, script, recording and setting?</Text>
+            {resetNote && <Text accessibilityLiveRegion="polite" style={[styles.note, { color: colors.muted }]}>{resetNote}</Text>}
             <View style={styles.confirmRow}>
               <Pressable
-                onPress={async () => {
-                  await cancelDailyReminder();
-                  await reset();
-                  router.replace('/onboarding');
-                }}
+                onPress={resetEverything}
+                disabled={reminderBusy}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: reminderBusy }}
                 hitSlop={8}
               >
-                <Text style={[styles.link, { color: colors.stumble }]}>Delete everything</Text>
+                <Text style={[styles.link, { color: colors.stumble }]}>{reminderBusy ? 'Deleting…' : 'Delete everything'}</Text>
               </Pressable>
-              <Pressable onPress={() => setConfirmReset(false)} hitSlop={8}>
+              <Pressable onPress={() => setConfirmReset(false)} disabled={reminderBusy} accessibilityRole="button" accessibilityState={{ disabled: reminderBusy }} hitSlop={8}>
                 <Text style={[styles.link, { color: colors.muted }]}>Keep it</Text>
               </Pressable>
             </View>

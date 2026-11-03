@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
@@ -56,6 +56,7 @@ export default function StartingPoint() {
   // Nothing chosen until they tap (undefined): a reminder is a yes they give, not one we assume.
   // null is an explicit "No reminder". Neither schedules anything.
   const [time, setTime] = useState<Reminder | null | undefined>(undefined);
+  const finishing = useRef(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -69,7 +70,8 @@ export default function StartingPoint() {
   const count = useCountUp(point?.flow, reduceMotion);
 
   const finish = async () => {
-    if (busy) return;
+    if (finishing.current) return;
+    finishing.current = true;
     setBusy(true);
     const ok = time ? await scheduleDailyReminder(time.hour, time.minute).catch(() => false) : false;
     await update({ onboarded: true, reminder: ok && time ? time : null });
@@ -139,6 +141,7 @@ export default function StartingPoint() {
         </Animated.View>
 
         <Text style={[styles.h2, { color: colors.ink }]}>Remind me each day</Text>
+        {Platform.OS === 'web' && <Text style={[styles.lead, { color: colors.muted }]}>Daily reminders are available in the phone app.</Text>}
         <View style={styles.chips} accessibilityRole="radiogroup">
           {TIMES.map((o) => {
             const on = time?.hour === o.hour && time?.minute === o.minute;
@@ -146,7 +149,8 @@ export default function StartingPoint() {
               <Pressable
                 key={`${o.hour}:${o.minute}`}
                 accessibilityRole="radio"
-                accessibilityState={{ selected: on }}
+                accessibilityState={{ checked: on, disabled: busy || Platform.OS === 'web' }}
+                disabled={busy || Platform.OS === 'web'}
                 onPress={() => setTime(o)}
                 style={[styles.chip, { borderColor: on ? colors.signal : colors.line, backgroundColor: on ? colors.signalSoft : colors.surface }]}
               >
@@ -156,7 +160,8 @@ export default function StartingPoint() {
           })}
           <Pressable
             accessibilityRole="radio"
-            accessibilityState={{ selected: time === null }}
+            accessibilityState={{ checked: time === null, disabled: busy }}
+            disabled={busy}
             onPress={() => setTime(null)}
             style={[styles.chip, { borderColor: time === null ? colors.signal : colors.line, backgroundColor: time === null ? colors.signalSoft : colors.surface }]}
           >

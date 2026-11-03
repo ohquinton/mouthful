@@ -23,6 +23,7 @@ export function ReadAloud({
   ready,
   onRead,
   onColdRead,
+  initiallyOpen = false,
 }: {
   passages: readonly Passage[];
   todayId: string;
@@ -31,9 +32,10 @@ export function ReadAloud({
   /** Opens Glide on a passage (the screen applies the Pro rule for anything but today's). */
   onRead: (p: Passage) => void;
   onColdRead: () => void;
+  initiallyOpen?: boolean;
 }) {
   const colors = useColors();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
 
   return (
     <View style={styles.wrap}>

@@ -1,3 +1,13 @@
+## Current checkpoint — 2026-11-03: two experiences
+
+Founder superseded railway design: simple opening doors for Articulation and English Speaking. Implemented launch-scoped selection, distinct Homes and curated Libraries, shared history/words explicitly labelled, and onboarding without duplicate mode picker. Existing session IDs and historical profile.line retained. Shared engines unchanged. New UI remains basic by request.
+
+Reminder reliability slice included: serialized native operations, truthful failure states, disabled pending controls, web explanation, Android channel preparation, reset continues despite reminder cleanup failure with visible notice.
+
+Validation: 49 suites / 830 tests passed; TypeScript passed; lint zero errors with 13 existing warnings. Jest emitted its existing open-handle warning. Browser initial doors, both Homes and switching passed. English Library and topic launch/Close route inspected; topic shuffle stays inside chosen experience. After shuffle fix, 33 focused tests passed; tsc/lint rerun passed. Independent final QA hit usage limit after finding the now-fixed stale ART_H reference. Phone microphone, native reminders, large text and screen reader verification outstanding. No native release.
+
+Earlier checkpoints below are historical and may describe superseded railway work.
+
 # In flight
 
 The one place that says what is running right now and how to resume it. The main session updates this

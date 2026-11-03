@@ -17,6 +17,7 @@ export function TopicTalks({
   ready = true,
   line,
   onOpen,
+  levels = [1, 2, 3],
 }: {
   level: PromptLevel;
   onLevel: (l: PromptLevel) => void;
@@ -25,12 +26,14 @@ export function TopicTalks({
   /** Your line: its colour marks the topics you've talked on. */
   line: LineId;
   onOpen: (p: Prompt) => void;
+  levels?: readonly PromptLevel[];
 }) {
   const colors = useColors();
   const info = TOPIC_LEVELS.find((l) => l.level === level) ?? TOPIC_LEVELS[0];
   const topics = topicsAt(level);
   const { fontScale } = useWindowDimensions();
   const wide = level === 3 || fontScale > 1.3;
+  const availableLevels = TOPIC_LEVELS.filter((item) => levels.includes(item.level));
 
   return (
     <View style={styles.wrap}>
@@ -47,8 +50,8 @@ export function TopicTalks({
         </View>
       )}
 
-      <View style={[styles.switcher, fontScale > 1.3 && { flexDirection: 'column' }, { backgroundColor: colors.line }]} accessibilityRole="tablist">
-        {TOPIC_LEVELS.map((l, i) => {
+      {availableLevels.length > 1 && <View style={[styles.switcher, fontScale > 1.3 && { flexDirection: 'column' }, { backgroundColor: colors.line }]} accessibilityRole="tablist">
+        {availableLevels.map((l, i) => {
           const on = l.level === level;
           return (
             <Pressable
@@ -56,7 +59,7 @@ export function TopicTalks({
               onPress={() => onLevel(l.level)}
               accessibilityRole="tab"
               accessibilityState={{ selected: on }}
-              accessibilityLabel={`${l.name}, ${i + 1} of ${TOPIC_LEVELS.length}`}
+              accessibilityLabel={`${l.name}, ${i + 1} of ${availableLevels.length}`}
               style={[styles.segment, on && { backgroundColor: colors.surface }]}
             >
               <Text style={[styles.segmentText, { color: on ? colors.ink : colors.muted }]} >
@@ -65,7 +68,7 @@ export function TopicTalks({
             </Pressable>
           );
         })}
-      </View>
+      </View>}
 
       <View style={styles.levelHead}>
         <Text style={[styles.blurb, { color: colors.muted }]}>{info.blurb}</Text>
