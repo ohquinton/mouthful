@@ -34,6 +34,9 @@ export type EventName =
   | 'purchase_result'
   | 'recording_played'
   | 'recordings_deleted'
+  | 'recall_answer' // remembered or not, and whether the phone heard the word: booleans, never the word
+  | 'recall_own_sentence' // heard, overruled and the reader's own tick: booleans, never the word or sentence
+  | 'recall_complete' // counts for a finished recall round
   | 'session_retry'
   | 'session_resume' // Carry on after the recogniser stopped; `error` is the listener's code
   | 'situation_start' // `which`: the situation id, never its text
