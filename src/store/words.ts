@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { applyResults, correctWord, readingResults, WordBook, WordResult } from '../engine/vocab';
+import { applyResults, correctWord, readingResults, recordOwnSentence, recordRecall, WordBook, WordResult } from '../engine/vocab';
 import { DICTIONARY } from '../content/wordpacks';
 import type { Alignment, PassageWord } from '../engine/align';
 
@@ -46,6 +46,18 @@ export function recordWords(results: WordResult[]): Promise<void> {
 export function recordCorrection(word: string): Promise<void> {
   const now = Date.now();
   return updateBook((book) => correctWord(book, word, now));
+}
+
+/** The reader's own "I remembered" or "Not yet". */
+export function saveRecallAnswer(word: string, remembered: boolean): Promise<void> {
+  const now = Date.now();
+  return updateBook((book) => recordRecall(book, word, remembered, now));
+}
+
+/** The reader's own "that was my own sentence". A tick and a date; the sentence is never stored. */
+export function saveOwnSentence(word: string): Promise<void> {
+  const now = Date.now();
+  return updateBook((book) => recordOwnSentence(book, word, now));
 }
 
 /**

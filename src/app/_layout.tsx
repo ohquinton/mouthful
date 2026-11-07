@@ -48,6 +48,7 @@ function RootLayout() {
         <Stack.Screen name="scripts/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="pack/[id]" />
         <Stack.Screen name="words" />
+        <Stack.Screen name="recall" options={{ gestureEnabled: false, animation: 'fade' }} />
         <Stack.Screen name="moment" options={{ presentation: 'modal' }} />
         <Stack.Screen name="review" />
       </Stack>

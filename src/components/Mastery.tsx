@@ -2,13 +2,13 @@ import { View } from 'react-native';
 import { LEARNED_AFTER_DAYS } from '../engine/vocab';
 import { Colors } from '../theme';
 
-/** Three dots: one per clean day. All three filled = learned. */
+/** Three dots: one per day read cleanly. It measures reading, not whether the word is remembered. */
 export function Mastery({ days, colors }: { days: number; colors: Colors }) {
   const done = days >= LEARNED_AFTER_DAYS;
   return (
     <View
       style={{ flexDirection: 'row', gap: 4 }}
-      accessibilityLabel={done ? 'Learned' : `${days} of ${LEARNED_AFTER_DAYS} clean days`}
+      accessibilityLabel={`Read cleanly on ${Math.min(days, LEARNED_AFTER_DAYS)} of ${LEARNED_AFTER_DAYS} days`}
     >
       {Array.from({ length: LEARNED_AFTER_DAYS }, (_, i) => (
         <View

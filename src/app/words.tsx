@@ -5,10 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Speech from 'expo-speech';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { DICTIONARY, inFreePack, practisableWords } from '../content/wordpacks';
-import { dueWords, stageLabel, summarise, WordBook, WordEntry } from '../engine/vocab';
+import { dueForRecall, dueWords, recallLabels, stageLabel, summarise, WordBook, WordEntry } from '../engine/vocab';
 import { loadBook } from '../store/words';
 import { Mastery } from '../components/Mastery';
-import { PrimaryButton } from '../components/ui';
+import { PrimaryButton, SecondaryButton } from '../components/ui';
 import { requirePro } from '../pro';
 import { useProfile } from '../store/profile';
 import { WordReflection } from '../components/WordReflection';
@@ -43,8 +43,13 @@ export default function YourWords() {
     router.push({ pathname: '/fixit', params: { words: (dueNow.length ? dueNow : due).join(','), title: 'Your words' } });
   };
 
+  // Only pack words have a meaning to recall from.
+  const recallCount = dueForRecall(book, (w) => DICTIONARY.has(w)).length;
+  const hasRecallWords = Object.keys(book).some((w) => DICTIONARY.has(w));
+
   const row = (e: WordEntry) => {
     const info = DICTIONARY.get(e.word);
+    const marks = recallLabels(e);
     return (
       <View key={e.word} style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.line }]}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -60,6 +65,9 @@ export default function YourWords() {
             <Mastery days={e.cleanDays.length} colors={colors} />
             <Text style={[styles.stage, { color: colors.muted }]}>{stageLabel(e)}</Text>
           </View>
+          {marks.map((mark) => (
+            <Text key={mark} style={[styles.stage, { color: colors.muted }]}>{mark}</Text>
+          ))}
           <View style={styles.actions}>
             <Pressable accessibilityRole="button" accessibilityLabel={`Practise ${e.word}`} onPress={() => {
               Speech.stop();
@@ -100,7 +108,7 @@ export default function YourWords() {
       <ScrollView contentContainerStyle={[styles.wrap, { paddingBottom: insets.bottom + space(4) }]}>
         <Text style={[styles.h1, { color: colors.ink }]}>Your words</Text>
         <Text style={[styles.lead, { color: colors.muted }]}>
-          Return to a word, practise it, then try using it in a thought of your own. Comfortable means heard in context on three different days. It doesn’t test whether you can use it without a script.
+          Return to a word, practise it, then try it from memory. Comfortable means read clearly in context on three different days. It’s about reading, not about remembering the word. Remembered and own sentence are your own marks.
         </Text>
 
         {ready && learning.length + learned.length > 0 && <View style={styles.stats}>
@@ -118,6 +126,13 @@ export default function YourWords() {
           <PrimaryButton
             label={`Practise today’s ${dueCount} ${dueCount === 1 ? 'word' : 'words'}`}
             onPress={practiseDue}
+          />
+        )}
+
+        {ready && hasRecallWords && (
+          <SecondaryButton
+            label={recallCount > 0 ? `Try ${recallCount} ${recallCount === 1 ? 'word' : 'words'} from memory` : 'Try words from memory'}
+            onPress={() => { Speech.stop(); router.push('/recall'); }}
           />
         )}
 

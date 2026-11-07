@@ -70,7 +70,7 @@ export default function PackScreen() {
         <Text style={[styles.pitch, { color: colors.muted }]}>{pack.pitch}</Text>
 
         <Text style={[styles.sub, { color: colors.muted }]}>
-          {bookReady ? `${learned} of ${pack.words.length} comfortable · Built through practice on different days.` : 'Loading your progress…'}
+          {bookReady ? `${learned} of ${pack.words.length} comfortable reading · Built by reading on different days.` : 'Loading your progress…'}
         </Text>
 
         <PrimaryButton
