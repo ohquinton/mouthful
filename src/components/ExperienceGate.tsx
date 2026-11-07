@@ -8,10 +8,11 @@ import { fonts, space, useColors } from '../theme';
 
 /** Routes mount only after a choice, so a cold deep link cannot start a practice behind the doors. */
 export function ExperienceGate({ children }: { children: ReactNode }) {
-  const { mode, choose } = useExperience();
+  const { mode, ready, choose } = useExperience();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   if (mode) return children;
+  if (!ready) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
   return (
     <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={[styles.wrap, { paddingTop: insets.top + space(4), paddingBottom: insets.bottom + space(3) }]}>

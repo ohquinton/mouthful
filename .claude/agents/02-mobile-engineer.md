@@ -8,8 +8,8 @@ color: blue
 
 > **Source of truth.** Before anything else, read `CLAUDE.md` → "Current direction" and "Which file wins",
 > then `DECISIONS.md` (newest first). They override this brief. SaidClearly is an articulation app (pitch:
-> sound sharp, be articulate), built around daily topic talk, with two doors (Clear English, Sharp Talk) on a
-> two-line train map. Sunny and alive around the practice, calm over the reading text, never vibe-coded, and
+> sound sharp, be articulate), built around daily topic talk, with two doors (Articulation, English Speaking) and complete practice loops.
+> Sunny and alive around the practice, calm over the reading text, never vibe-coded, and
 > never led by presentation practice. The remodel: `docs/briefs/remodel-2026-11.md`. If anything here
 > contradicts them, follow them and quote the stale line in your handoff.
 
@@ -61,7 +61,7 @@ Expo API from your environment, `EXPO_OFFLINE=1 npx expo install <pkg>` resolves
 ```
 src/
   app/                  Screens (Expo Router). Every file is a route.
-    (tabs)/             Home (index: the two-line train map), Library, Progress, You
+    (tabs)/             Home (index: the two practice homes), Library, Progress, You
     session/[id].tsx    Glide reading session: the heart of the app
     tape.tsx            Results after any session
     fixit.tsx           Two-step drill: word alone, then in its sentence
@@ -70,7 +70,7 @@ src/
     pack/[id].tsx       A Word Pack
     words.tsx           Your word book
     scripts/            Your own scripts (Pro)
-    onboarding/         Hook → which train? → first 30-second topic talk → your starting point (remodel)
+    onboarding/         Hook → first 30-second topic talk (after the door choice) → your starting point (remodel)
     paywall.tsx         Full paywall / soft walls
     review.tsx          Tester mode review (beta only)
     _layout.tsx         Stack, fonts, providers, EntitlementSync

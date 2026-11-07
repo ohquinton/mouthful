@@ -9,8 +9,8 @@ color: cyan
 
 > **Source of truth.** Before anything else, read `CLAUDE.md` → "Current direction" and "Which file wins",
 > then `DECISIONS.md` (newest first). They override this brief. SaidClearly is an articulation app (pitch:
-> sound sharp, be articulate), built around daily topic talk, with two doors (Clear English, Sharp Talk) on a
-> two-line train map. Sunny and alive around the practice, calm over the reading text, never vibe-coded, and
+> sound sharp, be articulate), built around daily topic talk, with two doors (Articulation, English Speaking) and complete practice loops.
+> Sunny and alive around the practice, calm over the reading text, never vibe-coded, and
 > never led by presentation practice. The remodel: `docs/briefs/remodel-2026-11.md`. If anything here
 > contradicts them, follow them and quote the stale line in your handoff.
 

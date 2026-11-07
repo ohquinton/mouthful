@@ -8,14 +8,15 @@ Renamed Mouthful → SaidClearly on 2026-10-30 (US risk; docs/NAME-CHECK.md), an
 
 ## Current direction (read this first; it overrides older text anywhere)
 
-The remodel (DECISIONS 2026-11-01, full brief `docs/briefs/remodel-2026-11.md`):
+Two experiences and a practice-loop focus (DECISIONS 2026-11-02 and 2026-11-07, build order `docs/ROADMAP.md`). The railway is gone: `docs/briefs/remodel-2026-11.md` and other older docs that describe a train map are history.
 - **What it is:** an articulation app. The pitch is identity: sound sharp, think on your feet, say what you mean clearly. Find precise words, build vocabulary, speak with steady pace, emphasis and presence, with fewer fillers and repeated words. **Presentation and interview practice never lead** (Quinton: the weakest part); moments are optional destinations.
-- **The core daily loop is topic talk:** a topic ("coffee"), a minute of talking, a rating, beat yourself tomorrow, watch your articulation improve over weeks. One Minute is the front door, not a tester-mode extra.
-- **Two doors, one app:** the home is a map with two train lines from one station. **Clear English** (ESL speakers: be understood, everyday fluency, "say this, not that") and **Sharp Talk** (precise words, no fillers, sounding sharp). Each stop is a lesson (topic talk, word pack, cold read, Glide rehearsal) and the Drop moves along the line. Pick a line once in onboarding; the other is one tap away. One listing, one subscription, one engine.
+- **The centre of the product:** someone's second attempt is meaningfully better than their first. Every exercise runs attempt → one finding → a specific adjustment → retry → revisit later. Topic talk stays the free daily habit, but talking for a minute and getting numbers is not a complete loop.
+- **Two doors, one app:** **Articulation** and **English Speaking**, each with its own home, activities and progression, and consistent controls. First launch shows both; the app then remembers the last door, with the switch on Home. Vocabulary serves both. One listing, one subscription, one engine. The code still has `line`, `sharp` and `clear` identifiers; never show those names to users.
 - **Who it's for:** fluent and ESL speakers alike, through their own door. Never remedial or condescending. UI copy stays plain English (no idioms).
-- **The feel:** sunny and alive, a slight Duolingo vibe: characters and motion on onboarding, the home map, results and empty states. The reading passage stays calm (principle 6). Alive is not vibe-coded: the Taste rule in `.claude/agents/04-design-ux.md` still bans glows, gradients, confetti and AI-looking art.
-- **Honest scorecard:** fillers, repeated words, vocabulary variety, Flow, time to first word, pace, steadiness. Grammar and creativity are practised, not measured. Pronunciation is never graded (principle 1).
-- **How we build:** one approved step at a time, in the brief's build order; stop for Quinton's approval between steps. Real bugs and trust breaks are fixed at once. Native-only work (Rive, haptics, speech) is unverified until a phone build exists, so it always has a fallback.
+- **The feel:** feature depth before visual redesign. Restrained character motion and clear hierarchy on homes, results and empty states. The reading passage stays calm (principle 6). The Taste rule in `.claude/agents/04-design-ux.md` still bans glows, gradients, confetti and AI-looking art.
+- **Honest scorecard:** fillers, repeated words, vocabulary variety, Flow, time to first word, pace, steadiness. Argument quality, relevance, grammar, confidence and creativity are practised and self-checked, never scored automatically. Pronunciation is never graded (principle 1). Say which results are measured and which are self-checked.
+- **How we build:** follow `docs/ROADMAP.md` and its definition of done; stop for Quinton on anything marked DECIDE. Real bugs and trust breaks are fixed at once. Native-only work (Rive, haptics, speech) is unverified until a phone build exists, so it always has a fallback.
+- **Money:** Pro sells the whole practice and the full paywall follows the first then-against-now comparison (DECISIONS 2026-11-07). Until that is built, the current free and Pro rules stay.
 - **Name:** SaidClearly. "Mouthful" survives only in code identifiers (bundle id, storage keys `mouthful.*`, product ids `mouthful_pro_*`, repo); never in anything a user sees.
 
 **Which file wins when they disagree** (newest dated decision first):
@@ -61,10 +62,10 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
 - `src/speech/gate.ts` — when speech counts as on-device (Android only from API 33) and whether a variety is supported
 - `src/speech/useListener.ts` — recogniser wrapper: on-device/consent, restarts, voice level, optional recording, `reset()` for retries
 - `src/store/recordings.ts` — the recordings folder; delete-all sweeps strays from older builds too
-- `src/content/lines.ts` — the two lines as 14 ordered stops each (ids `sharp-01`… and `clear-01`…, never rename), one stop a day, each an optional lesson then a topic talk; pure helpers for current stop, done today, start route
+- `src/content/lines.ts` — legacy from the train map (results still read it; removal is ROADMAP A3): the two lines as 14 ordered stops each (ids `sharp-01`… and `clear-01`…, never rename), one stop a day, each an optional lesson then a topic talk; pure helpers for current stop, done today, start route
 - `src/content/` — passages, Word Packs (7, including the free Make your point pack with self-guided speaking prompts), moments (interview, presentation, raise, meeting), scripts
-- `src/app/` — Expo Router screens: `(tabs)/` Home (the two-line train map), Library, Progress, You; `session/[id]`, `tape`, `fixit`, `talk`, `moment`, `pack/[id]`, `words`, `scripts/*`, `onboarding/*`, `paywall`, `review` (tester mode only)
-- `src/components/` — `HomeMap` (the line, stops, the Drop hopping) and `Drop` (the one flat mascot: breathing, blink, happy/up/down poses, nod; static under Reduce Motion), `InkCursor` and `VoiceRibbon` (Reanimated), `GlideWord`, `PlanCard`, `MicGate`, `Replay` (expo-audio), `Charts`
+- `src/app/` — Expo Router screens: `(tabs)/` Home (the two practice homes), Library, Progress, You; `session/[id]`, `tape`, `fixit`, `talk`, `moment`, `pack/[id]`, `words`, `scripts/*`, `onboarding/*`, `paywall`, `review` (tester mode only)
+- `src/components/` — `HomeMap` (legacy, ROADMAP A3) and `Drop` (the one flat mascot: breathing, blink, happy/up/down poses, nod; static under Reduce Motion), `InkCursor` and `VoiceRibbon` (Reanimated), `GlideWord`, `PlanCard`, `MicGate`, `Replay` (expo-audio), `Charts`
 - `src/purchases.native.ts` — RevenueCat (phones). `src/purchases.ts` — web/test stub.
 - `src/analytics.ts` — PostHog batch client. Event names, numbers and allowlisted short codes only; free text is dropped before sending.
 
@@ -92,7 +93,7 @@ Hidden: tap the version line on the You tab 7 times, or build with `EXPO_PUBLIC_
 
 ## Moments (optional destinations since the remodel; not the main flow)
 
-Home shows an active moment only as a compact `PlanCard` row under the map ("Got something coming up? Plan for it" otherwise). The plan's steps: learn the words → say them in context → add your real words → rehearse it (first run free, then Pro) → final run-through (cold read). Steps are marked done via `markStep` when the screen they launch finishes (`step` route param).
+Home shows an active moment only as a compact `PlanCard` row ("Got something coming up? Plan for it" otherwise). The plan's steps: learn the words → say them in context → add your real words → rehearse it (first run free, then Pro) → final run-through (cold read). Steps are marked done via `markStep` when the screen they launch finishes (`step` route param).
 
 ## Commands
 
@@ -104,7 +105,7 @@ npx expo start            # dev server (needs the development build, not Expo Go
 npx eas-cli@latest build --profile development --platform ios
 ```
 
-## Not built yet (in priority order)
+## Not built yet (older list; `docs/ROADMAP.md` sets the order)
 
 1. Controlled phone beta: your own iPhone first, then 10 readers, at least half with accents (see TESTING.md). Fix what the review data shows before adding features.
 2. Trademark check for "Mouthful" (CIPO and USPTO) before spending on branding. "Mouthful: Voice to To-Do List" exists on iOS in a different category.

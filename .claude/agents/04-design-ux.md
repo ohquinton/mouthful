@@ -8,8 +8,8 @@ color: pink
 
 > **Source of truth.** Before anything else, read `CLAUDE.md` → "Current direction" and "Which file wins",
 > then `DECISIONS.md` (newest first). They override this brief. SaidClearly is an articulation app (pitch:
-> sound sharp, be articulate), built around daily topic talk, with two doors (Clear English, Sharp Talk) on a
-> two-line train map. Sunny and alive around the practice, calm over the reading text, never vibe-coded, and
+> sound sharp, be articulate), built around daily topic talk, with two doors (Articulation, English Speaking) and complete practice loops.
+> Sunny and alive around the practice, calm over the reading text, never vibe-coded, and
 > never led by presentation practice. The remodel: `docs/briefs/remodel-2026-11.md`. If anything here
 > contradicts them, follow them and quote the stale line in your handoff.
 
@@ -94,12 +94,12 @@ Elsewhere:
 ## Taste: alive, never vibe-coded (Quinton, 2026-10-30; updated for the remodel 2026-11-01)
 
 **The app should feel sunny and alive, with a slight Duolingo vibe** (DECISIONS 2026-11-01): a character
-with personality (the Drop), a home that's a two-line train map, results that move, warmth on every
+with personality (the Drop), two distinct practice homes, results that move, warmth on every
 screen around the practice. Quinton was disappointed by a flat, presentation-tool look. But alive is
 crafted, not generic: think Duolingo's polish and Headspace's warmth, while the reading screen stays as
 calm as iA Writer (principle 6). Not a template with effects bolted on.
 
-**Where life goes:** onboarding, the home map, results, empty states, streaks, the coach in the practice
+**Where life goes:** onboarding, the homes, results, empty states, streaks, the coach in the practice
 footer. **Where it never goes:** over the reading passage.
 
 **Never:**
@@ -107,8 +107,8 @@ footer. **Where it never goes:** over the reading passage.
 - gradients on buttons, text or backgrounds (one flat colour per surface)
 - confetti, fireworks, sparkles, bouncing badges, emoji as decoration
 - more than one accent colour on a screen; cobalt is the accent, amber only means "watch out". The one
-  exception: on the home map each train line has its own colour (Clear English, Sharp Talk), proposed in
-  the remodel mockups and added to `theme.ts` in light and dark
+  exception: each door has its own colour (Articulation berry, English Speaking teal; `theme.ts` tokens
+  `sharp` and `clear`, in light and dark)
 - stock illustration packs, 3D blobs, AI-looking art, drop shadows on everything
 - animation for its own sake: every motion must explain or reward something (a word inking in, a timer
   counting, the Drop listening, a score counting up, a stop on the line being reached)
@@ -158,13 +158,13 @@ from the sideline or a teacher marking homework.
 | Screen | Its one job | Primary action |
 |---|---|---|
 | Onboarding hook | Make them feel "this is for me" in 5 seconds | Get started |
-| Which train? | Pick Sharp Talk or Clear English in 5 seconds; changeable later | Get on Sharp Talk |
+| The doors | Pick Articulation or English Speaking in 5 seconds; switch from Home | Enter the door |
 | First topic talk | Get permission without fear; recording stays opt-in (switch **off** by default) | Start talking |
 | Glide session | Read, with nothing else competing | (none: reading *is* the action; Finish is quiet) |
 | Too-short card | Get them back in without shame | Try again |
-| Results (Tape) | The rating, the one most useful finding, the line moving | Back to the map |
+| Results (Tape) | The rating, the one most useful finding, what to do next | The next exercise, or Done |
 | Fix-it | Say the hard words alone, then in a sentence | (automatic flow) |
-| Home (the map) | Today's stop on your line, the Drop, the streak | Start today's stop |
+| Home | Today's practice in this door, the Drop | Start practising |
 | Progress | Am I getting better *at the same kind of speaking*? | (read-only; re-test when due) |
 | You | Control: reminders, privacy, recordings, restore, reset | (settings) |
 | Paywall | Clear price, clear trial, easy exit | Start free trial |

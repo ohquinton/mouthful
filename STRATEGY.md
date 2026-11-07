@@ -1,35 +1,23 @@
 # Strategy (cofounder review, 2026-10-27)
 
-## Current focus · 2026-11-01: the remodel
+## Current focus · 2026-11-07: complete practice loops
 
-Quinton saw the app in the browser and was disappointed: the layout leads with presentations, interview
-plans and an ESL feel. The direction is now the remodel (DECISIONS 2026-11-01, `docs/briefs/remodel-2026-11.md`):
-an identity-first articulation app; topic talk as the daily loop; two doors (Clear English, Sharp Talk) on a
-two-line train map; sunny and alive outside the reading text; an honest scorecard with repeated words and
-vocabulary variety. Build order and approval gates are in the brief.
+Build order and gates: `docs/ROADMAP.md`. Two experiences, Articulation and English Speaking (DECISIONS 2026-11-02);
+the train map is gone. The aim is a second attempt meaningfully better than the first. Pro and paywall direction:
+DECISIONS 2026-11-07.
 
-Still true: no Apple account yet, so native verification (speech, haptics, Rive) stays outstanding; everything
-native needs a fallback. Money is tight: no paid services without asking.
+Still true: no phone has run the current build, so native verification stays outstanding and everything native needs a
+fallback. Money is tight: no paid services without asking.
 
-Everything below this section, down to "Next up", is the 2026-10-27 review: history and evidence, not orders.
+Everything below this section is the 2026-10-27 review: history and evidence, not orders.
 
-## Next up · 2026-11-01
+## Next up · 2026-11-07
 
-1. **Remodel step 2: results animations** (`docs/design/RESULTS-ANIMATIONS.md`), no new package. Awaiting go.
-2. **Remodel step 3: engine,** repeated words and vocabulary variety for One Minute, with tests.
-3. **Remodel step 4: brief + mockups** (product-lead, design-ux): "which train?" onboarding, the two-line home
-   map, One Minute out of tester mode, Progress as articulation skills. Quinton approves before rebuilding.
-3b. **Before any screen shows repeated words or variety** (qa-critic on `wording.ts`, 2026-11-01; speech-engine fixing):
-   prompt word families flagged (lucky for Luck, buses for The bus); kinda/sorta double counted; variety noisy at one
-   minute and ~9 points lower for realistic ESL speech; doubled phrases at restart seams; names and number words;
-   news→new; a privacy test on `minuteCompleteProps`. Wiring: pass `prompt` in `talk.tsx` and save the fields in `minuteRecord`.
-4. Carried over (still open): wire the first-word trend on the Tape (`tape.tsx:36-39`, pass `firstWordSeconds`);
-   `/fixit?words=` deep links ungated; target-length rework (DILEMMAS #16); Glide still line in
-   `session/[id].tsx`; `moment.tsx` date maths (use days.ts); "Read it again" keeps an extra baseline;
-   syllable format in packs (respellings vs split spelling, every pack mixes both); "think on your feet" idiom in
-   brand.ts; Today's 🔥 emoji vs the Taste rule; 2×2 tiles at the largest Dynamic Type on an SE.
-5. Done 2026-10-31: Fix-it gate on Your words; One Minute single score, Carry on clock, plain copy, "You started
-   after N seconds"; Your words from readings can become comfortable; resync fuzz pinned to 4200; `day1Line` removed.
+See `docs/ROADMAP.md`. Older items still open, to fold into it: the first-word trend on the Tape (`tape.tsx`);
+`/fixit?words=` deep links ungated; target-length rework (DILEMMAS #16); Glide still line in `session/[id].tsx`;
+`moment.tsx` date maths (use days.ts); "Read it again" keeps an extra baseline; syllable format in packs;
+"think on your feet" idiom in brand.ts; Today's fire emoji against the Taste rule; 2x2 tiles at the largest Dynamic
+Type on an SE.
 
 ## What Mouthful is for
 

@@ -33,9 +33,8 @@ CLAUDE.md gives, then flag the stale line (quote it and its file) in your handof
 think on your feet, say what you mean clearly. **The daily loop is topic talk** (One Minute): a topic, a
 minute of talking, a rating, beat yourself tomorrow, watch your articulation improve over weeks. Around it:
 **vocabulary packs** that lead into using each word in your own sentence, **cold reads**, and **Glide**
-(rehearse your own words; they ink in as you say them). The home is a **map with two train lines** from one
-station: **Clear English** (ESL speakers) and **Sharp Talk** (articulate). Full direction:
-`docs/briefs/remodel-2026-11.md` (DECISIONS 2026-11-01).
+(rehearse your own words; they ink in as you say them). There are two doors, each with its own home:
+**Articulation** and **English Speaking**. Build order: `docs/ROADMAP.md` (DECISIONS 2026-11-02 and 2026-11-07).
 
 **Presentation and interview practice never lead** (Quinton: the weakest part). Moments stay as optional
 destinations, reached from either line.
@@ -61,7 +60,7 @@ varied and precise words, starting faster, steadier pace), and a habit that feel
 
 **Market reality** (docs/COMPETITORS.md): follow-the-voice and on-device recognition are not moats (Perora,
 Sayglide). What can win:
-1. A daily loop people want to come back to: topic talk, an honest rating, a line on the map that moves.
+1. A daily loop people want to come back to: topic talk, an honest rating, and a retry that gets better.
 2. Trust: Glide that keeps up and rarely marks a said word red; no fake grades; the reader overrules the app.
 3. Honest progress people can see: time to first word, finishing on target, steadiness, words they now use.
 
