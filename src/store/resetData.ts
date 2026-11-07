@@ -1,4 +1,5 @@
 import { pauseWordWrites } from './words';
+import { pauseSituationWrites } from './situations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadSessions, recordingUris } from './sessions';
 import { deleteAllRecordings } from './recordings';
@@ -25,6 +26,7 @@ export function keptAfterReset(p: { analyticsOptOut?: boolean }): { analyticsOpt
  */
 export async function wipeAllData(profileKey: string, keptProfile: object | null): Promise<void> {
   const resumeWords = await pauseWordWrites();
+  const resumeSituations = await pauseSituationWrites();
   try {
     // Audio files first: once the database is cleared we'd no longer know where they are.
     try {
@@ -39,5 +41,5 @@ export async function wipeAllData(profileKey: string, keptProfile: object | null
       } catch {}
     }
     await resetAnalytics();
-  } finally { resumeWords(); }
+  } finally { resumeWords(); resumeSituations(); }
 }
