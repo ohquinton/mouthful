@@ -34,6 +34,12 @@ describe('wipeAllData', () => {
     expect(await AsyncStorage.getItem('mouthful.analyticsId')).toBeNull();
   });
 
+  it('clears Make your point history', async () => {
+    await AsyncStorage.setItem('mouthful.practice.point.v1', '[{"id":"1"}]');
+    await wipeAllData(PROFILE_KEY, null);
+    expect(await AsyncStorage.getItem('mouthful.practice.point.v1')).toBeNull();
+  });
+
   it('leaves no profile at all when nothing is kept, like a fresh install', async () => {
     await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify({ onboarded: true, pro: false, paywallSeen: true }));
     await wipeAllData(PROFILE_KEY, null);

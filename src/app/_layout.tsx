@@ -42,6 +42,7 @@ function RootLayout() {
         <Stack.Screen name="onboarding/day1" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="session/[id]" options={{ gestureEnabled: false, animation: 'fade' }} />
         <Stack.Screen name="talk" options={{ gestureEnabled: false, animation: 'fade' }} />
+        <Stack.Screen name="point" options={{ gestureEnabled: false, animation: 'fade' }} />
         <Stack.Screen name="tape" options={{ animation: 'fade' }} />
         <Stack.Screen name="fixit" options={{ presentation: 'modal' }} />
         <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />

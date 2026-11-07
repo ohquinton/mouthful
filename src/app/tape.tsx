@@ -144,7 +144,7 @@ export default function Tape() {
         style={{ backgroundColor: colors.bg }}
         contentContainerStyle={[styles.wrap, { paddingTop: insets.top + space(2), paddingBottom: insets.bottom + space(3) }]}
       >
-        <MinuteResult s={s} all={all} chosenLine={lineOf(profile.line)} onMeant={meant} onBack={done} onAgain={again} colors={colors} />
+        <MinuteResult s={s} all={all} chosenLine={lineOf(profile.line)} onMeant={meant} onBack={done} onAgain={again} onPoint={() => router.replace(takeAha() ?? '/point')} colors={colors} />
       </ScrollView>
     );
   }

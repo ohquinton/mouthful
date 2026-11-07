@@ -126,9 +126,10 @@ export default function Home() {
         ) : (
           <>
             <View style={[styles.activities, stacked && styles.activityStack]}>
-              <ActivityCard icon="chatbubbles-outline" title="Think on your feet" detail="Explain an idea. Tell a story. Make your case." label="Explore topics" accent={accent} soft={soft} stacked={stacked} onPress={() => router.push('/library')} />
+              <ActivityCard icon="chatbubbles-outline" title="Make your point" detail="A point, a reason, an example. Then say it again without help." label="Two tries" accent={accent} soft={soft} stacked={stacked} onPress={() => router.push('/point')} />
               <ActivityCard icon="book-outline" title="Find the word" detail="Learn a precise word, then make it your own." label="Free word pack" accent={accent} soft={soft} stacked={stacked} onPress={() => router.push({ pathname: '/pack/[id]', params: { id: 'precision' } })} />
             </View>
+            <ShelfRow icon="chatbubbles-outline" title="More topics" meta="Explain an idea. Tell a story. Make your case." onPress={() => router.push('/library')} />
             <ShelfRow icon="document-text-outline" title="Rehearse your real words" meta="Practise a script and review your pace and delivery. Your first script is free." onPress={() => router.push('/scripts')} />
           </>
         )}

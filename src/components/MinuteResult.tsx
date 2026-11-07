@@ -22,6 +22,7 @@ import {
   firstWordSeconds,
   isShortTalk,
   mainFinding,
+  nextAfterTalk,
   stoppedEarly,
   stripIsFresh,
   stripText,
@@ -95,7 +96,7 @@ function useCountUp(from: number, to: number, still: boolean): number {
 /**
  * The results for a topic talk (remodel-screens §4, simplified as approved 2026-11-01): the Flow
  * count with the change on your usual, the fine print, the one most useful finding with the Drop,
- * the line moving on, Back to the map, then "The details" (fillers, repeated words, kept going, first
+ * the line moving on, the next action and Done, then "The details" (fillers, repeated words, kept going, first
  * word, pace, and the week's vocabulary variety once there's enough to pool). Everything comes from
  * the saved numbers; the transcript is never stored. Never looks like a failure: a talk that stopped
  * early gets the encouraging line, no arrow, and its stop still counts.
@@ -107,6 +108,7 @@ export function MinuteResult({
   onMeant,
   onBack,
   onAgain,
+  onPoint,
   colors,
 }: {
   s: SavedSession;
@@ -122,6 +124,8 @@ export function MinuteResult({
   onMeant: (index: number, word: HabitWord) => void;
   onBack: () => void;
   onAgain: () => void;
+  /** Open Make your point. */
+  onPoint: () => void;
   colors: Colors;
 }) {
   const still = useReducedMotion();
@@ -130,6 +134,7 @@ export function MinuteResult({
   const short = isShortTalk(s);
   const flow = s.flow ?? 0;
   const early = stoppedEarly(s);
+  const next = nextAfterTalk(s);
   const usual = usualFor(s, all);
   // Null for a 30-second talk: it never gets a usual, so no countdown to one.
   const under = usualText(usual, early, short);
@@ -243,14 +248,14 @@ export function MinuteResult({
         still={still || !fresh}
       />
 
-      <PressScale onPress={onBack} label="Back to the map" style={[styles.primary, { backgroundColor: colors.button }]}>
-        <Text style={styles.primaryText}>Back to the map</Text>
+      {/* What to do next, right now: one action tied to this talk. */}
+      <PressScale onPress={next.action === 'point' ? onPoint : onAgain} label={`${next.label}. ${next.detail}`} style={[styles.primary, { backgroundColor: colors.button }]}>
+        <Text style={styles.primaryText}>{next.label}</Text>
       </PressScale>
-      {early && (
-        <PressScale onPress={onAgain} label="Talk about it again" style={styles.again}>
-          <Text style={[styles.againText, { color: colors.muted }]}>Talk about it again</Text>
-        </PressScale>
-      )}
+      <Text style={[styles.nextDetail, { color: colors.muted }]}>{next.detail}</Text>
+      <PressScale onPress={onBack} label="Done" style={styles.again}>
+        <Text style={[styles.againText, { color: colors.muted }]}>Done</Text>
+      </PressScale>
 
       {/* The details: calm, below the fold, folds away. */}
       <Pressable
@@ -443,6 +448,7 @@ const styles = StyleSheet.create({
   stripNext: { fontSize: 15, fontWeight: '500' },
   primary: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   primaryText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  nextDetail: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
   again: { alignItems: 'center', padding: space(1) },
   againText: { fontSize: 16, fontWeight: '600' },
   detailsHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, paddingTop: space(2), marginTop: space(1), minHeight: 44 },

@@ -268,6 +268,20 @@ export function mainFinding(s: SavedSession, slots: FlowSlots = FLOW_SLOTS): str
   return line;
 }
 
+/**
+ * The one thing to do straight after a talk's results. A talk with a problem you can act on now goes
+ * again on the same topic; one that went smoothly moves on to practising structure, because Flow says
+ * nothing about whether the point was clear.
+ */
+export function nextAfterTalk(s: Pick<SavedSession, 'minute'>): { action: 'again' | 'point'; label: string; detail: string } {
+  const m = s.minute as MinuteRecord | undefined;
+  if (m && stoppedEarly(s)) return { action: 'again', label: 'Try this topic again', detail: 'Keep talking a little longer this time.' };
+  if (m && m.longPauses >= 3) return { action: 'again', label: 'Try this topic again', detail: 'You know the topic now, so the words may come more easily.' };
+  const top = topRepeated(s);
+  if (top && top.count >= REPEATED_FINDING_AT) return { action: 'again', label: 'Try this topic again', detail: `Try using “${top.word}” less.` };
+  return { action: 'point', label: 'Now make a point', detail: 'Practise a point, a reason and an example.' };
+}
+
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
