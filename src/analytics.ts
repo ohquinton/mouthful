@@ -36,6 +36,9 @@ export type EventName =
   | 'recordings_deleted'
   | 'session_retry'
   | 'session_resume' // Carry on after the recogniser stopped; `error` is the listener's code
+  | 'situation_start' // `which`: the situation id, never its text
+  | 'situation_complete' // ids and numbers only: situationCompleteProps in content/situationFlow.ts
+  | 'situation_retry'
   | 'rating_prompt'; // the App Store rating prompt was shown; `reason`: second_run | after_moment
 
 type Props = Record<string, string | number | boolean | null | undefined>;

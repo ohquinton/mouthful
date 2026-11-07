@@ -9,6 +9,8 @@ import { EXPERIENCES, experienceTopic } from '../../content/experiences';
 import { loadBook } from '../../store/words';
 import { loadSessions, type SavedSession } from '../../store/sessions';
 import { summarise, type WordBook } from '../../engine/vocab';
+import { nextSituation } from '../../content/situationFlow';
+import { loadSituationRecords } from '../../store/situations';
 import { ahaPaywallRoute, ahaPending, claimAhaPaywall } from '../../pro';
 import { ShelfRow } from '../../components/library/ShelfRow';
 import { Drop } from '../../components/Drop';
@@ -27,6 +29,7 @@ export default function Home() {
   const [now, setNow] = useState(() => new Date());
   const [focused, setFocused] = useState(false);
   const [active, setActive] = useState(AppState.currentState === 'active');
+  const [situation, setSituation] = useState(() => nextSituation([]));
   const { width, fontScale } = useWindowDimensions();
   const stacked = width < 360 || fontScale > 1.25;
 
@@ -49,6 +52,12 @@ export default function Home() {
       setNow(new Date());
       setLoaded(true);
     });
+    return () => { live = false; };
+  }, []));
+
+  useFocusEffect(useCallback(() => {
+    let live = true;
+    loadSituationRecords().then((records) => { if (live) setSituation(nextSituation(records)); });
     return () => { live = false; };
   }, []));
 
@@ -75,7 +84,7 @@ export default function Home() {
   const { learning, comfortable } = summarise(book);
   const wordCount = learning.length + comfortable.length;
   const startTalk = () => router.push({ pathname: '/talk', params: { prompt: topic.id, seconds: '60', from: 'home' } });
-  const openReading = () => router.push({ pathname: '/session/[id]', params: { id: 'w.meetings.0' } });
+  const openSituation = () => router.push({ pathname: '/situation', params: { id: situation.id } });
 
   return (
     <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={[styles.wrap, { paddingTop: insets.top + space(2), paddingBottom: space(4) }]}>
@@ -95,21 +104,21 @@ export default function Home() {
       </View>
       <View style={[styles.hero, { backgroundColor: soft }]}>
         <View style={styles.heroTop}>
-          <Text style={[styles.eyebrow, { color: colors.ink }]}>{english ? 'READ IT. SAY IT.' : 'YOUR DAILY TOPIC'}</Text>
+          <Text style={[styles.eyebrow, { color: colors.ink }]}>{english ? 'EVERYDAY SITUATION' : 'YOUR DAILY TOPIC'}</Text>
           <View style={[styles.badge, { backgroundColor: colors.surface }]}><Text style={[styles.badgeText, { color: accent }]}>FREE</Text></View>
         </View>
         <View style={[styles.heroBody, stacked && styles.heroStacked]}>
           <View style={[styles.heroCopy, stacked && styles.heroCopyStacked]}>
-            <Text accessibilityRole="header" style={[styles.heroTitle, { color: colors.ink }]}>{english ? 'Opening a meeting' : topic.text}</Text>
-            <Text style={[styles.heroMeta, { color: colors.ink }]}>{english ? 'Guided reading · useful phrases' : '1 minute · speak in your own words'}</Text>
+            <Text accessibilityRole="header" style={[styles.heroTitle, { color: colors.ink }]}>{english ? situation.title : topic.text}</Text>
+            <Text style={[styles.heroMeta, { color: colors.ink }]}>{english ? 'See examples · answer in your own words' : '1 minute · speak in your own words'}</Text>
           </View>
           <View style={styles.coach}>
             <Drop height={stacked ? 76 : 104} pose="up" tilt={english ? 5 : -5} alive={focused && active} />
           </View>
         </View>
-        <Text style={[styles.heroDescription, { color: colors.ink }]}>{english ? 'Follow the words as you read aloud. Try a tricky word again, then put it in a sentence.' : 'One idea is enough to begin. Afterwards, explore your pace, repeated words and fillers the phone heard.'}</Text>
-        <Pressable accessibilityRole="button" onPress={english ? openReading : startTalk} style={({ pressed }) => [styles.start, { backgroundColor: accent, opacity: pressed ? 0.8 : 1 }]}>
-          <Text style={[styles.startText, { color: colors.onLine }]}>{english ? 'Let’s read aloud' : 'Let’s talk'}</Text>
+        <Text style={[styles.heroDescription, { color: colors.ink }]}>{english ? situation.task : 'One idea is enough to begin. Afterwards, explore your pace, repeated words and fillers the phone heard.'}</Text>
+        <Pressable accessibilityRole="button" onPress={english ? openSituation : startTalk} style={({ pressed }) => [styles.start, { backgroundColor: accent, opacity: pressed ? 0.8 : 1 }]}>
+          <Text style={[styles.startText, { color: colors.onLine }]}>{english ? 'Let’s practise' : 'Let’s talk'}</Text>
           <Ionicons name="arrow-forward" size={21} color={colors.onLine} />
         </Pressable>
       </View>
@@ -119,7 +128,7 @@ export default function Home() {
           <>
             <View style={[styles.activities, stacked && styles.activityStack]}>
               <ActivityCard icon="chatbubble-ellipses-outline" title="Everyday talk" detail={`Talk about ${topic.text.charAt(0).toLowerCase() + topic.text.slice(1)}. Starter ideas are there if you need them.`} label="1-minute talk" accent={accent} soft={soft} stacked={stacked} onPress={startTalk} />
-              <ActivityCard icon="book-outline" title="Useful words" detail="Hear a word. Learn its meaning. Say it in context." label="Free word pack" accent={accent} soft={soft} stacked={stacked} onPress={() => router.push({ pathname: '/pack/[id]', params: { id: 'meetings' } })} />
+              <ActivityCard icon="book-outline" title="Useful words" detail="Hear a word. Learn its meaning. Say it in context." label="Free word pack" accent={accent} soft={soft} stacked={stacked} onPress={() => router.push({ pathname: '/pack/[id]', params: { id: 'precision' } })} />
             </View>
             <ShelfRow icon="library-outline" title="English practice library" meta="Everyday topics, guided passages and word packs." onPress={() => router.push('/library')} />
           </>
