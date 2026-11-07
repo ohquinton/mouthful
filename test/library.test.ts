@@ -113,7 +113,7 @@ describe('best Flow per topic', () => {
 
 describe('word packs', () => {
   it('tints a pack with the line that uses it, your own line first', () => {
-    // Make your point is a lesson on both lines.
+    // The right word is a lesson on both lines.
     expect(packLine('precision', 'sharp')).toBe('sharp');
     expect(packLine('precision', 'clear')).toBe('clear');
     // Run the Meeting is only on Clear English (drill and Glide passages).

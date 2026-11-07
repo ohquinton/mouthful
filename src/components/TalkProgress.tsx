@@ -49,7 +49,7 @@ export function TalkProgress({ sessions, limit }: { sessions: SavedSession[]; li
           ))}
         </View>
       )}
-      <PrimaryButton label="Go to today’s stop" onPress={() => router.navigate('/')} />
+      <PrimaryButton label="Choose a practice" onPress={() => router.navigate('/')} />
     </View>
   );
 }

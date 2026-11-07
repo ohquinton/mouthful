@@ -34,7 +34,7 @@ const cold = (passageId: string): Lesson => ({ kind: 'cold', passageId });
 const glide = (passageId: string): Lesson => ({ kind: 'glide', passageId });
 
 /**
- * Sharp Talk: precise words (Make your point is free), cold reads, ideas and topics (level 2–3).
+ * Sharp Talk: precise words (The right word is free), cold reads, ideas and topics (level 2–3).
  * Clear English: everyday things (level 1), the free packs, short steady Glide passages.
  * Stop 1 on both lines is the first talk from onboarding (Coffee).
  */
@@ -271,11 +271,11 @@ export function startRoute(stop: Stop, opts: { pro: boolean; lessonDone: boolean
   return { pathname: '/talk', params: { prompt: stop.promptId, stop: stop.id, seconds: talkSeconds(), from: 'home' } };
 }
 
-/** The lesson's display name ("Make your point", "Signal and Noise"). */
+/** The lesson's display name ("The right word", "Signal and Noise"). */
 export function lessonTitle(lesson: Lesson): string {
   if (lesson.kind === 'pack') return getPack(lesson.packId)?.title ?? 'Word pack';
   const p = getPassage(lesson.passageId) ?? packPassage(lesson.passageId);
-  // Pack passages are titled "A useful disagreement · Make your point": the passage part is enough here.
+  // Pack passages are titled "A useful disagreement · The right word": the passage part is enough here.
   return p ? p.title.split(' · ')[0] : 'A short passage';
 }
 

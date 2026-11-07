@@ -152,7 +152,7 @@ describe('lessons', () => {
   });
 
   it('titles lessons by their pack or passage', () => {
-    expect(lessonTitle({ kind: 'pack', packId: 'precision' })).toBe('Make your point');
+    expect(lessonTitle({ kind: 'pack', packId: 'precision' })).toBe('The right word');
     expect(lessonTitle({ kind: 'cold', passageId: 'signal-noise' })).toBe('Signal and Noise');
     expect(lessonTitle({ kind: 'glide', passageId: 'w.precision.0' })).toBe('A useful disagreement');
   });
@@ -195,7 +195,7 @@ describe('starting a stop', () => {
   it('opens the lesson first, then the talk once the lesson is done today', () => {
     const r = startRoute(sharp(2), { pro: false, lessonDone: false });
     expect(r.pathname).toBe('/fixit');
-    expect(r.params).toMatchObject({ title: 'Make your point' });
+    expect(r.params).toMatchObject({ title: 'The right word' });
     expect(startRoute(sharp(2), { pro: false, lessonDone: true }).pathname).toBe('/talk');
   });
 
@@ -289,7 +289,7 @@ describe('done labels say what was done', () => {
   });
 
   it('a lesson done that day leads, with the talk under it', () => {
-    expect(doneLabel(LINES.sharp[1], { at: t, promptId: 'p13', flow: 71 }, true)).toEqual({ title: 'Word pack · Make your point', sub: 'Trust · Flow 71' });
+    expect(doneLabel(LINES.sharp[1], { at: t, promptId: 'p13', flow: 71 }, true)).toEqual({ title: 'Word pack · The right word', sub: 'Trust · Flow 71' });
   });
 
   it('"Your first talk" only for onboarding’s 30 seconds; a full-minute stop 1 is a topic talk', () => {

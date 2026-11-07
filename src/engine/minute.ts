@@ -229,10 +229,10 @@ export function minuteLine(s: MinuteLineStats, slots: FlowSlots = FLOW_SLOTS): s
   let lost: number; // Flow points the chosen issue cost
   if (secs < STOPPED_BEFORE_S) {
     // Plain English for ESL readers: no idioms ("run out", "lose the thread"). qa-critic, 2026-10-30.
-    line = `You stopped at ${secs} s. When you have nothing more to say, say what you would add with more time.`;
+    line = `You stopped at ${secs} s. Next time, add one more idea or example before you finish.`;
     lost = (kept * Math.max(0, MINUTE_SECONDS - talk)) / MINUTE_SECONDS;
   } else if (s.longPauses >= MANY_PAUSES) {
-    line = 'When you pause, say the word again and one thing it reminds you of.';
+    line = 'When you pause, add one example or one reason, then keep going.';
     lost = share(slots, 'pauses') * Math.min(100, PAUSE_COST * s.longPauses);
   } else if (s.wpm > TOO_FAST_WPM) {
     line = 'Breathe between ideas.';

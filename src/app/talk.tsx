@@ -309,7 +309,7 @@ export default function TopicTalk() {
             Talk about it for {length}. Take a moment to think: the first 8 seconds don’t count against you.
           </Text>
         )}
-        {running && <Text style={[styles.hint, { color: colors.muted }]}>Keep going. If you get stuck, say the word again.</Text>}
+        {running && <Text style={[styles.hint, { color: colors.muted }]}>Take your time. If you need help, try an idea below.</Text>}
         {prompt.ideas && prompt.ideas.length > 0 && !failed && !notice && (
           <View style={styles.ideas}>
             <Text style={[styles.ideasTitle, { color: colors.muted }]}>If you get stuck</Text>

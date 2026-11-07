@@ -63,7 +63,7 @@ Read AGENTS.md too: Expo SDK 58 has changed since most training data. Check the 
 - `src/speech/useListener.ts` — recogniser wrapper: on-device/consent, restarts, voice level, optional recording, `reset()` for retries
 - `src/store/recordings.ts` — the recordings folder; delete-all sweeps strays from older builds too
 - `src/content/lines.ts` — legacy from the train map (results still read it; removal is ROADMAP A3): the two lines as 14 ordered stops each (ids `sharp-01`… and `clear-01`…, never rename), one stop a day, each an optional lesson then a topic talk; pure helpers for current stop, done today, start route
-- `src/content/` — passages, Word Packs (7, including the free Make your point pack with self-guided speaking prompts), moments (interview, presentation, raise, meeting), scripts
+- `src/content/` — passages, Word Packs (7, including the free The right word pack with self-guided speaking prompts), moments (interview, presentation, raise, meeting), scripts
 - `src/app/` — Expo Router screens: `(tabs)/` Home (the two practice homes), Library, Progress, You; `session/[id]`, `tape`, `fixit`, `talk`, `moment`, `pack/[id]`, `words`, `scripts/*`, `onboarding/*`, `paywall`, `review` (tester mode only)
 - `src/components/` — `HomeMap` (legacy, ROADMAP A3) and `Drop` (the one flat mascot: breathing, blink, happy/up/down poses, nod; static under Reduce Motion), `InkCursor` and `VoiceRibbon` (Reanimated), `GlideWord`, `PlanCard`, `MicGate`, `Replay` (expo-audio), `Charts`
 - `src/purchases.native.ts` — RevenueCat (phones). `src/purchases.ts` — web/test stub.

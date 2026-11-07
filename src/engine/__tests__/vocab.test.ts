@@ -126,7 +126,7 @@ describe('word packs content', () => {
     expect(packPassage('w.finance.9')).toBeUndefined();
     expect(DICTIONARY.get('fiduciary')?.packId).toBe('finance');
     expect(DICTIONARY.size).toBe(56);
-    expect(packPassage('w.precision.0')?.title).toBe('A useful disagreement · Make your point');
+    expect(packPassage('w.precision.0')?.title).toBe('A useful disagreement · The right word');
     expect(DICTIONARY.get('premise')?.packId).toBe('precision');
   });
 });

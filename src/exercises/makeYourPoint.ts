@@ -88,7 +88,7 @@ export function changeBetween(first: PointAttempt, second: PointAttempt): string
   const a = partsSaid(first.check);
   const b = partsSaid(second.check);
   if (b > a) return `You included ${b} of the 3 parts this time, up from ${a}.`;
-  if (b === 3 && !second.hinted) return 'You said all three parts without the prompts.';
+  if (b === 3 && !second.hinted) return 'You checked all three parts without the prompts.';
   if (b < a) return `You included ${b} of the 3 parts this time, down from ${a}. Try once more with the missing part in mind.`;
   const sooner = Math.round(first.firstWordSeconds - second.firstWordSeconds);
   if (sooner >= 2) return `You started ${sooner} seconds sooner.`;

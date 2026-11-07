@@ -24,7 +24,7 @@ export type WordPack = {
 export const WORD_PACKS: WordPack[] = [
   {
     id: 'precision',
-    title: 'Make your point',
+    title: 'The right word',
     pitch: 'A sharper thought. The right word. Eight ways to say exactly what you mean.',
     free: true,
     words: [

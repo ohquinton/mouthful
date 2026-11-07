@@ -275,7 +275,7 @@ export function mainFinding(s: SavedSession, slots: FlowSlots = FLOW_SLOTS): str
  */
 export function nextAfterTalk(s: Pick<SavedSession, 'minute'>): { action: 'again' | 'point'; label: string; detail: string } {
   const m = s.minute as MinuteRecord | undefined;
-  if (m && stoppedEarly(s)) return { action: 'again', label: 'Try this topic again', detail: 'Keep talking a little longer this time.' };
+  if (m && stoppedEarly(s)) return { action: 'again', label: 'Try this topic again', detail: 'Add one more idea or example this time.' };
   if (m && m.longPauses >= 3) return { action: 'again', label: 'Try this topic again', detail: 'You know the topic now, so the words may come more easily.' };
   const top = topRepeated(s);
   if (top && top.count >= REPEATED_FINDING_AT) return { action: 'again', label: 'Try this topic again', detail: `Try using “${top.word}” less.` };

@@ -1,5 +1,6 @@
 import { Redirect, Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../store/profile';
 import { useColors } from '../../theme';
 import { useExperience } from '../../store/experience';
@@ -18,6 +19,7 @@ export default function TabsLayout() {
   const colors = useColors();
   const { profile, ready } = useProfile();
   const { mode } = useExperience();
+  const insets = useSafeAreaInsets();
 
   if (!ready) return null;
   if (!profile.onboarded) return <Redirect href="/onboarding" />;
@@ -28,7 +30,8 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: mode ? colors[EXPERIENCES[mode].line] : colors.ink,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line },
+        // Taller than the default so the labels aren't cut off on phones with no bottom inset.
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line, height: 58 + insets.bottom, paddingTop: 6, paddingBottom: insets.bottom + 6 },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         sceneStyle: { backgroundColor: colors.bg },
       }}

@@ -9,8 +9,6 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withDelay,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -24,7 +22,6 @@ import {
   mainFinding,
   nextAfterTalk,
   stoppedEarly,
-  stripIsFresh,
   stripText,
   topRepeated,
   usualFor,
@@ -35,7 +32,6 @@ import {
   type MinuteRecord,
 } from '../store/minute';
 import { promptById } from '../content/prompts';
-import { getStop, LINES, sessionForStop, stopNumber, withFirstTalk, type LineId } from '../content/lines';
 import { Drop } from './Drop';
 import { Colors, fonts, space } from '../theme';
 
@@ -46,7 +42,6 @@ export const FLOW_FINE_PRINT = 'Flow is whether you kept talking. It isn’t a g
 const COUNT_MS = 700;
 const TILE_STAGGER_MS = 100;
 const FINDING_AT_MS = COUNT_MS + 50;
-const STRIP_AT_MS = COUNT_MS + 150;
 const NOD_AT_MS = FINDING_AT_MS + 350;
 
 /**
@@ -96,7 +91,7 @@ function useCountUp(from: number, to: number, still: boolean): number {
 /**
  * The results for a topic talk (remodel-screens §4, simplified as approved 2026-11-01): the Flow
  * count with the change on your usual, the fine print, the one most useful finding with the Drop,
- * the line moving on, the next action and Done, then "The details" (fillers, repeated words, kept going, first
+ * what comes tomorrow, the next action and Done, then "The details" (fillers, repeated words, kept going, first
  * word, pace, and the week's vocabulary variety once there's enough to pool). Everything comes from
  * the saved numbers; the transcript is never stored. Never looks like a failure: a talk that stopped
  * early gets the encouraging line, no arrow, and its stop still counts.
@@ -104,7 +99,6 @@ function useCountUp(from: number, to: number, still: boolean): number {
 export function MinuteResult({
   s,
   all,
-  chosenLine,
   onMeant,
   onBack,
   onAgain,
@@ -114,12 +108,6 @@ export function MinuteResult({
   s: SavedSession;
   /** Every saved session, oldest first: for your usual and the week's variety. */
   all: SavedSession[];
-  /**
-   * The reader's chosen line (profile.line), read-only: only to find onboarding's first talk, which
-   * is saved without a stopId but is stop 1 of this line (content/lines.ts withFirstTalk). The strip's
-   * colour comes from the stop's own line.
-   */
-  chosenLine: LineId;
   /** "I meant that" on a likely filler chip: the earliest standing occurrence of that word. */
   onMeant: (index: number, word: HabitWord) => void;
   onBack: () => void;
@@ -145,16 +133,8 @@ export function MinuteResult({
   const [now] = useState(() => Date.now());
 
   const topic = promptById(s.promptId)?.text;
-  // The stop this talk completed, and its own line (not profile.line: it may be the other line).
-  const stopId = s.stopId ?? withFirstTalk(all, chosenLine).find((x) => x.id === s.id)?.stopId;
-  const stopInfo = getStop(stopId);
-  const stop = stopNumber(stopId);
-  const nextStop = stopInfo && stop !== undefined ? LINES[stopInfo.line][stop] : undefined;
-  const nextDone = !!nextStop && !!sessionForStop(nextStop.id, all);
-  const stripInput = { stopId, flow, early, short, at: s.at, now, nextDone };
-  const strip = stripText(stripInput);
-  // Reopened later: the strip says what happened then, drawn already, no hop onto tomorrow's stop.
-  const fresh = stripIsFresh(stripInput);
+  // Only what really happened: today's talk, and what tomorrow holds. Reopened later, the date.
+  const strip = stripText({ stopId: undefined, flow, early, short, at: s.at, now });
   // "34 s" never breaks across lines: a no-break space between the number and the s.
   const finding = mainFinding(s).replace(/(\d) s\b/g, '$1\u00a0s');
   const variety = weeklyVariety(all, s.at);
@@ -196,13 +176,6 @@ export function MinuteResult({
     },
   ];
 
-  // The strip in the colour of the stop's own line; a talk that wasn't a stop uses your line's.
-  const line = stopInfo?.line ?? chosenLine;
-  const lineColour = colors[line];
-  const lineSoft = line === 'sharp' ? colors.sharpSoft : colors.clearSoft;
-  // Checks drawn before the next stop: this one and up to two before it (fewer on stops 1 and 2).
-  const doneDots = Math.max(1, Math.min(3, stop ?? 3));
-
   return (
     <>
       <View style={styles.head}>
@@ -238,15 +211,10 @@ export function MinuteResult({
         </Text>
       </Animated.View>
 
-      <Strip
-        dots={doneDots}
-        text={strip}
-        colour={lineColour}
-        soft={lineSoft}
-        colors={colors}
-        happy={!early}
-        still={still || !fresh}
-      />
+      <View style={styles.strip} accessible accessibilityLabel={strip.next ? `${strip.done}. ${strip.next}.` : `${strip.done}.`}>
+        <Text style={[styles.stripDone, { color: colors.ink }]}>{strip.done}</Text>
+        {!!strip.next && <Text style={[styles.stripNext, { color: colors.muted }]}>{strip.next}</Text>}
+      </View>
 
       {/* What to do next, right now: one action tied to this talk. */}
       <PressScale onPress={next.action === 'point' ? onPoint : onAgain} label={`${next.label}. ${next.detail}`} style={[styles.primary, { backgroundColor: colors.button }]}>
@@ -355,72 +323,6 @@ export function MinuteResult({
  * Drop hopping onto it. The line's own colour (sharp or clear), the one place results use it.
  * Under Reduce Motion: drawn already, the Drop already there.
  */
-function Strip({
-  dots,
-  text,
-  colour,
-  soft,
-  colors,
-  happy,
-  still,
-}: {
-  dots: number;
-  text: { done: string; next: string };
-  colour: string;
-  soft: string;
-  colors: Colors;
-  happy: boolean;
-  still: boolean;
-}) {
-  const draw = useSharedValue(still ? 1 : 0);
-  const hop = useSharedValue(0);
-  useEffect(() => {
-    if (still) return;
-    draw.set(withDelay(STRIP_AT_MS, withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) })));
-    const up = { duration: 125, easing: Easing.out(Easing.quad) };
-    hop.set(withDelay(STRIP_AT_MS + 300, withSequence(withTiming(1, up), withTiming(0, { duration: 125, easing: Easing.in(Easing.quad) }))));
-  }, [still, draw, hop]);
-  const track = useAnimatedStyle(() => ({ width: `${draw.value * 100}%` }));
-  const drop = useAnimatedStyle(() => ({ opacity: 0.25 + 0.75 * draw.value, transform: [{ translateY: -6 * hop.value }] }));
-
-  return (
-    <View
-      style={[styles.strip, { backgroundColor: colors.surface, borderColor: colors.line }]}
-      accessible
-      accessibilityLabel={text.next ? `${text.done}. ${text.next}.` : `${text.done}.`}
-    >
-      <View style={styles.stripRow}>
-        {Array.from({ length: dots }, (_, k) => (
-          <View key={k} style={styles.stripCell}>
-            <View style={[styles.seg, { backgroundColor: colour }]} />
-            <View style={[styles.dot, { backgroundColor: colour, borderColor: colour }]}>
-              <Ionicons name="checkmark" size={16} color={colors.onLine} />
-            </View>
-          </View>
-        ))}
-        {/* The segment to the next stop draws in; the Drop waits on that stop. */}
-        <View style={styles.stripCell}>
-          <View style={[styles.seg, { backgroundColor: soft }]}>
-            <Animated.View style={[styles.segFill, { backgroundColor: colour }, track]} />
-          </View>
-          <View style={[styles.dot, styles.next, { backgroundColor: colors.surface, borderColor: colour }]} />
-          <Animated.View style={[styles.stripDrop, drop]}>
-            <Drop height={28} pose={happy ? 'happy' : 'rest'} />
-          </Animated.View>
-        </View>
-        <View style={[styles.stripCell, styles.ahead]}>
-          <View style={[styles.seg, { backgroundColor: soft }]} />
-          <View style={[styles.dot, styles.small, { backgroundColor: colors.surface, borderColor: soft }]} />
-        </View>
-      </View>
-      <View style={styles.stripText}>
-        <Text style={[styles.stripDone, { color: colors.ink }]}>{text.done}</Text>
-        {!!text.next && <Text style={[styles.stripNext, { color: colors.muted }]}>{text.next}</Text>}
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space(1) },
   eyebrow: { fontSize: 13, fontWeight: '800', letterSpacing: 1.2, flexShrink: 1 },
@@ -433,17 +335,7 @@ const styles = StyleSheet.create({
   fine: { fontSize: 14, lineHeight: 20 },
   finding: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), paddingVertical: space(0.5) },
   findingText: { flex: 1, fontSize: 19, lineHeight: 27, fontWeight: '500' },
-  strip: { borderWidth: 1, borderRadius: 18, paddingHorizontal: space(2), paddingTop: space(4), paddingBottom: space(1.75), gap: space(1.25) },
-  stripRow: { flexDirection: 'row', alignItems: 'center', height: 28 },
-  stripCell: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', height: 28 },
-  ahead: { flex: 0.6 },
-  seg: { position: 'absolute', left: 0, right: 14, height: 8, borderRadius: 4, overflow: 'hidden' },
-  segFill: { height: 8 },
-  dot: { width: 28, height: 28, borderRadius: 14, borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
-  next: { borderWidth: 4 },
-  small: { width: 20, height: 20, borderRadius: 10, borderWidth: 3 },
-  stripDrop: { position: 'absolute', right: 3, top: -28 },
-  stripText: { flexDirection: 'row', justifyContent: 'space-between', gap: space(1), flexWrap: 'wrap' },
+  strip: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: space(1), paddingVertical: space(0.5) },
   stripDone: { fontSize: 16, fontWeight: '800' },
   stripNext: { fontSize: 15, fontWeight: '500' },
   primary: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },

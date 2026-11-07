@@ -33,7 +33,7 @@ const CLEAN: FlowInput = { keptGoingSeconds: 60, longPauses: 0, wpm: 140, umPerM
 const BAD_WORDS = /pronounc|accent|correct/i;
 /** Plain English for ESL readers: no idioms or phrasal shortcuts in coaching (qa-critic, 2026-10-30). */
 const IDIOMS = /lose the thread|run out|get stuck|on track|keep it up|nail it|hang of|on the spot/i;
-const PAUSE_LINE = 'When you pause, say the word again and one thing it reminds you of.';
+const PAUSE_LINE = 'When you pause, add one example or one reason, then keep going.';
 
 describe('longPauses', () => {
   it('criterion 1: ignores the thinking time before the first word and counts two 3 s gaps', () => {
@@ -157,7 +157,7 @@ describe('minuteLine', () => {
   const ok = { talkSeconds: 60, longPauses: 0, wpm: 140, habitFillersPerMin: 0 };
 
   it('criterion 3: stopped at 30 s gets the stopped-early line with the seconds', () => {
-    expect(minuteLine({ ...ok, talkSeconds: 30 })).toBe('You stopped at 30 s. When you have nothing more to say, say what you would add with more time.');
+    expect(minuteLine({ ...ok, talkSeconds: 30 })).toBe('You stopped at 30 s. Next time, add one more idea or example before you finish.');
   });
 
   it('never shows a number that contradicts the line (44.9 s reads as 44 s, not 45)', () => {
